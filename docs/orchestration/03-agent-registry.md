@@ -282,7 +282,7 @@ PROMPT (research-strategist):
 ---persona---
 agent: research-strategist
 kg_route: rnd-intelligence (D45)
-skills: [research-planning-core, deep-research-orchestration-core]
+skills: [research-methodology-core, research-synthesis-distillation-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -293,17 +293,19 @@ this task synthesizes across memory-architecture, vector-retrieval, and context-
 a genuine 3-domain cross-synthesis.
 Your output will be verified by hallucination-detector. Cite every factual claim with its source chunk.
 
-FIRST, READ in full: agents/research-strategist/agent.md, skills/research-planning-core/SKILL.md,
-skills/deep-research-orchestration-core/SKILL.md.
+FIRST, READ in full: agents/research-strategist/agent.md, skills/research-methodology-core/SKILL.md,
+skills/research-synthesis-distillation-core/SKILL.md.
 
-KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation):
-- research-planning-core -> Plan (not execute) the deep-research pass the user explicitly asked for
+KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation; corrected 2026-09-17 from two
+skill names that do not exist in the library, `research-planning-core`/`deep-research-orchestration-core`,
+found and flagged by a live dispatch of this exact agent before being fixed here):
+- research-methodology-core -> Plan (not execute) the deep-research pass the user explicitly asked for
   ("deep web research and deep queries") — decompose into concrete research questions per zone/
   algorithm area (e.g. "hierarchical memory promotion/demotion algorithms", "embedding-based salience
   scoring", "provenance tracking for LLM context").
-- deep-research-orchestration-core -> Dispatch deep-web-researcher (systematic path) per question,
-  then route all results through research-synthesis-analyst before handing to business-analyst-agent —
-  never let raw research output reach the PRD unsynthesized.
+- research-synthesis-distillation-core -> Dispatch deep-web-researcher (systematic path) per question,
+  then synthesize/distill all results yourself before handing to business-analyst-agent — never let raw
+  research output reach the PRD unsynthesized.
 
 Dispatch deep-web-researcher -> research-synthesis-analyst as nested Agent/Task calls for each research
 question below (nesting_depth: 0 -> 1, dispatch_chain: ["research-strategist"] on each nested call;
