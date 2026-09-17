@@ -1,0 +1,458 @@
+{
+  "document_id": "AR0-ROUTING-INDEX-20260917-01",
+  "version": "1.0.0",
+  "author": "orchestrator-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.0 routing index)",
+  "date": "2026-09-17",
+  "correlation_id": "DASH-PH7-AR0-20260917",
+  "source_of_truth": {
+    "backlog": "docs/phase-6-sprint-planning/backlog_draft.json v1.0.0 (10 Sprint 1 stories, SPRINT READY)",
+    "hld": "docs/phase-1-architecture/HLD.md v1.0.0 (Sections 2, 3, 5, 6, 12F)",
+    "agent_registry": "claude-global-library/agents/ (529 entries enumerated by directory glob 2026-09-17)"
+  },
+  "agent_existence_verification": {
+    "method": "Directory glob of claude-global-library/agents/ followed by per-candidate read of agents/{name}/agent.md frontmatter (description, model, skills).",
+    "rule": "No agent name appears in this index unless its agents/{name}/agent.md was read in this session.",
+    "verified_candidates": [
+      "python-backend-engineer",
+      "database-engineer",
+      "database-storage-engineer",
+      "ai-engineer",
+      "ml-engineer",
+      "data-engineer",
+      "context-engineering-agent",
+      "algorithm-complexity-analyst",
+      "site-reliability-engineer",
+      "security-defense-architect",
+      "api-security-auditor",
+      "iam-security-engineer",
+      "cloud-security-architect",
+      "security-testing-engineer",
+      "loop-engineering-architect",
+      "feedback-control-loop-engineer",
+      "graph-orchestration-runtime-engineer",
+      "distributed-consensus-engineer",
+      "distributed-systems-mathematics-expert",
+      "infrastructure-as-code-engineer",
+      "mathematics-engineer"
+    ],
+    "rejected_by_name_check": [
+      {
+        "proposed_name": "storage-adapter-engineer",
+        "reason": "Does not exist in claude-global-library/agents/. Not used."
+      },
+      {
+        "proposed_name": "provenance-audit-engineer",
+        "reason": "Does not exist in claude-global-library/agents/. Not used."
+      }
+    ]
+  },
+  "scoring_model": {
+    "signals": [
+      {
+        "id": "domain_match",
+        "weight": 0.30,
+        "definition": "Overlap between the agent's declared domain/description keywords and the story's primary engineering domain."
+      },
+      {
+        "id": "skill_coverage",
+        "weight": 0.35,
+        "definition": "Fraction of the story's required capability set covered by the agent's frontmatter `skills:` list (mandatory skills only)."
+      },
+      {
+        "id": "hld_component_ownership",
+        "weight": 0.20,
+        "definition": "Agreement between the agent's role and the HLD's named owner/pattern/DSA for the component the story implements (HLD Sections 3, 5, 6)."
+      },
+      {
+        "id": "tech_stack_fit",
+        "weight": 0.15,
+        "definition": "Fit against the locked stack in HLD Section 2: Python 3.12, gRPC/FastAPI, PostgreSQL, Redis, Qdrant, OpenSearch, S3-compatible."
+      }
+    ],
+    "formula": "score = 0.30*domain_match + 0.35*skill_coverage + 0.20*hld_component_ownership + 0.15*tech_stack_fit",
+    "assignment_threshold": 0.75,
+    "threshold_source": "prompt-engineering-core distillation - a score below 0.75 is surfaced as a routing gap, never force-assigned.",
+    "range": "[0.0, 1.0] per signal and per composite score"
+  },
+  "stories": [
+    {
+      "story_id": "DASH-STORY-001",
+      "title": "Memory Orchestrator core facade and unified context-assembly API",
+      "hld_component": "HLD 3.1 Memory Orchestrator (application layer, co-located with dashanan-api per ADR-011)",
+      "hld_patterns": ["Facade (Section 6)", "Builder - ContextAssembly (Section 6)", "Result type - AssemblyResult (Section 6)"],
+      "hld_dsa": "Bounded max-heap of candidates + greedy 0/1-knapsack by value density, O(n log n) (Section 5)",
+      "required_capabilities": ["python-3.12", "fastapi/grpc-api-surface", "design-patterns-facade-builder", "dsa-heap-knapsack", "ports-and-adapters", "typed-error-contracts"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.95, "skill_coverage": 0.92, "hld_component_ownership": 0.90, "tech_stack_fit": 1.00},
+          "score": 0.937,
+          "above_threshold": true,
+          "evidence": "Frontmatter skills include python-core, python-design-patterns-core, fastapi-core, dsa-core, api-design-core - a direct match to the Facade/Builder patterns and the greedy-knapsack assembler the HLD mandates."
+        },
+        {
+          "agent": "ai-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.60, "skill_coverage": 0.45, "hld_component_ownership": 0.35, "tech_stack_fit": 0.90},
+          "score": 0.5425,
+          "above_threshold": false,
+          "evidence": "Strong on LLM/agent pipelines but carries no fastapi-core or python-design-patterns-core; the Orchestrator is a service facade, not an LLM pipeline."
+        },
+        {
+          "agent": "context-engineering-agent",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.40, "skill_coverage": 0.25, "hld_component_ownership": 0.30, "tech_stack_fit": 0.20},
+          "score": 0.2975,
+          "above_threshold": false,
+          "evidence": "Its context-window skills target multi-agent orchestration token budgets, not a product's own context-assembly API. Name similarity is a false signal."
+        },
+        {
+          "agent": "graph-orchestration-runtime-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.38, "skill_coverage": 0.20, "hld_component_ownership": 0.22, "tech_stack_fit": 0.30},
+          "score": 0.268,
+          "above_threshold": false,
+          "evidence": "Scoped to LangGraph/Temporal-class orchestration frameworks. ADR-011 explicitly rejects a workflow-engine shape for this component."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-002",
+      "title": "Working Memory zone (Zone 1) - TTL-primary scratch context",
+      "hld_component": "HLD 3.2 Zone 1 Working Memory (ADR-005: in-process LRU / Redis in Shape B)",
+      "hld_patterns": ["Repository port + adapter (Section 6)", "Strategy - per-zone rotation policy (Section 6)"],
+      "hld_dsa": "LRU = HashMap + doubly-linked list, capacity-bounded; Redis sorted set for score ranking; O(1) get/put/evict (Section 5)",
+      "required_capabilities": ["python-3.12", "redis-adapter", "lru-ttl-eviction", "dsa-hashmap-linkedlist", "repository-port-compliance"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.90, "skill_coverage": 0.88, "hld_component_ownership": 0.85, "tech_stack_fit": 1.00},
+          "score": 0.898,
+          "above_threshold": true,
+          "evidence": "Carries redis-core and dsa-core plus python-design-patterns-core. Zone 1 is application-layer zone logic behind a ZoneRepository port, which is this agent's declared surface."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.80, "skill_coverage": 0.82, "hld_component_ownership": 0.70, "tech_stack_fit": 0.85},
+          "score": 0.7945,
+          "above_threshold": true,
+          "evidence": "Viable runner-up: redis-core + performance-optimization + clean-architecture. Loses ownership points because Zone 1's TTL-eviction semantics live in domain logic, not in a storage tier."
+        },
+        {
+          "agent": "database-storage-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.35, "skill_coverage": 0.30, "hld_component_ownership": 0.20, "tech_stack_fit": 0.25},
+          "score": 0.2875,
+          "above_threshold": false,
+          "evidence": "Scoped to a database's OWN storage engine internals (WAL/ARIES, LSM-tree, B+tree, MVCC, buffer pool). Dashanan consumes PostgreSQL/Redis; it does not build one. Name-similarity trap - explicitly rejected."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-003",
+      "title": "Episodic Memory zone (Zone 2) - chronological recency store",
+      "hld_component": "HLD 3.3 Zone 2 Episodic Memory (ADR-006: PostgreSQL Shape B / SQLite Shape A)",
+      "hld_patterns": ["Repository port + adapter (Section 6)"],
+      "hld_dsa": "Append-only table + B-tree PK (tenant, session, seq) + BRIN index on occurred_at; keyset (cursor) pagination, O(1) per page (Section 5)",
+      "required_capabilities": ["postgresql-schema-index-design", "brin-btree-index-selection", "keyset-pagination", "migrations", "decay-attribute-schema", "dpdp-erasure-locatability"],
+      "candidates": [
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.92, "skill_coverage": 0.90, "hld_component_ownership": 0.92, "tech_stack_fit": 0.85},
+          "score": 0.9025,
+          "above_threshold": true,
+          "evidence": "rdbms-core + performance-optimization + clean-architecture. HLD Section 5 states this zone's whole design as index strategy (BRIN vs B-tree) and pagination class - schema/index territory."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.80, "skill_coverage": 0.75, "hld_component_ownership": 0.70, "tech_stack_fit": 1.00},
+          "score": 0.7925,
+          "above_threshold": true,
+          "evidence": "Viable runner-up via rdbms-core, but the story's decisive content is index/pagination design rather than service logic."
+        },
+        {
+          "agent": "data-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.50, "hld_component_ownership": 0.35, "tech_stack_fit": 0.80},
+          "score": 0.53,
+          "above_threshold": false,
+          "evidence": "ETL/warehouse/stream-processing scope. Zone 2 is an OLTP append-only store on the request path, not a pipeline."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-004",
+      "title": "Zone 2 capacity cap and MaxAge forced-archival backstop (OAQ-4)",
+      "hld_component": "HLD 12F Sprint 1 coherence (OAQ-4) - the sole bound on Zone 2 growth with no Zone 8 destination",
+      "hld_patterns": ["Template Method - rotation sweep skeleton (Section 6)", "Strategy - per-zone policy (Section 6)"],
+      "hld_dsa": "Bounded min-heap / sorted-set lowest-MemoryScore selection; sweep pops due items (Section 5)",
+      "required_capabilities": ["python-3.12", "sweep-scheduling", "memoryscore-ranked-eviction", "runtime-configuration-surface", "dpdp-consistent-erasure", "postgresql-bulk-delete"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.85, "skill_coverage": 0.82, "hld_component_ownership": 0.80, "tech_stack_fit": 1.00},
+          "score": 0.852,
+          "above_threshold": true,
+          "evidence": "The backstop is a sweep in the rotation worker consuming MemoryScore - application logic plus a config surface (NFR-009), matching python-core/dsa-core/rdbms-core."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.78, "skill_coverage": 0.78, "hld_component_ownership": 0.72, "tech_stack_fit": 0.85},
+          "score": 0.7785,
+          "above_threshold": true,
+          "evidence": "Viable runner-up for the bulk-delete and index-impact half of the story; weaker on the MemoryScore ranking dependency."
+        },
+        {
+          "agent": "site-reliability-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.45, "skill_coverage": 0.35, "hld_component_ownership": 0.30, "tech_stack_fit": 0.60},
+          "score": 0.4075,
+          "above_threshold": false,
+          "evidence": "Capacity-planning adjacency is superficial; SRE owns SLO/observability/capacity policy, not in-product eviction semantics."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-005",
+      "title": "Provenance/Audit zone (Zone 7) - source, confidence, edit history",
+      "hld_component": "HLD 3.8 Zone 7 Provenance/Audit (ADR-010) - append-only PostgreSQL, no UPDATE grant",
+      "hld_patterns": ["Repository port + adapter (Section 6)"],
+      "hld_dsa": "Append-only table + SHA-256 hash chain (prev_hash -> record_hash); HashMap item_id -> record list; conflict detection by set intersection (Section 5)",
+      "required_capabilities": ["postgresql-append-only-schema", "db-role-least-privilege", "sha256-hash-chain", "migrations", "audit-immutability", "tamper-evidence"],
+      "candidates": [
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.88, "skill_coverage": 0.86, "hld_component_ownership": 0.90, "tech_stack_fit": 0.85},
+          "score": 0.8725,
+          "above_threshold": true,
+          "evidence": "rdbms-core + application-security-core + clean-architecture. The story's binding constraints are schema shape, the absence of an UPDATE grant, and per-service role least privilege - database security territory."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.78, "skill_coverage": 0.74, "hld_component_ownership": 0.70, "tech_stack_fit": 1.00},
+          "score": 0.783,
+          "above_threshold": true,
+          "evidence": "Viable runner-up; owns the hash-chain computation and confidence formula, weaker on DB role/grant enforcement."
+        },
+        {
+          "agent": "security-defense-architect",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.60, "skill_coverage": 0.55, "hld_component_ownership": 0.45, "tech_stack_fit": 0.40},
+          "score": 0.5225,
+          "above_threshold": false,
+          "evidence": "Below the implementation threshold, but the highest-scoring candidate for the P1 security REVIEW role (cryptography-core + application-security-core against HLD threats R-1/T-2)."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-006",
+      "title": "Cross-cutting provenance write-path enforcement (WAL/outbox gate)",
+      "hld_component": "HLD 7.2 write path + 8.4 failure modes + ADR-010 (Transactional Outbox / WAL durability barrier)",
+      "hld_patterns": ["Transactional Outbox / WAL (Section 6)", "Circuit Breaker (Section 6)"],
+      "hld_dsa": "Provenance journal fsync durability barrier; Redis set with TTL for event dedup, O(1) membership (Section 5)",
+      "required_capabilities": ["python-3.12", "fastapi/grpc-422-contract", "transactional-outbox", "message-queues", "durability-barrier-fsync", "structurally-unbypassable-gate"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.93, "skill_coverage": 0.90, "hld_component_ownership": 0.88, "tech_stack_fit": 1.00},
+          "score": 0.920,
+          "above_threshold": true,
+          "evidence": "fastapi-core (422 contract) + message-queues-core (outbox/relay) + api-design-core + error-handling. The gate lives on the Orchestrator write path, which this agent owns from DASH-STORY-001."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.50, "hld_component_ownership": 0.40, "tech_stack_fit": 0.85},
+          "score": 0.5475,
+          "above_threshold": false,
+          "evidence": "Owns the Zone 7 sink but not the API-layer rejection contract that defines this story."
+        },
+        {
+          "agent": "api-security-auditor",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.50, "skill_coverage": 0.40, "hld_component_ownership": 0.35, "tech_stack_fit": 0.35},
+          "score": 0.4125,
+          "above_threshold": false,
+          "evidence": "Below the implementation threshold; highest-scoring candidate for the P1 security REVIEW role on the write-path gate (OWASP API Top 10, bypass testing)."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-007",
+      "title": "Retrieval-Index zone (Zone 6) - hybrid vector + lexical index",
+      "hld_component": "HLD 3.7 Zone 6 Retrieval-Index (ADR-007 Qdrant per-tenant collections, ADR-008 BM25 + RRF, ADR-013 hard physical partition)",
+      "hld_patterns": ["Repository port + adapter (Section 6)", "Adapter (Section 6)", "Circuit Breaker (Section 6)"],
+      "hld_dsa": "HNSW (M=16, efConstruction=200, efSearch=64) O(log n) ANN; BM25 inverted index; RRF fusion score = sum_r 1/(60 + rank_r(d)) (Section 5)",
+      "required_capabilities": ["vector-database-qdrant", "hnsw-tuning", "bm25-opensearch", "rrf-rank-fusion", "embedding-provider-port", "per-tenant-physical-partitioning", "cache-key-tenant-prefixing"],
+      "candidates": [
+        {
+          "agent": "ai-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.90, "skill_coverage": 0.88, "hld_component_ownership": 0.88, "tech_stack_fit": 0.90},
+          "score": 0.889,
+          "above_threshold": true,
+          "evidence": "vector-database-core + rag-core cover HNSW parameterization, hybrid retrieval and rank fusion - the precise content of ADR-007/ADR-008."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.70, "skill_coverage": 0.60, "hld_component_ownership": 0.55, "tech_stack_fit": 1.00},
+          "score": 0.680,
+          "above_threshold": false,
+          "evidence": "Strong on the Python adapter surface but carries no vector-database-core; HNSW/RRF tuning would be guesswork."
+        },
+        {
+          "agent": "ml-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.62, "skill_coverage": 0.58, "hld_component_ownership": 0.40, "tech_stack_fit": 0.75},
+          "score": 0.5815,
+          "above_threshold": false,
+          "evidence": "Has vector-database-core and rag-core, but its centre of gravity is training/fine-tuning/serving, not a production index tier."
+        },
+        {
+          "agent": "data-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.48, "hld_component_ownership": 0.40, "tech_stack_fit": 0.80},
+          "score": 0.533,
+          "above_threshold": false,
+          "evidence": "Index-worker ingestion adjacency only; no vector/lexical retrieval skills."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-008",
+      "title": "Memory Score computation engine (six-term formula)",
+      "hld_component": "HLD 3.1 Orchestrator / Scoring service (Sections 12A-12C thresholds)",
+      "hld_patterns": ["Value Object - immutable MemoryScore, ScoreTerms (Section 6)"],
+      "hld_dsa": "Fixed 6-element vector + per-zone weight vector; dot product O(1); exponential decay exp(-lambda*dt) (Section 5)",
+      "required_capabilities": ["python-3.12", "numeric-normalization-to-0-1", "immutable-value-objects", "runtime-weight-configuration", "exponential-decay-math", "explainable-score-output"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.85, "skill_coverage": 0.80, "hld_component_ownership": 0.82, "tech_stack_fit": 1.00},
+          "score": 0.849,
+          "above_threshold": true,
+          "evidence": "python-design-patterns-core (Value Object) + dsa-core + config surface. Math derivations are delegated, not self-derived - see mathematical_delegation in ar1_assignments.json."
+        },
+        {
+          "agent": "ai-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.45, "hld_component_ownership": 0.38, "tech_stack_fit": 0.90},
+          "score": 0.5335,
+          "above_threshold": false,
+          "evidence": "Consumes relevance signals but does not own the scoring service; no design-pattern or config-surface skills."
+        },
+        {
+          "agent": "mathematics-engineer",
+          "model": "opus",
+          "signals": {"domain_match": 0.45, "skill_coverage": 0.35, "hld_component_ownership": 0.30, "tech_stack_fit": 0.30},
+          "score": 0.3625,
+          "above_threshold": false,
+          "evidence": "Correctly scores below the IMPLEMENTATION threshold - it is the math master, a blocking delegation target for normalization and decay derivations, not the implementing agent."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-009",
+      "title": "Rotation state machine - Active to Compressed (Archived deferred)",
+      "hld_component": "HLD Rotation Engine (ADR-012 deadline scheduling + read-triggered promotion), Section 12C complexity",
+      "hld_patterns": ["State Machine (Section 6)", "Template Method - sweep skeleton (Section 6)", "Observer / Event Bus (Section 6)"],
+      "hld_dsa": "Per-zone hierarchical timer wheel (bucketed min-heap) keyed on predicted threshold-crossing timestamp; closed-form deadline delta_t* = -(1/lambda) ln(6*theta - C), O(1) per item; sweep O(k log N) (Section 5)",
+      "required_capabilities": ["python-3.12", "guarded-state-machine", "timer-wheel-min-heap", "template-method", "event-publication", "gated-transition-invariants"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.88, "skill_coverage": 0.85, "hld_component_ownership": 0.84, "tech_stack_fit": 1.00},
+          "score": 0.8795,
+          "above_threshold": true,
+          "evidence": "python-design-patterns-core covers State Machine and Template Method verbatim; dsa-core covers the bucketed min-heap; message-queues-core covers event publication."
+        },
+        {
+          "agent": "algorithm-complexity-analyst",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.50, "skill_coverage": 0.45, "hld_component_ownership": 0.35, "tech_stack_fit": 0.30},
+          "score": 0.4225,
+          "above_threshold": false,
+          "evidence": "Analysis-only agent (NP-hardness, approximation ratios, streaming). It can verify the O(k log N) claim but does not implement the engine."
+        },
+        {
+          "agent": "loop-engineering-architect",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.35, "skill_coverage": 0.25, "hld_component_ownership": 0.20, "tech_stack_fit": 0.25},
+          "score": 0.270,
+          "above_threshold": false,
+          "evidence": "Designs AGENT loops (S,T,E,X tuples, exit predicates), not a product's rotation sweep. Keyword collision on 'sweep/loop' is a false signal."
+        }
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-010",
+      "title": "ADR-012 deadline-invalidation wiring on non-Recency term mutation",
+      "hld_component": "HLD Section 12C / ADR-012 - deadline invalidation on every non-Recency term mutation path",
+      "hld_patterns": ["Observer / Event Bus (Section 6)", "Template Method (Section 6)"],
+      "hld_dsa": "O(log N) re-insert into the bucketed min-heap / skip list on invalidation (Section 12C)",
+      "required_capabilities": ["python-3.12", "cross-cutting-hook-wiring", "o-log-n-priority-structure-reinsert", "three-mutation-path-coverage", "stale-state-prevention"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.86, "skill_coverage": 0.84, "hld_component_ownership": 0.82, "tech_stack_fit": 1.00},
+          "score": 0.866,
+          "above_threshold": true,
+          "evidence": "Same agent already owns all three named mutation paths (001 read path, 006 conflict-detection path, 008 configuration-override path), which removes the cross-agent handoff risk this story's silent-failure mode depends on."
+        },
+        {
+          "agent": "algorithm-complexity-analyst",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.52, "skill_coverage": 0.48, "hld_component_ownership": 0.38, "tech_stack_fit": 0.30},
+          "score": 0.445,
+          "above_threshold": false,
+          "evidence": "Can certify the O(log N) re-insert bound; cannot own the wiring."
+        },
+        {
+          "agent": "feedback-control-loop-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.30, "skill_coverage": 0.20, "hld_component_ownership": 0.18, "tech_stack_fit": 0.25},
+          "score": 0.2435,
+          "above_threshold": false,
+          "evidence": "PID/control-theory scope for agent quality loops. 'Invalidation/feedback' keyword overlap is a false signal."
+        }
+      ]
+    }
+  ],
+  "index_level_findings": [
+    {
+      "id": "AR0-F1",
+      "severity": "INFO",
+      "finding": "Every one of the 10 stories has at least one candidate at or above the 0.75 threshold. No story required a force-assignment or a below-threshold fallback."
+    },
+    {
+      "id": "AR0-F2",
+      "severity": "WARNING",
+      "finding": "python-backend-engineer is the top-scoring candidate on 7 of 10 stories (001, 002, 004, 006, 008, 009, 010). This is a single-point-of-failure and a serialization bottleneck in the Sprint 1 execution graph, not a scoring error: the HLD locks one Python 3.12 codebase, so concentration is the honest result. Mitigation belongs in AR.2 execution grouping, not in AR.1 reassignment."
+    },
+    {
+      "id": "AR0-F3",
+      "severity": "WARNING",
+      "finding": "Three name-similarity traps were scored and explicitly rejected rather than silently skipped: database-storage-engineer (builds a database's own WAL/LSM/B+tree engine, not application repository adapters), context-engineering-agent (multi-agent token budgets, not the product's context-assembly API), loop-engineering-architect / feedback-control-loop-engineer (agent loops, not the product's rotation sweep). Each is recorded with its score so a later reviewer sees the rejection was measured."
+    },
+    {
+      "id": "AR0-F4",
+      "severity": "INFO",
+      "finding": "No agent in the library scores at or above 0.75 as an IMPLEMENTER for the security-review dimension of the P1 stories. This is expected and correct - the P1 override is a separate review role, scored separately in ar1_assignments.json, not a competing implementation assignment."
+    }
+  ]
+}
