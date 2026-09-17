@@ -1297,10 +1297,10 @@ FIRST, before doing anything, READ these files in full and apply them — this i
 
 KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
 - jira-devops-tooling-core -> This project is Jira-only (per this agent's Operating Rule 11 — SP.5
-  never branches to GitHub Issues inside the pipeline). Create the `DASHANAN` Jira project, one Epic
-  per SRS FR-NNN (13 total: 8 zone FRs + 3 cross-cutting), Stories under each Epic per scrum-master-
-  agent's INVEST decomposition, and the Sprint 1 container scoped to Orchestrator core + Zones 1/2/6/7
-  per the already-agreed Team Alignment.
+  never branches to GitHub Issues inside the pipeline). The `Dashanan` Jira project (key `DSHN`) already
+  exists — create one Epic per SRS FR-NNN (12 total: 8 zone FRs + 3 cross-cutting + 1 Memory Score/
+  rotation FR), Stories under each Epic per scrum-master-agent's INVEST decomposition, and the Sprint 1
+  container scoped to Orchestrator core + Zones 1/2/6/7 per the already-agreed Team Alignment.
 - agile-metrics-core -> Not directly load-bearing for the CREATE step itself (dashboard/velocity
   metrics apply once the sprint is running, not at setup) — background only, no task-specific extract
   beyond confirming the sprint's burn-down/velocity widgets are configured for later use.
@@ -1327,10 +1327,10 @@ Exception: a genuine business/scope decision escalates to whoever dispatched you
 AGREED CONTRACTS: Sprint 1 scope = Orchestrator core + Zones 1/2/6/7 (Team Alignment, scrum-master-
 agent <-> solution-architect) — create exactly this scope, no silent expansion.
 
-TASK: Using `mcp-jira-api`, create the `DASHANAN` Jira project (if it does not exist), 13 Epics
-(FR-ZONE-01..08 + 3 cross-cutting), Stories per scrum-master-agent's backlog_draft.json under each
-Epic, the Sprint 1 container with the agreed scope, and the mandatory 3-way sub-task split per story.
-Record every created key in `fr_to_jira_map`.
+TASK: Using `mcp-jira-api` against the existing `DSHN` project, create 12 Epics (FR-001..FR-012),
+Stories per scrum-master-agent's backlog_draft.json/sprint_plan.json under each Epic (10 Sprint-1
+stories now, per the SP.0.5-patched backlog), the Sprint 1 container with the agreed scope, and the
+mandatory 3-way sub-task split per story. Record every created key in `fr_to_jira_map`.
 
 OUTPUT FORMAT: AGENT OUTPUT per your agent.md — jira_setup_report.json with fr_to_jira_map, board
 configuration spec.
