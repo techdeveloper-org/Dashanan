@@ -1439,7 +1439,7 @@ PROMPT:
 ---persona---
 agent: orchestrator-agent
 kg_route: cross-cutting
-skills: [routing-index-core, agent-scoring-core]
+skills: [ai-agents-core, prompt-engineering-core, system-design, error-handling-patterns, logging-patterns]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -1449,16 +1449,24 @@ Thinking configured at XHIGH (budget_tokens: 32,000). Pinned by the Phase 7 AR.0
 scoped routing-index build (not the top-level MAXIMUM/fable orchestrator role).
 Your output will be verified by hallucination-detector.
 
-FIRST, READ in full: agents/orchestrator-agent/agent.md, skills/routing-index-core/SKILL.md,
-skills/agent-scoring-core/SKILL.md.
+FIRST, READ in full: agents/orchestrator-agent/agent.md, skills/ai-agents-core/SKILL.md,
+skills/prompt-engineering-core/SKILL.md, skills/system-design/SKILL.md,
+skills/error-handling-patterns/SKILL.md, skills/logging-patterns/SKILL.md.
+(Corrected 2026-09-17: previous skill list — routing-index-core, agent-scoring-core — does not exist
+in the library. Fixed against agent.md's real frontmatter.)
 
-KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation):
-- routing-index-core -> Build ar0_routing_index.json scoring all 528 agents × 4 signals for fitness
-  against each Sprint 1 story (Orchestrator core + Zones 1/2/6/7 stories) — favor backend-engineering,
-  context-engineering, and aiml domain agents for these specific stories.
-- agent-scoring-core -> Score threshold ≥ 0.75 for a valid assignment; any story scoring below this for
-  every candidate agent is a routing gap — surface it explicitly rather than force-assigning a weak
-  match.
+KNOWLEDGE DISTILLATION (5/5 skills covered — corrected to agent.md's real frontmatter skill list):
+- ai-agents-core -> Build ar0_routing_index.json scoring candidate agents' fitness against each Sprint
+  1 story (Orchestrator core + Zones 1/2/6/7 stories) — favor backend-engineering, context-engineering,
+  and quality-testing domain agents for these specific stories.
+- prompt-engineering-core -> Score threshold >= 0.75 for a valid assignment; any story scoring below
+  this for every candidate agent is a routing gap — surface it explicitly rather than force-assign.
+- system-design -> Cross-check each assignment against the HLD's own component ownership (e.g. the
+  Memory Score story should route to whichever agent type the HLD implies owns core algorithm logic).
+- error-handling-patterns -> Flag any story with a circular or unresolvable dependency in AR.1
+  assignment (should not happen given Phase 6's DAG, but verify rather than assume).
+- logging-patterns -> Ensure ar1_assignments.json records enough rationale per assignment (not just the
+  chosen agent) for AR.4/prompt-generation-expert to cite in its generated prompts' AGREED CONTRACTS.
 
 TASK: AR.0 — build the routing index over the 104 domain KGs for Sprint 1's stories. AR.1 — score and
 assign each story to its best-fit implementation agent (expect python-backend-engineer,
