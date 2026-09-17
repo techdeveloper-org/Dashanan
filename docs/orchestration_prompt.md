@@ -104,6 +104,9 @@ D14 →[D14::B_composed — no single-domain match, cross-domain AI/ML+context-e
 D15 →[D15::B2 High risk — memory/PII-adjacent, not Critical-regulated]→ D16
 D16 →[D16::B1 mandatory — always applies]→ D17             emits: anti-hallucination-always-on
 D17 →[D17::B1 Enterprise — apply context engineering gate]→ D18   emits: phase:A.5
+  (Phase A.5's Context Delivery Plan output is itself gated by a structural-validation +
+  bounded-retry-then-escalate rule — see "CONTEXT DELIVERY PLAN VALIDATION" under RESILIENCE & QA
+  RULES below; this is distinct from, and in addition to, the SC.1-3 protocol above)
 D18 →[D18::B2 Phase 1 ran — Phase A/A.5 inline solution-architect SKIPPED, Phase 1 pipeline supersedes]→ D19
 D19 →[D19::B1 Enterprise — squad lead routing deferred to Phase B]→ D21
 D21 →[D21::B1 Enterprise + AI/LLM stack detected ("context", "memory", "llm" tokens) → harness phases ACTIVATE for eventual Phase B]→ D22   emits: phase:A.6, phase:H (deferred, not in this bundle)
@@ -210,7 +213,48 @@ Phase 8   — Pre-Impl. Alignment:    business-analyst-agent + product-manager-a
                                         satisfied... improve the plan" instruction.
 ```
 
-**Self-Correction / Invariant Gates:** SC.1-3 (D22) fires automatically on ANY `consensus-agent` REJECTED verdict in Phases 1/1.5/2/5/6/7/8 — auto-RCA (`root-cause-analysis-agent`) → Correction ADR → repair → re-run, ≤3 iterations (ADR-9), then escalate to user. IV.1-2 (D23) is pruned (greenfield, no cross-domain DIRTY marks exist yet).
+## SELF-CORRECTION & BOUNDED ESCALATION PROTOCOL (SC.1-3, D22 — applies to every gate in this bundle)
+
+Every `consensus-agent` REJECTED verdict, and every other sub-1.0/sub-threshold gate result in this
+bundle (hallucination-detector NLI<1.0, context-faithfulness-engineer FactScore<1.0, reliability-auditor
+RS<1.0, Phase 1.5's C_api<0.85, Phase A.5's Context Delivery Plan validation — see the dedicated rule
+below), is handled by the **same bounded loop**, never an open-ended retry:
+
+```
+Iteration 1: producing agent(s) receive the itemized issue list -> fix -> re-submit -> re-gate.
+Iteration 2 (if still failing): root-cause-analysis-agent runs an auto-RCA pass on WHY the same
+  category of issue recurred (not just what the issue is) -> produces a Correction ADR -> producing
+  agent(s) repair against that ADR, not just the surface symptom -> re-submit -> re-gate.
+Iteration 3 (if STILL failing on the same open item(s)): identical RCA->ADR->repair->re-gate cycle,
+  now flagged as the FINAL automated attempt.
+```
+
+**Hard ceiling: ≤3 iterations (ADR-9).** If the 3rd re-gate still returns REJECTED / sub-threshold on
+the SAME open item(s), the loop MUST STOP and escalate to the human user — it does NOT attempt a 4th
+retry, and it does NOT silently relax the gate's threshold to force a pass. The escalation is presented
+as:
+
+```
+⛔ SELF-CORRECTION ESCALATION — Phase {N}, gate: {consensus-agent | hallucination-detector | ... }
+  Open item(s) after 3 automated iterations: {itemized list, unchanged across iterations 1-3}
+  Position — {producing agent, e.g. solution-architect}: {its stated rationale for its current answer}
+  Position — {reviewing/disagreeing agent, e.g. consensus-agent or python-backend-engineer}: {its
+    stated objection}
+  Correction ADRs attempted: {ADR-ids from iterations 2-3, with what each one tried and why it
+    didn't resolve the disagreement}
+  ⛔ STOP — human resolution required before any further iteration. This is not a relaxation of the
+  gate's threshold (e.g. RS still must reach 1.0, C_api still must reach ≥0.85 — escalation is what
+  happens when the automated loop cannot get there on its own, not permission to accept less). Reply
+  with your resolution (pick a position, propose a third option, or explicitly accept a documented
+  exception) to unblock iteration 4.
+```
+
+This protocol is what prevents the binary `consensus-agent` gate (APPROVED/REJECTED, no partial
+states — see Consensus Loop Rule below) from becoming an infinite retry loop on a genuine disagreement
+(e.g. `solution-architect` vs. `python-backend-engineer` on an API payload shape): it is NOT infinite,
+it is bounded at 3 automated attempts, then it becomes the human's call, always.
+
+IV.1-2 (D23) is pruned for this bundle (greenfield, no cross-domain DIRTY marks exist yet).
 
 ---
 
@@ -283,8 +327,9 @@ MUST NOT: introduce stories with no FR traceability
 
 - **QA Pipeline Rule:** `test-management-agent` + `unit-testing-specialist`/`integration-testing-engineer`/`api-testing-engineer` run at Phase 1.5 for contract-level test strategy; full D.0-D.4 QA pipeline applies once Phase B begins (out of scope here).
 - **Hallucination Gate Rule:** `hallucination-detector` runs after every agent's output in every phase above — no skip, no exceptions, all project types.
-- **Reliability Gate Rule:** `reliability-auditor` computes RS = (NLI × FactScore × DRE × Coverage)^(1/4) at Phase 7 and Phase 8; **RS must equal 1.0 exactly** before either STOP 7 or STOP 8 clears — sub-1.0 loops back to the owning phase per the retry-loop rules, no partial credit.
-- **Consensus Loop Rule:** every `consensus-agent` gate in this bundle (Phase 1, 1.5, 2, 5, 6×2, 7, 8) is BINARY `APPROVED`/`REJECTED` only — "approved with minor notes" is an invalid state and must be rejected by the orchestrator if returned.
+- **Reliability Gate Rule:** `reliability-auditor` computes RS = (NLI × FactScore × DRE × Coverage)^(1/4) at Phase 7 and Phase 8; **RS must equal 1.0 exactly** before either STOP 7 or STOP 8 clears — sub-1.0 loops back to the owning phase per the SELF-CORRECTION & BOUNDED ESCALATION PROTOCOL above (≤3 iterations, then human escalation). **Escalation is never a relaxation of the RS=1.0 bar** — if the loop is stuck after 3 iterations, the human decides whether to re-architect the failing component, accept a documented and explicitly-approved exception, or authorize further iteration; RS=1.0 stays the mandatory bar for Phase 8's STOP either way.
+- **Consensus Loop Rule:** every `consensus-agent` gate in this bundle (Phase 1, 1.5, 2, 5, 6×2, 7, 8) is BINARY `APPROVED`/`REJECTED` only — "approved with minor notes" is an invalid state and must be rejected by the orchestrator if returned. The loop is **bounded at ≤3 automated iterations (ADR-9)** per the SELF-CORRECTION & BOUNDED ESCALATION PROTOCOL above; it does not retry indefinitely on a genuine unresolved disagreement between agents (e.g. `solution-architect` vs. `python-backend-engineer` on an API shape) — the 3rd consecutive REJECTED on the same item(s) triggers mandatory human escalation with both agents' positions shown.
+- **Context Delivery Plan Validation Rule (Phase A.5):** `context-engineering-agent`'s Context Delivery Plan output is structurally validated (non-placeholder Differential GSD chunk names, a Context Budget line for every downstream agent, budgets that sum sanely against each agent's own STEP 4.5 ceiling) before Phase 1.5+ agents receive any prompt. On validation failure: one retry, then escalate to the human with the raw failed output and a STOP — never silently proceed with an incomplete plan, never loop indefinitely. Full mechanics: see the CONSTRAINTS block of the `context-engineering-agent` prompt above.
 - **Model Fallback Protocol:** on sonnet rate limit, retry same agent at `opus`; opus rate limit retries at `fable`; fable escalates to the user. Never silently downgrade.
 - **Sprint Completion Gate:** N/A yet (fires only once Phase B sprints are executing) — noted for forward reference.
 
@@ -851,6 +896,17 @@ CONSTRAINTS:
 - BLOCKING: zero Phase 1.5+ agents receive any prompt/context until this Context Delivery Plan exists
   and is saved — this is a hard pipeline gate, not a suggestion.
 - Never use placeholder Differential GSD chunk names.
+- **Structural validation before this gate is considered cleared** (orchestrator-enforced, not
+  self-certified by you): every downstream agent in Phases 1.5/2/5/6/7/8 must have (a) a non-empty
+  `Context Budget: {N} tokens | Sources: [...]` line, (b) Differential GSD chunk names that are
+  concrete and traceable to a real artifact (e.g. `hld-approved-delta`), never a placeholder, and
+  (c) budget values that sum sanely against that agent's own token ceiling from STEP 4.5 (a budget
+  larger than the agent's own thinking budget_tokens is invalid). If the orchestrator's validation
+  finds ANY missing/invalid field: (1) it returns the exact failing field(s) to you, by name; (2) you
+  get exactly ONE retry to fix them; (3) if the retry still fails validation, the orchestrator
+  escalates to the human user with your raw output and a STOP (same shape as the SELF-CORRECTION
+  ESCALATION block above) — it does NOT silently proceed to Phase 1.5 with an incomplete plan, and it
+  does NOT loop retrying indefinitely.
 
 ## Mathematical Delegation
 Delegate any token-budget optimization math (e.g. compression-ratio targets for the 20-100x reduction
@@ -1190,6 +1246,67 @@ pattern and are not separately duplicated here for length, per the disclosed SCA
 
 ===================================================================
 
+## ESTIMATED COST & TOKEN BUDGET (Phase 0-8 run)
+
+**These are order-of-magnitude planning estimates, not a quote.** Actual spend depends on real output
+lengths (this table uses `budget_tokens` as a ceiling proxy, not a guaranteed output size), retry
+behavior, and current model pricing at execution time — treat every number below as a rounded range,
+not a precise figure.
+
+**1. Single-pass base (26 unique agent dispatches, STEP 4.5 table, no gate recurrence, no retries):**
+~471,000 tokens — this is the "each distinct agent role runs exactly once" floor.
+
+**2. Realistic full-pipeline volume (accounting for gate recurrence this bundle actually specifies):**
+the cross-cutting gate cell is not a single dispatch — `consensus-agent` recurs 8 times (Phase 1, 1.5,
+2, 5, 6×2, 7, 8) and `hallucination-detector` + `context-faithfulness-engineer` run after roughly
+10-12 distinct artifact outputs across all phases (PRD, HLD, OpenAPI spec, PRD re-validation, SRS +
+13 diagrams, backlog draft, sprint-ready backlog, routing plan, alignment re-check), each at their own
+budget_tokens ceiling:
+```
+consensus-agent        : 8  × 20,000               ≈ 160,000
+hallucination-detector  : ~11 × 32,000               ≈ 352,000
+context-faithfulness-eng: ~11 × 32,000               ≈ 352,000
+reliability-auditor     : 2  × 16,000               ≈ 32,000
+─────────────────────────────────────────────────────────────
+Gate-recurrence subtotal                             ≈ 896,000
+Single-pass base (from #1, already includes one
+  instance of each of the above)                     ≈ 471,000
+Less: double-counted single instances already in #1  ≈ -132,000
+─────────────────────────────────────────────────────────────
+ESTIMATED REALISTIC TOTAL (zero retries triggered)    ≈ 1,200,000 – 1,400,000 tokens
+```
+
+**3. Worst-case with retries (FIX applied above — bounded at ≤3 iterations per gate, ADR-9):** each
+gate that actually gets REJECTED/sub-threshold and needs the full 3-iteration self-correction cycle
+adds up to ~2 extra passes of that phase's producing-agent + gate cost. A pipeline where 2-3 phases
+each hit their retry ceiling once could realistically push the total to **~2,000,000 – 2,500,000
+tokens** for one full Phase 0→8 run. This is the actual value of FIX 1's bound: without it, this
+number would have no ceiling at all.
+
+**4. Rough USD range (order-of-magnitude only, using standard current per-model blended
+input+output pricing tiers — sonnet cheapest, opus mid-tier, fable premium; do not treat as exact):**
+- Sonnet-tier volume (the large majority — ~900K-1.1M tokens in the realistic case): roughly **$5-15**
+- Opus-tier volume (`solution-architect` EXCELLENCE, `research-mathematics-expert`,
+  `agile-business-mathematics-expert`, auto-invoked math masters — roughly 200K-300K tokens): roughly
+  **$8-20**
+- **Realistic single-pass estimate: ~$15-35 USD total.** **Worst-case with retries: ~$30-70 USD.**
+  `fable` tier is not budgeted anywhere in this bundle (MAXIMUM/fable is reserved for the top-level
+  `orchestrator-agent` role running the full SDLC, out of scope for this Phase 0-8 bundle), so it does
+  not add to this estimate.
+
+**5. Highest token-volume phases (matches what was already suspected before this fix was requested):**
+- **Phase 5 (Blueprint Docs)** — 5 diagram-engineering agents producing 13 UML + 13 Draw.io files each
+  traceable back to the SRS/HLD, plus `hallucination-detector`/`context-faithfulness-engineer` checking
+  all 13+ artifacts individually. This is the single highest artifact-count phase in the bundle.
+- **Phase 7 (Agent-Task Routing)** — `orchestrator-agent`'s AR.0 routing-index build scores against all
+  104 domain KGs (32,000 budget_tokens alone), `agile-business-mathematics-expert`'s Kahn's DAG proof
+  runs at EXCELLENCE (64,000), and `prompt-generation-expert`'s AR.4 step generates 3 CoT prompts
+  (dev/qa/review) **per story** — this multiplies with Sprint 1's actual story count, which is not yet
+  known at authoring time (Phase 6 hasn't run yet) and is therefore the single largest source of
+  estimation uncertainty in this whole table.
+
+---
+
 ## EXECUTION SUMMARY
 
 **Portability Mode:** IN-REPO — DECIDED: this bundle is meant for live dispatch from a Claude Code
@@ -1209,10 +1326,18 @@ engineering`, `aiml`, `backend-engineering`, `distributed-systems-database-engin
 unread this session (filtered `python -c` queries only, per the Master KG anti-pattern rule).
 
 **Context Engineering:** Differential GSD activated | ~7,000 tokens avg budget per agent | Phase 1 A.5
-BLOCKING gate enforced (context-engineering-agent runs only after consensus-agent APPROVED on the HLD).
+BLOCKING gate enforced (context-engineering-agent runs only after consensus-agent APPROVED on the HLD)
+| **Context Delivery Plan output is structurally validated before Phase 1.5+ dispatch — 1 retry, then
+human escalation on repeated validation failure** (see Context Delivery Plan Validation Rule).
 
 **Consensus Gate:** BINARY (APPROVED/REJECTED only) | Loop enforced at Phases 1, 1.5, 2, 5, 6×2, 7, 8 |
-No partial states permitted.
+No partial states permitted | **Bounded at ≤3 automated self-correction iterations (ADR-9), then
+mandatory human escalation with both agents' positions shown — never an unbounded retry loop.**
+
+**Estimated Cost & Token Budget:** ~1.2M-1.4M tokens / ~$15-35 USD realistic single-pass; ~2M-2.5M
+tokens / ~$30-70 USD worst-case with retries — see the dedicated ESTIMATED COST & TOKEN BUDGET section
+above for the full breakdown and assumptions. Phase 5 (13 UML + 13 Draw.io) and Phase 7 (routing +
+per-story CoT generation) are the highest-volume phases.
 
 **Hallucination Gates:** hallucination-detector + context-faithfulness-engineer run after EVERY agent
 output in every phase listed above — mandatory, no exceptions, this project is not LLM-output-only so
