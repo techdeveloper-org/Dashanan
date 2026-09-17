@@ -2,7 +2,9 @@
 
 **Dashasan** (दशानन — "the ten-headed one") is a reusable, engine-agnostic **dynamic memory orchestration engine** for AI / LLM context systems.
 
-Named after the mythological figure with ten heads, Dashasan gives any AI system that plugs it in a form of **unlimited, structured memory**: instead of stuffing everything into one flat context window, it distributes and rotates context across **ten specialized, dynamically managed memory zones**, orchestrating what moves between them, what gets compressed, what gets promoted, and what gets retrieved — at a depth a single context window cannot sustain on its own.
+Named after the mythological figure with ten heads, Dashasan gives any AI system that plugs it in a form of **unlimited, structured memory**: instead of stuffing everything into one flat context window, it distributes and rotates context across **8 specialized, dynamically managed memory zones**, orchestrating what moves between them, what gets compressed, what gets promoted, and what gets retrieved — at a depth a single context window cannot sustain on its own.
+
+*(The "ten heads" naming is deliberately kept from the mythology even though the engineering zone count is 8 — two pairs of the original 10-zone concept were consolidated during architecture review: Temporal into Episodic, and Summary/Compressed into Consolidation. See `docs/phase-0-rnd/01-vision-and-prd.md` for the full rationale.)*
 
 > ⚠️ **Status:** Early architecture & R&D phase. This repository currently holds the project scaffold. The full Software Requirements Specification, High-Level Design, ADRs, and UML/architecture diagrams are being produced through a structured multi-agent orchestration pipeline (BA/PM research → solution architecture → joint blueprint validation → API contract design → documentation → sprint planning). Those artifacts will land in `docs/` and `SRS.md` as they are approved.
 
@@ -14,20 +16,18 @@ Every AI/LLM application eventually hits the same wall: the model's context wind
 
 Dashasan instead treats memory as a **living, orchestrated system** with multiple specialized zones, each with its own retention, compression, promotion/demotion, and retrieval policy — so an AI system using it can hold a much larger *effective* context, without needing a larger context window.
 
-## The Ten Heads — memory zones (working model, subject to the architecture phase)
+## The Eight Heads — memory zones (working model, subject to the architecture phase)
 
-1. **Episodic** — recent turn-by-turn interaction history
-2. **Semantic** — durable facts and knowledge extracted from interactions
-3. **Procedural** — learned task/workflow patterns and how-to knowledge
-4. **Working** — the active, in-flight context for the current task
+1. **Working** — the active, in-flight context for the current task
+2. **Episodic** — recent turn-by-turn interaction history, time-anchored (absorbs the former separate "Temporal" zone as a per-entry attribute)
+3. **Semantic** — durable facts and knowledge extracted from interactions
+4. **Procedural** — learned task/workflow patterns and how-to knowledge
 5. **Entity** — structured knowledge about people, objects, and concepts referenced over time
-6. **Temporal** — time-anchored context (what happened when, recency/decay signals)
-7. **Summary / Compressed** — progressively summarized/compressed older context
-8. **Retrieval-Index** — the searchable index layer used to pull relevant memory back in
-9. **Provenance / Audit** — where each piece of memory came from and how it was derived
-10. **Cross-Session / Long-Term Consolidation** — memory that survives across sessions and gets consolidated over time
+6. **Retrieval-Index** — the searchable index layer used to pull relevant memory back in
+7. **Provenance / Audit** — where each piece of memory came from and how it was derived
+8. **Consolidation** — long-term, cross-session consolidated store (absorbs the former separate "Summary/Compressed" zone: compression is a mechanism Consolidation applies, not its own zone)
 
-Context rotates between these zones dynamically — promoted, demoted, compressed, or archived — under an orchestration policy, rather than living statically in one place.
+A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency + w3·Importance + w4·UserAffinity + w5·TaskRelevance + w6·ProvenanceConfidence`) drives rotation between these zones — promoted, compressed, or archived — under an orchestration policy, rather than context living statically in one place. See `docs/phase-0-rnd/01-vision-and-prd.md` for the full formula and rotation-policy definition.
 
 ## Goals
 
