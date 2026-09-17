@@ -1,0 +1,132 @@
+{
+  "document_id": "SP5-JIRASETUP-20260917-01",
+  "version": "1.0.0",
+  "author": "agile-tooling-specialist",
+  "phase": "Phase 6 - Sprint Planning (SP.5 Jira setup)",
+  "date": "2026-09-17",
+  "project": {
+    "key": "DSHN",
+    "name": "Dashanan",
+    "template": "scrum",
+    "board_id": 100,
+    "board_name": "DSHN board",
+    "board_url": "https://techdeveloper28.atlassian.net/jira/software/projects/DSHN/boards"
+  },
+  "sprint": {
+    "sprint_id": 168,
+    "sprint_name": "Sprint 1",
+    "state": "future",
+    "board_id": 100,
+    "goal": "Prove Dashanan's core memory loop end to end - orchestrated write/read through Working and Episodic Memory, hybrid retrieval, provenance-gated writes, and Memory-Score-driven Active->Compressed rotation.",
+    "story_count": 10,
+    "total_story_points": 55,
+    "stories_in_sprint": [
+      "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22"
+    ]
+  },
+  "created_issues": {
+    "epics": [
+      "DSHN-1", "DSHN-2", "DSHN-3", "DSHN-4", "DSHN-5", "DSHN-6",
+      "DSHN-7", "DSHN-8", "DSHN-9", "DSHN-10", "DSHN-11", "DSHN-12"
+    ],
+    "stories": [
+      "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22"
+    ],
+    "sub_tasks": [
+      "DSHN-23", "DSHN-24", "DSHN-25", "DSHN-26", "DSHN-27", "DSHN-28",
+      "DSHN-29", "DSHN-30", "DSHN-31", "DSHN-32", "DSHN-33", "DSHN-34",
+      "DSHN-35", "DSHN-36", "DSHN-37", "DSHN-38", "DSHN-39", "DSHN-40",
+      "DSHN-41", "DSHN-42", "DSHN-43", "DSHN-44", "DSHN-45", "DSHN-46",
+      "DSHN-47", "DSHN-48", "DSHN-49", "DSHN-50", "DSHN-51", "DSHN-52"
+    ],
+    "total_issue_count": 52
+  },
+  "story_to_subtask_map": {
+    "DSHN-13": { "dev": "DSHN-23", "qa": "DSHN-24", "review": "DSHN-25", "sp": { "dev": 5, "qa": 2, "review": 1 } },
+    "DSHN-14": { "dev": "DSHN-26", "qa": "DSHN-27", "review": "DSHN-28", "sp": { "dev": 3, "qa": 1, "review": 1 } },
+    "DSHN-15": { "dev": "DSHN-29", "qa": "DSHN-30", "review": "DSHN-31", "sp": { "dev": 3, "qa": 1, "review": 1 } },
+    "DSHN-16": { "dev": "DSHN-32", "qa": "DSHN-33", "review": "DSHN-34", "sp": { "dev": 2, "qa": 1, "review": 1 } },
+    "DSHN-17": { "dev": "DSHN-35", "qa": "DSHN-36", "review": "DSHN-37", "sp": { "dev": 3, "qa": 1, "review": 1 } },
+    "DSHN-18": { "dev": "DSHN-38", "qa": "DSHN-39", "review": "DSHN-40", "sp": { "dev": 3, "qa": 1, "review": 1 } },
+    "DSHN-19": { "dev": "DSHN-41", "qa": "DSHN-42", "review": "DSHN-43", "sp": { "dev": 5, "qa": 2, "review": 1 } },
+    "DSHN-20": { "dev": "DSHN-44", "qa": "DSHN-45", "review": "DSHN-46", "sp": { "dev": 5, "qa": 2, "review": 1 } },
+    "DSHN-21": { "dev": "DSHN-47", "qa": "DSHN-48", "review": "DSHN-49", "sp": { "dev": 3, "qa": 1, "review": 1 } },
+    "DSHN-22": { "dev": "DSHN-50", "qa": "DSHN-51", "review": "DSHN-52", "sp": { "dev": 2, "qa": 1, "review": 1 } }
+  },
+  "fr_to_jira_map": {
+    "FR-001": {
+      "epic_key": "DSHN-1",
+      "story_keys": ["DSHN-14"],
+      "sprint_1_coverage": true
+    },
+    "FR-002": {
+      "epic_key": "DSHN-2",
+      "story_keys": ["DSHN-15", "DSHN-16"],
+      "sprint_1_coverage": true
+    },
+    "FR-003": {
+      "epic_key": "DSHN-3",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog (WSJF rank 10)."
+    },
+    "FR-004": {
+      "epic_key": "DSHN-4",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog (WSJF rank 12); also the future source of inferred Importance salience currently defaulted to 0.5 in DASH-STORY-008."
+    },
+    "FR-005": {
+      "epic_key": "DSHN-5",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog (WSJF rank 9)."
+    },
+    "FR-006": {
+      "epic_key": "DSHN-6",
+      "story_keys": ["DSHN-19"],
+      "sprint_1_coverage": true
+    },
+    "FR-007": {
+      "epic_key": "DSHN-7",
+      "story_keys": ["DSHN-17"],
+      "sprint_1_coverage": true
+    },
+    "FR-008": {
+      "epic_key": "DSHN-8",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog (WSJF rank 11); unblocks the Compressed->Archived transition deferred in DASH-STORY-009."
+    },
+    "FR-009": {
+      "epic_key": "DSHN-9",
+      "story_keys": ["DSHN-13"],
+      "sprint_1_coverage": true
+    },
+    "FR-010": {
+      "epic_key": "DSHN-10",
+      "story_keys": ["DSHN-18"],
+      "sprint_1_coverage": true
+    },
+    "FR-011": {
+      "epic_key": "DSHN-11",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog (WSJF rank 8) - remaining zone coverage beyond Sprint 1 adapters."
+    },
+    "FR-012": {
+      "epic_key": "DSHN-12",
+      "story_keys": ["DSHN-20", "DSHN-21", "DSHN-22"],
+      "sprint_1_coverage": true
+    }
+  },
+  "fr_to_jira_map_completeness": {
+    "total_frs": 12,
+    "frs_mapped": 12,
+    "frs_with_sprint_1_stories": 7,
+    "frs_epic_only": 5,
+    "verified_complete": true
+  }
+}
