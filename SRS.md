@@ -58,6 +58,8 @@ Dashanan (दशानन) is a reusable, engine-agnostic dynamic memory orchest
 | NFR-009 | Weight/threshold configurability | Memory Score weights (w1..w6) and rotation thresholds SHALL be a per-deployment configuration surface, not hardcoded constants. | Medium |
 | NFR-010 | Timeline / delivery model | No fixed deadline is imposed; delivery follows an iterative R&D -> architecture -> consensus-loop model. | Low |
 | NFR-011 | Hallucination risk classification | The system's hallucination risk is classified MEDIUM (general AI infrastructure); this SHALL inform the depth of verification gates applied to Dashanan's own generated artifacts in later phases. | Medium |
+| NFR-012 | Promotion-before-eviction read-your-own-writes guarantee | Within a single session, a client SHALL be able to read back an item immediately after writing it (Zone 1 synchronous write, ADR-002/ADR-005). When that item's score crosses a promotion threshold, the system SHALL NOT evict it from Zone 1 until its promotion to the target zone is durably committed and published (ADR-016, HLD §7.7). | High |
+| NFR-013 | Regulated-identifier detection at the write gate | The system SHALL detect and tokenize a configured set of regulated structured identifiers (e.g. Aadhaar, PAN, payment card numbers) in write-path payloads before persistence or Zone 6 indexing (ADR-017). This is scoped narrowly to regulated structured identifiers and SHALL NOT be construed as general content redaction; it is distinct from and narrower than NFR-006's DPDP purpose-limitation/erasure obligations. | High |
 
 ## 4. Acceptance Criteria
 
@@ -80,6 +82,8 @@ Dashanan (दशानन) is a reusable, engine-agnostic dynamic memory orchest
 | AC-015 | NFR-007 (Memory poisoning, STRIDE T-1) | Given adversarial content is written to any zone via prompt injection, When that content is later surfaced, Then it is never interpolated into any prompt Dashanan itself issues as an instruction, and a contradicting true fact triggers the conflict-detection sweep to downgrade both records rather than silently overwriting the true fact (HLD threat T-1). |
 | AC-016 | NFR-008 | Given a zone write bypasses provenance recording, When the write path is exercised, Then the write is rejected before persistence (same enforcement path as AC-010). |
 | AC-017 | NFR-009 | Given a deployment operator sets a non-default weight profile (w1..w6) or rotation thresholds, When the Orchestrator computes MemoryScore for that deployment, Then the configured values are used instead of the MVP defaults, without a code change. |
+| AC-018 | NFR-012 | Given an item's score crosses `PromoteThreshold` (or is read-triggered per ADR-012) while it is also eligible for Zone 1 TTL/capacity eviction, When the rotation worker's sweep processes it, Then the target-zone write is durably committed and its `memory.promoted` event is published before the item is evicted from Zone 1, so no `assemble` call in that window returns a result missing the item (HLD §7.7, ADR-016). |
+| AC-019 | NFR-013 | Given a write payload contains a regulated structured identifier from the configured set (e.g. Aadhaar, PAN, card number), When the write is processed by `POST /v1/memory/write`, Then the identifier is tokenized before the ADR-010 journal fsync and before any zone persistence or Zone 6 indexing, and the rest of the payload's user-stated content is persisted unredacted (ADR-017). |
 
 ## 5. Out of Scope
 
@@ -103,3 +107,4 @@ The following are explicitly out of scope for Dashanan v1 and are excluded to pr
 | Date | Version | Task | Change Summary | Status |
 |---|---|---|---|---|
 | 2026-09-17 | 1.0.0 | SRS authoring (Phase 0-2 promotion) | Initial canonical SRS created, promoting all 12 PRD FRs and 11 PRD NFRs with HLD component traceability, 17 Acceptance Criteria grounded in HLD Section 10 STRIDE/DPDP controls, and 12 explicit Out of Scope items for Dashanan v1. | Done |
+| 2026-09-17 | 1.0.1 | Close doc gaps from external architecture review (#1) | Added NFR-012/NFR-013 and AC-018/AC-019 for the two real gaps an external review surfaced: promotion-before-eviction read-your-own-writes ordering (HLD ADR-016, §7.7) and regulated-identifier detection at the write gate (HLD ADR-017), narrowly scoped and reconciled with existing ADR-002/ADR-005/ADR-010/ADR-014/DPDP-1/DPDP-2. The other 3 claims in the same review (zone count, MemoryScore normalization, circuit-breaker degradation) were verified already correct; no SRS change needed for those. | Done |

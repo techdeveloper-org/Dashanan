@@ -1010,6 +1010,118 @@ ADR-015: Embedding provider
       |any`) checked before every provider call, not left to documentation.
 ```
 
+### ADR-016: Promotion-before-eviction ordering invariant
+
+```
+ADR-016: Promotion/eviction ordering
+  Status:    PROPOSED  [tightens ADR-002/ADR-005; see OAQ-17]
+  Chosen:    A ROTATION-WORKER-ENFORCED ORDERING INVARIANT: when an item's score crosses
+             `PromoteThreshold` (deadline-scheduled per ADR-009) or a read-triggered
+             promotion fires (ADR-012), the target-zone write MUST be durably committed
+             and its `memory.promoted` event MUST be published BEFORE the rotation
+             worker allows that item's Zone 1 `idle_ttl` or capacity-overflow eviction
+             to proceed. An item mid-promotion is never eligible for eviction.
+  Why:
+    1. ADR-002's Consequences already establish same-session read-your-own-writes for
+       UNPROMOTED items: "Zone 1 is always read first in assembly, so read-your-own-write
+       holds within the session... designed around, not accepted as a defect." ADR-005
+       independently states that content that matters "is demoted to Zone 2 on eviction."
+       Neither ADR specifies which happens first when a promotion and an eviction are
+       both pending for the SAME item at the SAME time -- that race is the one case
+       those two ADRs leave open.
+    2. Without this invariant, a plausible interleaving is: (a) the rotation sweep
+       promotes the item's score past threshold and schedules the `memory.promoted`
+       event, (b) before that event drains, the item's `idle_ttl` fires and the item is
+       evicted from Zone 1, (c) a client's next `assemble` call lands in the gap between
+       (b) and the promoted copy becoming visible in Zone 2/5/6. This is a narrow window
+       (bounded by the rotation sweep p99 figures in Section 9: 50 ms/500 ms/5 s), not
+       the unbounded eventual-consistency lag an external review of this HLD initially
+       assumed -- but it is real and was previously unstated.
+    3. The fix is a scheduling-order constraint on the rotation worker's own Template
+       Method sweep (Section 6: pop due items -> re-score -> evaluate guarded transition
+       -> publish -> reschedule), not a new component: the sweep already evaluates a
+       transition and publishes before rescheduling; this ADR makes explicit that
+       eviction is itself a transition subject to the same "publish before finalize"
+       ordering, rather than a separate, unordered code path.
+  Rejected:
+    A client-side read-through buffer or local write cache -- rejected: it would
+      duplicate state ADR-002 already keeps correctly in Zone 1, and would need its own
+      invalidation logic, trading one race for another.
+    Making promotion synchronous with the eviction sweep -- rejected: it would
+      reintroduce the O(N) synchronous cost ADR-012's deadline scheduling exists to
+      avoid (Section 12C).
+  Consequences:
+    Accepted trade-offs: an item that is mid-promotion holds a small amount of extra
+      time in Zone 1 past its nominal `idle_ttl` -- bounded by one rotation-worker sweep
+      cycle, not unbounded.
+    Risks: the rotation worker must treat "promote" and "evict" as ordered, not
+      independent, transitions for the same item; this must be enforced in the sweep's
+      guarded-transition check (Section 6 State Machine pattern), not left as an
+      implicit assumption.
+  India Layer: N/A -- this is a correctness invariant, not a residency or compliance
+      concern.
+```
+
+### ADR-017: Regulated-identifier detection at the write gate
+
+```
+ADR-017: Write-gate regulated-identifier scrub
+  Status:    PROPOSED  [narrows ADR-014's log-tier filter; see OAQ-18]
+  Chosen:    A REGULATED-IDENTIFIER DETECTOR runs synchronously inside `POST
+             /v1/memory/write`, on the payload itself, BEFORE the ADR-010 write-ahead
+             journal fsync and before any zone persistence or Zone 6 indexing. It
+             detects and tokenizes a narrow, explicit set of regulated structured
+             identifiers (Aadhaar, PAN, payment card numbers, and equivalents for other
+             deployment jurisdictions) and replaces them with a reversible token in the
+             persisted payload. This is NOT general content redaction.
+  Why:
+    1. ADR-014's "PII-anonymization filter runs pre-emission" (Section 8 India layer,
+       threat I-6) is explicitly scoped to the OBSERVABILITY/LOG tier only: "MEMORY
+       PAYLOADS ARE NEVER LOGGED." It says nothing about the memory PAYLOAD itself as
+       persisted in a zone or indexed into Zone 6 -- that content is, by design, exactly
+       the user-stated facts the product exists to retain (PRD Goal 1; DPDP-1 purpose
+       limitation governs their lawful retention, not their exclusion).
+    2. Without a narrow write-gate scrub, a regulated structured identifier pasted into
+       a conversation turn would be persisted verbatim, embedded, and indexed into
+       Zone 6 -- a materially higher-risk exposure than a log line, because it becomes
+       retrievable by similarity search rather than requiring a targeted query.
+    3. Scope is deliberately narrow -- detection of a small, well-defined class of
+       structured regulated identifiers, not free-text PII in general -- because a
+       blanket content scrubber would silently work against the product's stated
+       purpose (retaining user-stated facts) and would conflict with DPDP-2's already-
+       approved resolution (crypto-shredding is the erasure mechanism for lawfully-
+       retained content, not pre-write redaction). ADR-017 and DPDP-2 are complementary:
+       DPDP-2 handles erasure of content the system correctly retained; ADR-017 prevents
+       a narrow class of high-risk identifiers from being retained as plain content in
+       the first place.
+    4. Running the scrub BEFORE the ADR-010 journal fsync (rather than after, or only
+       at the zone-storage step) means the durability barrier and the provenance audit
+       trail (FR-010) see the SAME tokenized payload as zone storage -- there is no
+       window where the journal holds an un-scrubbed copy that zone storage does not.
+  Rejected:
+    General-purpose free-text PII redaction on every write -- rejected on reason 3: it
+      would silently discard the user-stated facts DPDP-1/DPDP-2 already govern
+      lawfully, defeating the product's purpose.
+    Scrubbing only at the ADR-014 log tier -- rejected: does not address content that
+      reaches persistent zone storage and Zone 6 indexing, which is the actual risk
+      the external review correctly identified.
+    Scrubbing after the ADR-010 journal fsync -- rejected: would leave an un-scrubbed
+      copy durable in the journal even if zone storage were scrubbed, defeating the
+      purpose of the invariant.
+  Consequences:
+    Accepted trade-offs: a detector false negative on an identifier format outside the
+      configured regulated set is possible; the detector's configured identifier set is
+      a per-deployment config surface (parallel to NFR-009's weight/threshold
+      configurability), reviewable and extensible without a code change.
+    Risks: detector unavailability would need to fail closed (reject the write, same
+      posture as FR-010's `422` on missing `source_type`) or fail open (accept
+      un-scrubbed) -- this choice is deployment-profile-specific and is flagged for
+      Phase 1.5 API-contract sign-off, not decided here.
+  India Layer: Aadhaar and PAN are the two identifier classes with explicit Indian
+      regulatory handling requirements; both are in the default configured set for any
+      tenant with `embedding_residency` set to an Indian region (ADR-015).
+```
+
 ---
 
 ## Section 5 — DSA Choices per Component
@@ -1160,6 +1272,14 @@ The write request carries the mandatory FR-010 provenance block: `{ source_type,
 
 All events carry the standard metadata envelope: `event_id` (UUID v4), `event_type`, `occurred_at` (ISO 8601 UTC), `correlation_id`, `causation_id`, `tenant_id`, `schema_version`. Schema evolution is **additive only**: new optional fields with defaults (FULL compatibility per EDA M6). Field removal or retype requires a new event type, never an in-place change.
 
+### 7.7 Read-Your-Own-Writes Consistency Contract
+
+**The guarantee, and where it already comes from.** ADR-002's Consequences already establish the core guarantee: the accepted write lands in Zone 1 (Working) **synchronously**, before the `202` returns, and `POST /v1/context/assemble` reads Zone 1 first by default — "so read-your-own-write holds within the session even though cross-zone visibility is eventual. This is the single most important consequence of the split and it is designed around, not accepted as a defect." ADR-005 independently confirms the complementary side: content that matters is demoted (not silently dropped) to Zone 2 on Zone 1 eviction. Together they mean: **a client that writes an item and immediately calls `assemble` within the same session sees that item, full stop — no client-side buffer or polling required for this case.**
+
+**The one gap those two ADRs leave open, and what closes it.** Neither ADR specifies which wins when a promotion and an eviction are both pending for the *same* item at the *same* time. **ADR-016** closes this: the rotation worker's sweep treats "publish `memory.promoted` and durably commit the target-zone write" as ordered strictly before "evict from Zone 1" for any item mid-promotion. The resulting bound on cross-zone visibility lag is the rotation sweep p99 figures already given in Section 9 (50 ms / 500 ms / 5 s per zone) — not an unbounded eventual-consistency window.
+
+**What this does not claim.** Cross-zone materialization (an item becoming visible via Zone 2/5/6 once promoted out of Zone 1) remains asynchronous by design (ADR-002) and is bounded, not instant. A host that needs to confirm a specific promotion completed can poll `GET /v1/writes/{write_id}` (§7.2) or `GET /v1/jobs/{job_id}` for a forced sweep (§7.3) — no new endpoint is introduced by this contract.
+
 ---
 
 ## Section 8 — Deployment Topology, Resilience and Failure Modes
@@ -1257,7 +1377,8 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 | **I-3** | **Info disclosure** | **Shared caches as a cross-tenant oracle.** An embedding or assembly cache keyed only by content hash lets an attacker detect, by timing, whether another tenant stored a given string. | **Every cache key is prefixed with `tenant_id`.** No exceptions, including the embedding cache where content-hash keying is otherwise the obvious design. |
 | I-4 | Info disclosure | Embedding inversion reconstructs source text from vectors | Vectors treated as PII: encrypted at rest, tenant-partitioned, included in the erasure cascade, never shared across tenants. |
 | I-5 | Info disclosure | Consolidation merges items across tenants during compression | The consolidation job is tenant-scoped by construction and **asserts tenant uniformity before any merge**, failing the batch rather than merging on violation. |
-| I-6 | Info disclosure | Memory payloads leak into logs or error messages | ADR-014: payloads are never logged — only `item_id`, content hash, token count, term values. Error responses never echo payloads. PII-anonymization filter runs pre-emission. |
+| I-6 | Info disclosure | Memory payloads leak into logs or error messages | ADR-014: payloads are never logged — only `item_id`, content hash, token count, term values. Error responses never echo payloads. PII-anonymization filter runs pre-emission. **Distinct from I-6a below**: ADR-014 covers the log/observability tier only, not persisted zone content. |
+| I-6a | Info disclosure | A regulated structured identifier (Aadhaar, PAN, card number) pasted into a conversation turn is persisted verbatim and becomes retrievable via Zone 6 similarity search | **ADR-017**: a write-gate identifier detector tokenizes the configured regulated-identifier set before zone persistence/indexing and before the ADR-010 journal fsync. Narrower than general redaction — see ADR-017 Why §3 for why blanket scrubbing is explicitly rejected. |
 | I-7 | Info disclosure | Memory content sent to an external embedding/summarization API | ADR-015 `embedding_residency` policy per tenant, checked before every provider call; local-model adapter available. |
 | D-1 | DoS | Write flood exhausts a tenant's storage or the shared engine | Per-tenant token-bucket rate limits (shared state in Redis) + per-tenant per-zone capacity quotas (Section 12A). |
 | D-2 | DoS | An adversarial write pattern makes rotation sweeps quadratic | Deadline scheduling makes the sweep O(k log N) **by construction** (Section 12C) — there is no input that restores an O(N) scan. |
@@ -1272,6 +1393,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 - **DPDP-3 Erasure reach.** The cascade must reach eight zones, the vector index, the lexical index and Zone 8 archives. This is what makes the `subject_id` secondary index on every zone table **mandatory** (ADR-006) — without it the cascade is eleven full scans.
 - **DPDP-4 Residency.** Per-tenant `embedding_residency` policy (ADR-015); all stores in-region for tenants handling Indian personal data.
 - **DPDP-5 Breach notification.** 72-hour notification requires knowing *what* was exposed — Zone 7's provenance chain plus the tenant-partitioned structure make the blast radius of any breach precisely enumerable rather than estimated.
+- **DPDP-6 Regulated-identifier minimization at ingestion.** ADR-017's write-gate detector tokenizes the configured regulated-identifier set (Aadhaar, PAN, card numbers) before persistence/indexing. This **narrows, and does not replace,** DPDP-1 (purpose limitation) and DPDP-2 (crypto-shredding erasure): the vast majority of retained content remains lawfully-retained user-stated fact governed by DPDP-1/DPDP-2 as already resolved; DPDP-6 addresses only the narrower risk of a small class of high-risk structured identifiers reaching the vector/lexical index as plain content.
 
 ### CERT-In
 
@@ -1281,7 +1403,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 
 ## Section 11 — Open Architectural Questions
 
-Sixteen items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract.
+Eighteen items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract. Items marked **Proposed** without that tag are new decisions this HLD introduces in its own later sections (not Phase 0 gaps) and still need consensus-gate sign-off.
 
 | # | Item | Decision taken here | Why it needs review |
 |---|---|---|---|
@@ -1301,6 +1423,8 @@ Sixteen items for the consensus gate. Items marked **[DERIVED FINDING]** are def
 | OAQ-14 | **NEW SCOPE:** conflict-detection sweep on Zone 3/5 writes | Proposed | From research brief §4. Not in the PRD's FRs. It is what makes `ProvenanceConfidence` a live computation instead of a write-once constant, and it is the strongest memory-poisoning control (T-1). Recommend adopting as **FR-013**. |
 | OAQ-15 | **Embedding provider is a hard dependency Phase 0 never named** | Addressed by ADR-015 | Zone 6 cannot exist without it. It is also the read path's dominant latency cost and a DPDP cross-border transfer surface. Should appear explicitly in the PRD's dependency list. |
 | OAQ-16 | **8-zone taxonomy: NO revision proposed.** One structural observation. | Taxonomy holds | The taxonomy survives contact with the architecture. **Observation, not a revision request:** Zones 6 and 7 are categorically different from Zones 1-5 and 8 — they are *derived, cross-cutting layers* over the other six, not independent memory stores. Consequences already reflected here: they have no independent `lambda_zone`, Zone 6 needs no independent durability, and neither participates in the `Active -> Compressed -> Archived` lifecycle as a *source*. The count stays 8; the HLD models them as a distinct tier. |
+| OAQ-17 | **Proposed:** promotion-before-eviction ordering invariant (ADR-016) | Proposed, needs approval | Tightens ADR-002/ADR-005 by resolving the one race they leave open (an item's promotion and its Zone 1 eviction both pending at once). Not a Phase 0 gap — it is a gap in this HLD's own later sections, surfaced by external review of the read-your-own-writes contract (new §7.7). Needs architect sign-off that the rotation-worker ordering constraint is the right mechanism versus an alternative (e.g. a grace period on eviction). |
+| OAQ-18 | **Proposed:** regulated-identifier detection at the write gate (ADR-017) | Proposed, needs approval | Narrows ADR-014's log-tier-only PII filter to also cover a small, explicit class of regulated structured identifiers in persisted/indexed content — deliberately not general redaction (see ADR-017 Why §3 and its interaction with DPDP-1/DPDP-2). Needs: (a) legal/compliance confirmation of the exact identifier set per deployment jurisdiction, (b) a decision on the detector-unavailable fail-open vs. fail-closed posture, deferred to Phase 1.5 per ADR-017's Consequences. |
 
 ---
 
