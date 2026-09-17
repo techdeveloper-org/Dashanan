@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0" compressed="false">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="2" value="Host AI System
+gRPC / REST client" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="240" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="3" value="Shape A: Embedded Library (NFR-002, ADR-001)
+pip package, in-process, offline-capable (NFR-005)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="140" width="420" height="380" as="geometry" />
+    </mxCell>
+    <mxCell id="4" value="Dashanan Python SDK Facade
+in-process, no network required" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="60" y="190" width="380" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="5" value="In-process LRU (Zone 1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="60" y="270" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="6" value="Embedded SQLite
+(Zones 2/3/4/5/7)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="60" y="330" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="7" value="hnswlib + SQLite FTS5
+(Zone 6)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="60" y="390" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="8" value="Local Filesystem (Zone 8)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="60" y="450" width="380" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="9" value="Shape B: Sidecar Service (NFR-002, ADR-001)
+containerized, multi-tenant" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="520" y="140" width="900" height="560" as="geometry" />
+    </mxCell>
+    <mxCell id="10" value="dashanan-api
++ orchestrator
+Python 3.12, gRPC + FastAPI
+(co-located, ADR-011)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="550" y="190" width="260" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="11" value="dashanan-rotation-worker
+promote/compress/archive sweep" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="850" y="190" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="12" value="dashanan-index-worker
+Zone 6 index maintenance" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="850" y="260" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="13" value="dashanan-provenance-relay
+drains provenance WAL" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="850" y="330" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="14" value="Event Bus
+Redis Streams (ADR-003)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="550" y="300" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="15" value="Hot Store: Redis
+Zone 1, idempotency, cache (ADR-005)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="550" y="400" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="16" value="Structured Store: PostgreSQL
+Zones 2/3/4/5/7 (ADR-006)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="550" y="480" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="17" value="Vector Index: Qdrant
+Zone 6 ANN, per-tenant (ADR-007)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="850" y="400" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="18" value="Lexical Index: OpenSearch
+Zone 6 BM25 (ADR-008)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="850" y="480" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="19" value="Object Store: S3-compatible
+Zone 8 archives (ADR-009)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;boundedLbl=1;" vertex="1" parent="1">
+      <mxGeometry x="850" y="560" width="260" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="4" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="4" target="6" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="22" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="4" target="7" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="4" target="8" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="24" value="Zone 1 get/put" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="10" target="15" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="25" value="ANN query" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="10" target="17" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="26" value="BM25 query" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="10" target="18" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="27" value="publish events, XADD" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="10" target="14" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="28" value="XREADGROUP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="14" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="29" value="XREADGROUP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="14" target="12" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="30" value="XREADGROUP" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="14" target="13" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="31" value="state transitions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="11" target="16" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="32" value="upsert/delete vectors" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="12" target="17" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="33" value="upsert/delete docs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="12" target="18" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="34" value="append provenance" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="13" target="16" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="35" value="write compressed archives" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="11" target="19" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="36" value="embeds in-process" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="2" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="37" value="gRPC/REST, mTLS+JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="2" target="10" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>

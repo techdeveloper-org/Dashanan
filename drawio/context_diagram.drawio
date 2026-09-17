@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0" compressed="false">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="2" value="External Actors (HLD S1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="360" height="400" as="geometry" />
+    </mxCell>
+    <mxCell id="3" value="Host AI System / Agent Framework
+(FR-009)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="70" y="90" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="4" value="Long-running Coding Agent
+(host profile)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="70" y="170" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="5" value="Short-lived Support Session
+(host profile)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="70" y="250" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="6" value="Deployment Operator
+(NFR-009)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#4285f4;" vertex="1" parent="1">
+      <mxGeometry x="70" y="330" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="7" value="Dashanan Memory Orchestrator
+(FR-009, FR-012)
+8-zone dynamic memory
+orchestration engine" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fef7e0;strokeColor=#f9ab00;strokeWidth=2;" vertex="1" parent="1">
+      <mxGeometry x="480" y="200" width="320" height="100" as="geometry" />
+    </mxCell>
+    <mxCell id="8" value="External Dependencies (HLD S1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="900" y="40" width="360" height="400" as="geometry" />
+    </mxCell>
+    <mxCell id="9" value="Embedding Provider
+(FR-006)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="930" y="100" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="10" value="Summarization LLM
+(compress transition, FR-012)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="930" y="200" width="300" height="60" as="geometry" />
+    </mxCell>
+    <mxCell id="11" value="Storage Backends
+Relational / KV / Vector /
+Lexical / Object Store
+(FR-011 pluggable adapters)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f3f4;strokeColor=#5f6368;" vertex="1" parent="1">
+      <mxGeometry x="930" y="300" width="300" height="90" as="geometry" />
+    </mxCell>
+    <mxCell id="12" value="Assemble context (sync) /
+Write memory (async-accepted)
+gRPC / REST / in-process" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="3" target="7" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="13" value="host profile of" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="4" target="3" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="14" value="host profile of" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="5" target="3" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="15" value="Configure + observe
+REST admin API (NFR-009)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="6" target="7" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="16" value="Embed query and items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="7" target="9" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="17" value="Summarize aged items" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="7" target="10" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="18" value="Pluggable adapters (FR-011)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;fontSize=10;" edge="1" source="7" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>

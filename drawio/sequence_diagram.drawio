@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0" compressed="false">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="2" value="Flow 1 -- Context Assembly (sync read) [FR-009, FR-006, FR-007]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;verticalAlign=top;align=left;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="30" width="1180" height="660" as="geometry" />
+    </mxCell>
+    <mxCell id="3" value="Host AI System" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="60" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="4" value="dashanan-api (Orchestrator)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="260" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="5" value="Zone 1 Working (Hot Store)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="460" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="6" value="Zone 6 Vector Index (Qdrant)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="660" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="7" value="Zone 6 Lexical Index (OpenSearch)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="860" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="8" value="Zones 2/3/4/5 (Structured Store)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="1060" y="40" width="180" height="620" as="geometry" />
+    </mxCell>
+    <mxCell id="9" value="1: POST /context/assemble (AssembleContextRequest: session_id, task/query_embedding, token_budget, zones, cursor)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.0484;exitDx=0;exitDy=0;entryX=0;entryY=0.0484;entryDx=0;entryDy=0;" edge="1" source="3" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="10" value="2: Read current-session Working items (read-your-own-write, ADR-002)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.1452;exitDx=0;exitDy=0;entryX=0;entryY=0.1452;entryDx=0;entryDy=0;" edge="1" source="4" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="11" value="par: Zone 6 hybrid fan-out (RRF-fused)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;verticalAlign=top;align=left;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="170" width="700" height="140" as="geometry" />
+    </mxCell>
+    <mxCell id="12" value="3: ANN query (vector similarity)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.2581;exitDx=0;exitDy=0;entryX=0;entryY=0.2581;entryDx=0;entryDy=0;" edge="1" source="4" target="6" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="13" value="4: Ranked candidate list (vector_only)" style="edgeStyle=elbowEdgeStyle;html=1;dashed=1;endArrow=open;endFill=0;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.3065;exitDx=0;exitDy=0;entryX=0;entryY=0.3065;entryDx=0;entryDy=0;" edge="1" source="6" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="14" value="5: BM25 query (lexical)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.3548;exitDx=0;exitDy=0;entryX=0;entryY=0.3548;entryDx=0;entryDy=0;" edge="1" source="4" target="7" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="15" value="6: Ranked candidate list (lexical_only)" style="edgeStyle=elbowEdgeStyle;html=1;dashed=1;endArrow=open;endFill=0;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.4032;exitDx=0;exitDy=0;entryX=0;entryY=0.4032;entryDx=0;entryDy=0;" edge="1" source="7" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="16" value="7: Reciprocal Rank Fusion (score = sum 1/(k+rank), k=60) -&gt; hybrid_rrf" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.4839;entryX=1;entryY=0.5323;" edge="1" source="4" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="17" value="8: Fetch owning-zone records for fused item_ids (score_terms, provenance)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.5806;exitDx=0;exitDy=0;entryX=0;entryY=0.5806;entryDx=0;entryDy=0;" edge="1" source="4" target="8" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="18" value="9: MemoryItem records" style="edgeStyle=elbowEdgeStyle;html=1;dashed=1;endArrow=open;endFill=0;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.6290;exitDx=0;exitDy=0;entryX=0;entryY=0.6290;entryDx=0;entryDy=0;" edge="1" source="8" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="19" value="10: Budget-fit + rank (token_budget cap, max_items cap, min_provenance_conf)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.7097;entryX=1;entryY=0.7581;" edge="1" source="4" target="4" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="20" value="11: 200 ContextAssembly (items, token_count_total, items_considered, items_returned, degraded, retrieval_mode, next_cursor)" style="edgeStyle=elbowEdgeStyle;html=1;dashed=1;endArrow=open;endFill=0;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.8065;exitDx=0;exitDy=0;entryX=0;entryY=0.8065;entryDx=0;entryDy=0;" edge="1" source="4" target="3" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="21" value="If items_considered &gt; items_returned,
+next_cursor is echoed for the SAME assembly_id
+(AssembleContextRequest.cursor on the follow-up call).
+410 StaleCursor if replayed against a rotated/expired basis." style="shape=mxgraph.uml.note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="260" y="580" width="500" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="22" value="Flow 2 -- Memory Write (sync accept, async process) [FR-009, FR-010, FR-013]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;verticalAlign=top;align=left;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="770" width="1560" height="680" as="geometry" />
+    </mxCell>
+    <mxCell id="23" value="Host AI System" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="60" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="24" value="dashanan-api (Orchestrator)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="260" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="25" value="Zone 1 Working (Hot Store)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="460" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="26" value="Provenance WAL (local fsync)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="660" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="27" value="Event Bus (Redis Streams)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="860" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="28" value="rotation-worker" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="1060" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="29" value="provenance-relay" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="1260" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="30" value="Zone 7 Provenance (Structured Store)" style="shape=mxgraph.uml.lifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;recursiveResize=0;outlineConnect=0;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="1460" y="780" width="180" height="640" as="geometry" />
+    </mxCell>
+    <mxCell id="31" value="1: POST /memory/write (WriteMemoryRequest: session_id, content, provenance) + Idempotency-Key" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.0469;exitDx=0;exitDy=0;entryX=0;entryY=0.0469;entryDx=0;entryDy=0;" edge="1" source="23" target="24" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="32" value="2: FR-010 boundary check: resolvable source_type? (422 if not)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.1250;entryX=1;entryY=0.1719;" edge="1" source="24" target="24" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="33" value="3: Synchronous Zone 1 write (durability barrier, ADR-002)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.2344;exitDx=0;exitDy=0;entryX=0;entryY=0.2344;entryDx=0;entryDy=0;" edge="1" source="24" target="25" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="34" value="4: fsync provenance record (durability barrier, ADR-010)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.3281;exitDx=0;exitDy=0;entryX=0;entryY=0.3281;entryDx=0;entryDy=0;" edge="1" source="24" target="26" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="35" value="5: 202 WriteReceipt (write_id, status=accepted, accepted_at)" style="edgeStyle=elbowEdgeStyle;html=1;dashed=1;endArrow=open;endFill=0;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.4062;exitDx=0;exitDy=0;entryX=0;entryY=0.4062;entryDx=0;entryDy=0;" edge="1" source="24" target="23" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="36" value="6: Publish memory.written (item_id, zone, token_count, provenance_id, score_terms)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.5000;exitDx=0;exitDy=0;entryX=0;entryY=0.5000;entryDx=0;entryDy=0;" edge="1" source="24" target="27" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="37" value="par: Async consumers (consumer groups, XREADGROUP)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;verticalAlign=top;align=left;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="260" y="1140" width="1200" height="180" as="geometry" />
+    </mxCell>
+    <mxCell id="38" value="7: Deliver memory.written" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.6250;exitDx=0;exitDy=0;entryX=0;entryY=0.6250;entryDx=0;entryDy=0;" edge="1" source="27" target="28" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="39" value="8: Schedule rotation deadline (promote/compress/archive timer)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.6875;entryX=1;entryY=0.7344;" edge="1" source="28" target="28" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="40" value="9: Deliver memory.written" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.7656;exitDx=0;exitDy=0;entryX=0;entryY=0.7656;entryDx=0;entryDy=0;" edge="1" source="27" target="29" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="41" value="10: Drain provenance WAL entry" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.8125;exitDx=0;exitDy=0;entryX=0;entryY=0.8125;entryDx=0;entryDy=0;" edge="1" source="29" target="26" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="42" value="11: Append ProvenanceRecord (prev_hash/record_hash chain, status: durable)" style="edgeStyle=elbowEdgeStyle;html=1;endArrow=block;endFill=1;fontSize=9;align=center;verticalAlign=top;exitX=1;exitY=0.8594;exitDx=0;exitDy=0;entryX=0;entryY=0.8594;entryDx=0;entryDy=0;" edge="1" source="29" target="30" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="43" value="Host may poll GET /writes/{write_id}
+for status: accepted -&gt; indexed -&gt; failed." style="shape=mxgraph.uml.note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="260" y="1380" width="460" height="50" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>

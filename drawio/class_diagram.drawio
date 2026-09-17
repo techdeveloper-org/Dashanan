@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0" compressed="false">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="2" value="&lt;&lt;Application, FR-009&gt;&gt;
+MemoryOrchestrator" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="620" y="20" width="340" height="156" as="geometry" />
+    </mxCell>
+    <mxCell id="3" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="2">
+      <mxGeometry x="0" y="4" width="340" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="4" value="+assembleContext(tenant_id, query) ContextAssembly
++writeMemory(tenant_id, item) WriteReceipt
++explainScore(item_id) MemoryScore
+-routeToZone(fact) Zone" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="2">
+      <mxGeometry x="0" y="10" width="340" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="5" value="&lt;&lt;Port Interface, FR-011&gt;&gt;
+ZoneRepository" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="620" y="260" width="340" height="156" as="geometry" />
+    </mxCell>
+    <mxCell id="6" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="5">
+      <mxGeometry x="0" y="4" width="340" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="7" value="+get(tenant_id, item_id) MemoryItem
++put(tenant_id, item) void
++query(tenant_id, filter) List~MemoryItem~
++delete(tenant_id, item_id) void" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="5">
+      <mxGeometry x="0" y="10" width="340" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="8" value="&lt;&lt;Application, FR-012&gt;&gt;
+RotationEngine" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="20" width="300" height="124" as="geometry" />
+    </mxCell>
+    <mxCell id="9" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="8">
+      <mxGeometry x="0" y="4" width="300" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="10" value="+sweep() void
++transition(item, target_state) void" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="8">
+      <mxGeometry x="0" y="10" width="300" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="11" value="&lt;&lt;Domain Value Object, FR-012&gt;&gt;
+MemoryScore" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1040" y="260" width="300" height="188" as="geometry" />
+    </mxCell>
+    <mxCell id="12" value="-recency
+-frequency
+-importance
+-userAffinity
+-taskRelevance
+-provenanceConfidence" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="11">
+      <mxGeometry x="0" y="4" width="300" height="102" as="geometry" />
+    </mxCell>
+    <mxCell id="13" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="11">
+      <mxGeometry x="0" y="110" width="300" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="14" value="+compute() float" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="11">
+      <mxGeometry x="0" y="116" width="300" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="15" value="&lt;&lt;Zone 1, FR-001&gt;&gt;
+WorkingMemoryZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="20" y="540" width="260" height="204" as="geometry" />
+    </mxCell>
+    <mxCell id="16" value="-tenant_id
+-session_id
+-item_id
+-payload
+-token_count
+-written_at
+-last_access_at" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="15">
+      <mxGeometry x="0" y="4" width="260" height="118" as="geometry" />
+    </mxCell>
+    <mxCell id="17" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="15">
+      <mxGeometry x="0" y="126" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="18" value="+evictOnTTL() void" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="15">
+      <mxGeometry x="0" y="132" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="19" value="&lt;&lt;Zone 2, FR-002&gt;&gt;
+EpisodicMemoryZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="540" width="260" height="188" as="geometry" />
+    </mxCell>
+    <mxCell id="20" value="-episode_id
+-occurred_at
+-written_at
+-payload
+-actors
+-state" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="19">
+      <mxGeometry x="0" y="4" width="260" height="102" as="geometry" />
+    </mxCell>
+    <mxCell id="21" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="19">
+      <mxGeometry x="0" y="110" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="22" value="+queryByRecency() List~Episode~" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="19">
+      <mxGeometry x="0" y="116" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="23" value="&lt;&lt;Zone 3, FR-003&gt;&gt;
+SemanticMemoryZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="580" y="540" width="260" height="172" as="geometry" />
+    </mxCell>
+    <mxCell id="24" value="-edge_id
+-subject_ref
+-predicate
+-object_ref
+-state" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="23">
+      <mxGeometry x="0" y="4" width="260" height="86" as="geometry" />
+    </mxCell>
+    <mxCell id="25" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="23">
+      <mxGeometry x="0" y="94" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="26" value="+applyOwnershipSpec(fact) Zone" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="23">
+      <mxGeometry x="0" y="100" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="27" value="&lt;&lt;Zone 4, FR-004&gt;&gt;
+ProceduralMemoryZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="860" y="540" width="260" height="172" as="geometry" />
+    </mxCell>
+    <mxCell id="28" value="-procedure_id
+-task_signature_hash
+-steps
+-success_count
+-failure_count" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="27">
+      <mxGeometry x="0" y="4" width="260" height="86" as="geometry" />
+    </mxCell>
+    <mxCell id="29" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="27">
+      <mxGeometry x="0" y="94" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="30" value="+lookupBySignature() Procedure" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="27">
+      <mxGeometry x="0" y="100" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="31" value="&lt;&lt;Zone 5, FR-005&gt;&gt;
+EntityMemoryZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1140" y="540" width="260" height="172" as="geometry" />
+    </mxCell>
+    <mxCell id="32" value="-entity_id
+-entity_type
+-canonical_name
+-aliases
+-attributes" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="31">
+      <mxGeometry x="0" y="4" width="260" height="86" as="geometry" />
+    </mxCell>
+    <mxCell id="33" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="31">
+      <mxGeometry x="0" y="94" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="34" value="+getByEntityId() EntityRecord" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="31">
+      <mxGeometry x="0" y="100" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="35" value="&lt;&lt;Zone 6, FR-006, derived&gt;&gt;
+RetrievalIndexZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="540" width="260" height="156" as="geometry" />
+    </mxCell>
+    <mxCell id="36" value="-item_id
+-source_zone
+-vector
+-model_id" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="35">
+      <mxGeometry x="0" y="4" width="260" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="37" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="35">
+      <mxGeometry x="0" y="78" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="38" value="+hybridSearch(query) List~MemoryItem~" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="35">
+      <mxGeometry x="0" y="84" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="39" value="&lt;&lt;Zone 7, FR-007, FR-010&gt;&gt;
+ProvenanceAuditZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="20" y="800" width="260" height="220" as="geometry" />
+    </mxCell>
+    <mxCell id="40" value="-provenance_id
+-item_id
+-source_type
+-confidence
+-conflict_status
+-prev_hash
+-record_hash" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="39">
+      <mxGeometry x="0" y="4" width="260" height="118" as="geometry" />
+    </mxCell>
+    <mxCell id="41" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="39">
+      <mxGeometry x="0" y="126" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="42" value="+recordWrite(item_id, source) void
++computeConfidence() float" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="39">
+      <mxGeometry x="0" y="132" width="260" height="38" as="geometry" />
+    </mxCell>
+    <mxCell id="43" value="&lt;&lt;Zone 8, FR-008&gt;&gt;
+ConsolidationZone" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#ffffff;strokeColor=#000000;html=1;" vertex="1" parent="1">
+      <mxGeometry x="300" y="800" width="260" height="156" as="geometry" />
+    </mxCell>
+    <mxCell id="44" value="-blob_id
+-period
+-source_item_ids
+-compressed_payload" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="43">
+      <mxGeometry x="0" y="4" width="260" height="70" as="geometry" />
+    </mxCell>
+    <mxCell id="45" value="" style="line;strokeColor=#000000;fillColor=none;" vertex="1" parent="43">
+      <mxGeometry x="0" y="78" width="260" height="2" as="geometry" />
+    </mxCell>
+    <mxCell id="46" value="+readArchived(blob_id) ConsolidatedBlob" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;fontSize=10;" vertex="1" parent="43">
+      <mxGeometry x="0" y="84" width="260" height="22" as="geometry" />
+    </mxCell>
+    <mxCell id="47" value="depends on" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="2" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="48" value="uses" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="2" target="8" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="49" value="computes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="2" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="50" value="reads" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="8" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="51" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="15" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="52" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="19" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="53" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="23" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="54" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="27" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="55" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="31" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="56" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="35" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="57" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="39" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="58" value="implements" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=0;fontSize=10;" edge="1" source="43" target="5" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="59" value="provides ProvenanceConfidence term" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="39" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="60" value="references entity_id only (no copy)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open;endFill=0;fontSize=10;" edge="1" source="23" target="31" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+  </root>
+</mxGraphModel>
