@@ -1,0 +1,209 @@
+{
+  "document_id": "AR3-CONTEXT-WINDOWS-20260917-01",
+  "version": "1.0.0",
+  "author": "context-engineering-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.3 per-story context window design)",
+  "date": "2026-09-17",
+  "correlation_id": "DASH-PH7-AR3-20260917",
+  "depends_on": [
+    "docs/phase-7-routing/ar1_assignments.json v1.0.0",
+    "docs/phase-6-sprint-planning/backlog_draft.json v1.0.0"
+  ],
+  "classification_model": {
+    "name": "Bell-LaPadula classification-ceiling",
+    "rule": "No story's context window may include Zone 2 (Episodic) or Zone 5 (Entity) content bearing PII unless the story itself is security-cleared. No Sprint 1 story is security-cleared for raw PII read access. Where a story's implementation reasoning needs to reference Zone 2/5 content shape, a redacted/pseudonymized synthetic example is substituted for any real or realistic PII value.",
+    "zone_5_note": "Zone 5 (Entity Memory) is out of Sprint 1 scope per backlog_draft.json future_sprints_backlog (FR-005). No Sprint 1 story context window touches Zone 5; the ceiling is recorded as N/A-not-yet-applicable rather than omitted."
+  },
+  "context_windows": [
+    {
+      "story_id": "DASH-STORY-001",
+      "title": "Memory Orchestrator core facade and unified context-assembly API",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 6000,
+      "sources": [
+        "HLD_Section_2_ContainerArchitecture",
+        "HLD_Section_3.1_MemoryOrchestrator_OwnershipMatch",
+        "HLD_Section_5_GreedyKnapsackContextAssembly",
+        "HLD_Section_6_FacadeAndBuilderPatterns",
+        "HLD_Invariant_3.0_1_NoDomainImportsInfrastructure",
+        "SRS_FR-009",
+        "SRS_AC-009",
+        "SRS_AC-009-SUPP-1",
+        "AR1-001_must_not_deviate_list"
+      ],
+      "pii_exclusion_applied": false,
+      "pii_note": "Orchestrator owns no persistent zone data (application layer only, HLD 3.1). No Zone 2/5 content enters this context window; nothing to redact."
+    },
+    {
+      "story_id": "DASH-STORY-002",
+      "title": "Working Memory zone (Zone 1) - TTL-primary scratch context",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5000,
+      "sources": [
+        "HLD_Section_3.2_ZoneOwnershipMatch_ADR-005",
+        "HLD_Section_5_O1_LRU_HashMap_DLL",
+        "HLD_Invariant_3.0_2_TenantIdMandatoryAtPort",
+        "SRS_FR-001",
+        "SRS_AC-001",
+        "AR1-002_must_not_deviate_list"
+      ],
+      "pii_exclusion_applied": false,
+      "pii_note": "Zone 1 is scratch/TTL context, not Zone 2/5. No classification ceiling triggered; content is transient session context, no PII redaction required for this window."
+    },
+    {
+      "story_id": "DASH-STORY-003",
+      "title": "Episodic Memory zone (Zone 2) - chronological recency store",
+      "assigned_agent": "database-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_Section_3.3_ZoneOwnershipMatch_ADR-006",
+        "HLD_Section_5_BRIN_vs_BTree_IndexDecision",
+        "HLD_Section_5_KeysetPagination_O1_vs_Offset",
+        "SRS_FR-002",
+        "SRS_AC-002",
+        "SRS_AC-002-DPDP-1_REDACTED",
+        "AR1-003_must_not_deviate_list",
+        "AR1-G3_dpdp_erasure_routing_gap_advisory"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 2 is the flagged PII-bearing zone (Bell-LaPadula ceiling). This story is NOT security-cleared. Only the schema shape and index/query decisions are admitted to context (chronological order, decay attribute, keyset pagination); no example conversational content is included. AC-002-DPDP-1 is included as a REDACTED requirement statement only (erasure/purpose-limitation obligation text), with all example PII values stripped and replaced by placeholder tokens such as <PII_EXAMPLE_REDACTED> where illustration is needed. DPDP erasure IMPLEMENTATION is out of this story per AR1-G3 (review-only, security-defense-architect consult) - the context window therefore excludes any crypto-shredding mechanism detail beyond the pointer to AC-013, which is not itself dereferenced here."
+    },
+    {
+      "story_id": "DASH-STORY-004",
+      "title": "Zone 2 capacity cap and MaxAge forced-archival backstop (OAQ-4)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_Section_12F_OAQ-4_SprintHardDependency",
+        "HLD_Section_6_TemplateMethod_SweepSkeleton",
+        "SRS_FR-002",
+        "SRS_AC-002-CAP-1",
+        "SRS_AC-002-CAP-2",
+        "SRS_AC-002-CAP-DPDP-1_REDACTED",
+        "AR1-004_must_not_deviate_list",
+        "AR1-004_p1_reviewer_scope_security-defense-architect"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "This story evicts PII-bearing Zone 2 items and is P1-gated (security-defense-architect, Maker-Checker). Context window carries the eviction-ranking and config-surface mechanics only (MemoryScore ordering, cap/MaxAge config), never raw evicted item content. AC-002-CAP-DPDP-1 is included as a REDACTED requirement statement with cross-zone consistency language intact but no PII example values. The implementing agent (python-backend-engineer) is not security-cleared; the reviewer's scope note is included so the implementer knows what the reviewer will check, without granting the implementer PII read access it does not have."
+    },
+    {
+      "story_id": "DASH-STORY-005",
+      "title": "Provenance/Audit zone (Zone 7) - source, confidence, edit history",
+      "assigned_agent": "database-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_Section_3.8_ZoneOwnershipMatch_ADR-010",
+        "HLD_Section_5_SHA256_PrevHashChain",
+        "HLD_Section_10_Threat_R-1",
+        "SRS_FR-007",
+        "SRS_AC-007",
+        "AR1-005_must_not_deviate_list",
+        "AR1-005_p1_reviewer_scope_security-defense-architect"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 7 stores source attribution and edit-history METADATA about facts written from any zone, including Zone 2. This context window admits only the provenance schema (source_type, confidence, hash chain, item_id pointer) - it never includes the underlying Zone 2/5 fact content the provenance record points to. Any illustrative record uses a pseudonymized item_id and a placeholder source_type; no example resembles a real conversational fragment."
+    },
+    {
+      "story_id": "DASH-STORY-006",
+      "title": "Cross-cutting provenance write-path enforcement (WAL/outbox gate)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5000,
+      "sources": [
+        "HLD_Section_7.2_WritePath_ADR-010",
+        "HLD_Section_6_TransactionalOutbox",
+        "SRS_FR-010",
+        "SRS_AC-010",
+        "SRS_AC-016",
+        "AR1-006_must_not_deviate_list",
+        "AR1-006_p1_reviewer_scope_api-security-auditor"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "The gate operates on write-path CONTROL METADATA (source_type resolvability, 422 contract) across all Sprint 1 zones including Zone 2, but never needs to inspect payload content to enforce the gate. Context window is scoped to the control-plane contract only; no zone payload examples (PII or otherwise) are included."
+    },
+    {
+      "story_id": "DASH-STORY-007",
+      "title": "Retrieval-Index zone (Zone 6) - hybrid vector + lexical index",
+      "assigned_agent": "ai-engineer",
+      "context_budget_tokens": 7000,
+      "sources": [
+        "HLD_Section_3.7_ZoneOwnershipMatch_ADR-007_ADR-008_ADR-013",
+        "HLD_Section_5_HNSW_BM25_RRF_Params",
+        "HLD_Section_3.7_Zone1Excluded_ZonesIndexed_2-5_7_8",
+        "HLD_Threats_I-1_I-2_I-3_TenantIsolation",
+        "SRS_FR-006",
+        "SRS_AC-006",
+        "SRS_AC-006-COST-1",
+        "SRS_AC-014",
+        "AR1-007_must_not_deviate_list",
+        "AR1-007_p1_reviewer_scope_api-security-auditor_conditional",
+        "AR1-007_mathematical_delegation_mathematics-engineer"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 6 indexes Zones 2-5, 7, 8 (Zone 1 excluded, HLD 3.7), so its index necessarily derives from Zone 2 content. Context window admits only VECTOR/EMBEDDING-LEVEL and index-structure detail (HNSW params, BM25, RRF fusion, per-tenant partitioning, cache-key prefixing) - never the underlying source text used to produce an embedding. No example embedding is paired with example raw PII content; illustrations use an opaque pseudonymized item_id only. This is the highest-risk story for indirect PII leakage via example content because it sits directly on top of Zone 2, so the redaction is applied strictly."
+    },
+    {
+      "story_id": "DASH-STORY-008",
+      "title": "Memory Score computation engine (six-term formula)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 6000,
+      "sources": [
+        "HLD_Section_3.1_ScoringService_OwnershipMatch",
+        "HLD_Section_5_O1_DotProduct_ExpDecay",
+        "HLD_Section_6_ValueObject_Immutability",
+        "HLD_Sections_12A-12C_MemoryScoreFormula",
+        "SRS_FR-012",
+        "SRS_AC-017",
+        "SRS_AC-012-SCORE-1",
+        "AR1-008_must_not_deviate_list",
+        "AR1-008_mathematical_delegation_mathematics-engineer"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "MemoryScore is computed from numeric term inputs (Recency, Frequency, Importance, UserAffinity, TaskRelevance, ProvenanceConfidence) sourced from Zones 2, 6, 7. Context window carries only the formula, weight/threshold config surface, and term-normalization contract - no example item whose score is being illustrated includes real or realistic PII text; any worked example uses abstract term values (e.g. Recency=0.8) only."
+    },
+    {
+      "story_id": "DASH-STORY-009",
+      "title": "Rotation state machine - Active to Compressed (Archived deferred)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_RotationEngine_ADR-012",
+        "HLD_Section_12C_TimerWheel_ClosedFormDeadline",
+        "HLD_Section_6_GuardedStateMachine_TemplateMethod",
+        "SRS_FR-012",
+        "SRS_AC-012",
+        "SRS_AC-012-ROT-1",
+        "AR1-009_must_not_deviate_list",
+        "AR1-009_mathematical_delegation_mathematics-engineer"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "The rotation sweep transitions items (including Zone 2 items) by state, keyed on item_id and MemoryScore only. Context window excludes item payload content entirely - state-machine and scheduling logic never needs to read the item body, so no redaction substitution was even necessary beyond confirming the exclusion."
+    },
+    {
+      "story_id": "DASH-STORY-010",
+      "title": "ADR-012 deadline-invalidation wiring on non-Recency term mutation",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5000,
+      "sources": [
+        "HLD_Section_12C_ADR-012_InvalidationWiring",
+        "SRS_FR-012",
+        "SRS_AC-012-INVAL-1",
+        "AR1-010_must_not_deviate_list",
+        "AR1-010_mathematical_delegation_mathematics-engineer_advisory",
+        "cross_reference_DASH-STORY-001_read_path",
+        "cross_reference_DASH-STORY-005_006_conflict_detection_path",
+        "cross_reference_DASH-STORY-008_override_path"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Wiring touches a mutation SIGNAL (Frequency-on-access, ProvenanceConfidence-on-conflict, Importance-on-override), not zone payload content. Context window includes only the three named hook points and the O(log N) re-insert contract; no Zone 2 content, conflict text, or override rationale text is admitted as example material."
+    }
+  ],
+  "summary": {
+    "stories_total": 10,
+    "total_context_budget_tokens": 55500,
+    "stories_with_pii_exclusion_applied": 8,
+    "stories_without_pii_exclusion_trigger": ["DASH-STORY-001", "DASH-STORY-002"],
+    "zone_5_stories_in_sprint_1": 0,
+    "strictest_redaction": "DASH-STORY-003 (direct Zone 2 owner) and DASH-STORY-007 (indexes Zone 2 content into embeddings) carry the strictest redaction discipline - both exclude raw/realistic PII text even from illustrative examples, substituting pseudonymized item_id placeholders.",
+    "note_on_security_clearance": "No Sprint 1 story is security-cleared for raw PII. Where a P1 reviewer (security-defense-architect, api-security-auditor) needs deeper access for its own review, that access is scoped to the reviewer's separate review context, not to the implementing agent's context window documented here."
+  }
+}
