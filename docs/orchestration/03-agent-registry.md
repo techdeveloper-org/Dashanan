@@ -1377,7 +1377,7 @@ KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
   Operating Rule "ALWAYS specify a minimal tagging taxonomy before recommending any allocation
   model") for any Sprint-1 story that provisions the vector-store/retrieval-index backing for Zone 6
   — this is the single most likely new-infrastructure story in Sprint 1's Orchestrator-core+Zones-
-  1/2/8/9 scope.
+  1/2/6/7 scope.
 - finops-unit-economics-core -> Add a cost-estimate AC to that story distinguishing average vs.
   marginal cost per unit (per-query retrieval cost, not just total monthly spend) — per this agent's
   mandatory "never conflate fixed-cost amortization with genuine efficiency improvement" rule.
@@ -1454,7 +1454,7 @@ KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation):
 TASK: AR.0 — build the routing index over the 104 domain KGs for Sprint 1's stories. AR.1 — score and
 assign each story to its best-fit implementation agent (expect python-backend-engineer,
 context-engineering-agent, and database-storage-engineer as likely top scorers for the Orchestrator-
-core/Zone-1/2/8/9 stories). Apply the P1 security override (Team Alignment, already agreed) to any
+core/Zone-1/2/6/7 stories). Apply the P1 security override (Team Alignment, already agreed) to any
 story touching Zone 7, the storage-adapter interface, or cross-tenant isolation.
 
 OUTPUT FORMAT: AGENT OUTPUT per your agent.md — ar0_routing_index.json + ar1_assignments.json.
