@@ -1844,7 +1844,7 @@ PROMPT (hallucination-detector, representative — reused after every phase's ou
 ---persona---
 agent: hallucination-detector
 kg_route: anti-hallucination (D24, cross-cutting, mandatory always-on)
-skills: [nli-faithfulness-core, selfcheckgpt-core, semantic-entropy-core, factscore-core]
+skills: [hallucination-detection-core, uncertainty-quantification-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -1855,18 +1855,23 @@ MEDIUM for this project) plus this agent's own role default.
 This agent's own output is what downstream gates consume — no further hallucination check on it, but
 context-faithfulness-engineer independently cross-checks the same artifact in parallel.
 
-FIRST, READ in full: agents/hallucination-detector/agent.md, skills/nli-faithfulness-core/SKILL.md,
-skills/selfcheckgpt-core/SKILL.md, skills/semantic-entropy-core/SKILL.md, skills/factscore-core/SKILL.md.
+FIRST, READ in full: agents/hallucination-detector/agent.md, skills/hallucination-detection-core/SKILL.md,
+skills/uncertainty-quantification-core/SKILL.md.
+(Corrected 2026-09-17: previous 4-skill list — nli-faithfulness-core, selfcheckgpt-core,
+semantic-entropy-core, factscore-core — does not exist in the library. Fixed against agent.md's real
+frontmatter; the NLI/FactScore/SelfCheckGPT/semantic-entropy techniques themselves are still the
+correct methodology per hallucination-detection-core's own content, just not separate skill files.)
 
-KNOWLEDGE DISTILLATION (4/4 skills covered — role-metadata distillation):
-- nli-faithfulness-core -> Compute NLI entailment score for the artifact just produced against its
-  stated source (PRD against Phase 0 research brief, HLD against PRD, OpenAPI against HLD, SRS against
-  HLD, backlog against SRS, routed prompts against backlog) — target NLI >= 0.95, no domain relaxation.
-- selfcheckgpt-core -> Cross-check factual claims (e.g. "HNSW gives O(log n) retrieval" claims in the
-  HLD) via self-consistency sampling if genuinely disputable.
-- semantic-entropy-core -> Flag any claim with high semantic entropy (agent expressed via inconsistent
-  phrasing across re-generations) as a hallucination candidate needing human/mathematics-engineer review.
-- factscore-core -> Per-claim FactScore against the source artifact — target FactScore >= 0.95.
+KNOWLEDGE DISTILLATION (2/2 skills covered — corrected to agent.md's real frontmatter skill list):
+- hallucination-detection-core -> Compute NLI entailment + FactScore for the artifact just produced
+  against its stated source (PRD against Phase 0 research brief, HLD against PRD, OpenAPI against HLD,
+  SRS against HLD, backlog against SRS, routed prompts against backlog) — target NLI >= 0.95 and
+  FactScore >= 0.95, no domain relaxation; cross-check disputable factual claims (e.g. "HNSW gives
+  O(log n) retrieval") via self-consistency sampling, and flag high-semantic-entropy claims (inconsistent
+  phrasing across re-generations) as hallucination candidates needing human/mathematics-engineer review.
+- uncertainty-quantification-core -> Attach a confidence/uncertainty band to each flagged claim, not
+  just a binary pass/fail, so the producing agent knows which flags are high-confidence defects vs.
+  borderline calls worth a second look.
 
 TASK: Compute NLI faithfulness + FactScore for the artifact just produced by the immediately-preceding
 agent in this pipeline (parameterized per phase — this block is dispatched once per agent output, not
