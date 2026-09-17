@@ -207,7 +207,7 @@ as:
   Correction ADRs attempted: {ADR-ids from iterations 2-3, with what each one tried and why it
     didn't resolve the disagreement}
   ⛔ STOP — human resolution required before any further iteration. This is not a relaxation of the
-  gate's threshold (e.g. RS still must reach 1.0, C_api still must reach ≥0.85 — escalation is what
+  gate's threshold (e.g. RS still must reach >= 0.95, C_api still must reach ≥0.85 — escalation is what
   happens when the automated loop cannot get there on its own, not permission to accept less). Reply
   with your resolution (pick a position, propose a third option, or explicitly accept a documented
   exception) to unblock iteration 4.
