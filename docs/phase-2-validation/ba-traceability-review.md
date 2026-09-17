@@ -36,7 +36,7 @@ Modeled per requirements-traceability-core §2.1 as a bipartite graph G = (R ∪
 
 **Orphan FRs (deg = 0): NONE.** All 12 PRD FRs trace to at least one HLD component/section.
 
-**Orphan HLD components (an implemented component with no traceable FR): NONE found.** Every named component in HLD §3 (Orchestrator, Zones 1–8) and every supporting container in §2 (`dashanan-api`, `dashanan-rotation-worker`, `dashanan-index-worker`, `dashanan-provenance-relay`) resolves to FR-009, FR-006, or FR-010 respectively — none is unaccounted-for infrastructure. The Rotation Engine (§3.11, owns `RotationDeadline`) is the execution mechanism of FR-012 and is not a standalone orphan.
+**Orphan HLD components (an implemented component with no traceable FR): NONE found.** Every named component in HLD §3 (Orchestrator, Zones 1–8) and every supporting container in §2 traces to an FR: `dashanan-api` -> FR-009 (Orchestrator routing), `dashanan-rotation-worker` -> FR-012 (Memory Score/rotation state machine, per §2 lines 95-99 — corrected 2026-09-17, not FR-006/FR-009/FR-010 as an earlier version of this sentence implied), `dashanan-index-worker` -> FR-006 (Retrieval-Index), `dashanan-provenance-relay` -> FR-010 (cross-cutting provenance/audit obligation) — none is unaccounted-for infrastructure. The Rotation Engine (§3.11, owns `RotationDeadline`) is the execution mechanism of FR-012 and is not a standalone orphan.
 
 **Zero orphan FRs, zero orphan components — the Phase 2 consensus-gate precondition is met on traceability grounds.**
 
