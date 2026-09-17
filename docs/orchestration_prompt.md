@@ -1,6 +1,6 @@
-# DASHASAN — ORCHESTRATION BUNDLE (INDEX)
+# DASHANAN — ORCHESTRATION BUNDLE (INDEX)
 
-**Dashasan** is a reusable, embeddable dynamic memory orchestration engine for AI/LLM context systems — 8 specialized memory zones, a central Memory Score formula driving promotion/compression/archival between them, giving any AI system that embeds it a much larger effective context than its native window. **Enterprise complexity, 24 real agents dispatched** (not the library's full 528), covering Phases 0 → 1 → 1.5 → 2 → 5 → 6 → 7 → 8 (architecture through pre-implementation alignment — Phase B/coding is explicitly *not* included; this bundle stops at Phase 8's `IMPLEMENTATION READY` STOP for user sign-off).
+**Dashanan** is a reusable, embeddable dynamic memory orchestration engine for AI/LLM context systems — 8 specialized memory zones, a central Memory Score formula driving promotion/compression/archival between them, giving any AI system that embeds it a much larger effective context than its native window. **Enterprise complexity, 24 real agents dispatched** (not the library's full 528), covering Phases 0 → 1 → 1.5 → 2 → 5 → 6 → 7 → 8 (architecture through pre-implementation alignment — Phase B/coding is explicitly *not* included; this bundle stops at Phase 8's `IMPLEMENTATION READY` STOP for user sign-off).
 
 This was originally a single ~2,400-line file. Per architecture review (2026-09-17), it's now split into 3 focused files, each self-contained enough to read alone:
 
@@ -18,4 +18,4 @@ Five fixes applied after user architecture review: (1) 8-zone consolidation (was
 
 Paste all 3 files (in order: 01 → 02 → 03) into a fresh Claude Code conversation as `orchestrator-agent` to begin execution, or continue dispatching phase-by-phase from a live session, as already done for Phase 0 in this project's working session.
 
-Repo creation was handled separately and directly (public, `techdeveloper-org/Dashasan`) — not part of this bundle's own scope, per the same reasoning as before.
+Repo creation was handled separately and directly (public, `techdeveloper-org/Dashanan`) — not part of this bundle's own scope, per the same reasoning as before.

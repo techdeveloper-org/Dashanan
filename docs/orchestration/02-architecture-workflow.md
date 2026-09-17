@@ -1,4 +1,4 @@
-# DASHASAN -- ARCHITECTURE & WORKFLOW
+# DASHANAN -- ARCHITECTURE & WORKFLOW
 Part 2 of 3 -- see `../docs/orchestration_prompt.md` for the index. This file covers: routing/complexity
 classification, the full Phase 0-8 execution plan with gates, the bounded self-correction/escalation
 protocol (SC.1-3, ADR-9), Team Alignment resolutions, Interface Contracts, Resilience & QA rules, the
@@ -150,7 +150,7 @@ Phase 5   — Blueprint Docs:         business-analyst-agent (SRS author) + prod
                                      → consensus-agent BINARY (DOCUMENTATION APPROVED)
                                      GATE: SRS.md + 7 UML + 7 Draw.io, all FR-traceable
 Phase 6   — Sprint Planning:        scrum-master-agent (backlog+ACs+sub-tasks) + agile-tooling-specialist
-                                     (Jira Epics/Stories/Sprint via mcp-jira-api, project DASHASAN)
+                                     (Jira Epics/Stories/Sprint via mcp-jira-api, project DASHANAN)
                                      ∥ SP.0.5 reviewers: business-analyst-agent + product-manager-agent
                                      + solution-architect + finops-analyst (cloud/vector-store cost ACs)
                                      → consensus-agent BINARY ×2 (DRAFT APPROVED, then SPRINT READY)
@@ -365,7 +365,7 @@ input+output pricing tiers — sonnet cheapest, opus mid-tier, fable premium; do
 ## EXECUTION SUMMARY
 
 **Portability Mode:** IN-REPO — DECIDED: this bundle is meant for live dispatch from a Claude Code
-session with file access to `claude-global-library` and the `Dashasan` project root; every agent block
+session with file access to `claude-global-library` and the `Dashanan` project root; every agent block
 above uses the imperative READ-list FIFTH LINE and the short-form KNOWLEDGE DISTILLATION shape.
 
 **Master KG:** 528 agents (deduped), 1034 skills (deduped), 104 domains, 77 math masters, 9146 edges
@@ -408,7 +408,7 @@ themselves (not of running code, since none exists yet).
 **Reliability Score Target:** RS >= 0.95 mandatory at Phase 7 (Phase D/E within the routing pipeline) and
 Phase 8 (RS_phase8) — no domain relaxation.
 
-**Jira Tracking:** ACTIVE (once Phase 6 runs) — new project `DASHASAN`, Sprint 1 scoped to Orchestrator
+**Jira Tracking:** ACTIVE (once Phase 6 runs) — new project `DASHANAN`, Sprint 1 scoped to Orchestrator
 core + Zones 1/2/6/7, every Phase 7-routed story carrying a `Jira Ticket:` header for the eventual
 Phase B dispatch (not included in this bundle).
 
@@ -502,11 +502,11 @@ on their own FIRST-LINE mandatory full skill reads at dispatch time.
 
 ## CLOSING NOTE — OUT OF SCOPE FOR THIS DOCUMENT
 
-Per the user's item 6 ("create a repository named Dashasan... public techdeveloper-org repository"):
+Per the user's item 6 ("create a repository named Dashanan... public techdeveloper-org repository"):
 **this action was intentionally NOT taken by this bundle.** Creating a new public GitHub repository
 under an organization is a broad-scope, externally-visible action that this template's own Section on
 risky actions requires explicit, separate user confirmation for — it is not implied by "generate an
-orchestration prompt." When you are ready, ask explicitly to create the `techdeveloper-org/Dashasan`
+orchestration prompt." When you are ready, ask explicitly to create the `techdeveloper-org/Dashanan`
 repository (via `mcp__github-api__github_create_...` or the `git-ops`/`github-api` MCP servers per your
 global CLAUDE.md Section 3), and per Section 5 of that same file, open a tracking issue in it before any
 first commit lands.

@@ -1,4 +1,4 @@
-# DASHASAN -- AGENT REGISTRY (MULTI-AGENT PROMPT BUNDLE)
+# DASHANAN -- AGENT REGISTRY (MULTI-AGENT PROMPT BUNDLE)
 Part 3 of 3 -- see `../docs/orchestration_prompt.md` for the index. This file is the full, dispatchable
 multi-agent prompt bundle for Phases 0/1/1.5/2/5/6/7/8. See `02-architecture-workflow.md` for the WHY
 (phase gates, retry loops, cost estimate); this file is the HOW (one `---persona---`-blocked prompt per
@@ -46,7 +46,7 @@ never separately dispatched -- see `02-architecture-workflow.md` for the routing
 
 ## STEP 13 — MULTI-AGENT PROMPT BUNDLE
 
-**Portability Mode: IN-REPO** — DECIDED: this bundle is generated for dispatch from a live Claude Code session that has file access to `claude-global-library` (for `agents/{name}/agent.md` + `skills/{name}/SKILL.md`) and to the `Dashasan` project root. Every agent block below therefore uses the imperative READ-list FIFTH LINE, not the STANDALONE provenance-only form.
+**Portability Mode: IN-REPO** — DECIDED: this bundle is generated for dispatch from a live Claude Code session that has file access to `claude-global-library` (for `agents/{name}/agent.md` + `skills/{name}/SKILL.md`) and to the `Dashanan` project root. Every agent block below therefore uses the imperative READ-list FIFTH LINE, not the STANDALONE provenance-only form.
 
 **FULL-READ MANDATE DISCLOSURE (updated after a second authoring pass — SCALE HONESTY ESCAPE VALVE still legitimately applies at 26 direct agents / well over 40 cumulative skill edges, but the genuine full-read floor has been substantially closed since the first pass):**
 - **Agent.md read in full this session (13 of 26 — up from 1 of 26 in the first authoring pass):** `solution-architect`, `api-testing-engineer`, `integration-testing-engineer`, `uml-behavioral-diagram-engineer`, `uml-interaction-diagram-engineer`, `drawio-diagram-architect`, `mermaid-diagram-engineer`, `agile-tooling-specialist`, `finops-analyst`, `context-faithfulness-engineer`, `reliability-auditor`, `security-testing-engineer`, `prompt-generation-expert`. Every KNOWLEDGE DISTILLATION entry for these 13 agents' blocks is built from their real Core Responsibilities / Operating Rules / Mathematical Delegation text (not paraphrased metadata) — this second pass also caught and corrected two real routing errors the first pass's role-metadata-only approach could not have caught: `finops-analyst`'s true home KG is `finops-cloud-cost-engineering`, not `agile-business`; `security-testing-engineer`'s true home KG is `quality-testing`, not `cybersecurity` (both verified against `knowledge-graph/_master/indices/agent_to_kg.json`). It also confirmed the UML/Draw.io cell's real roster is exactly the 5 agents already used in this bundle (`uml-structural/behavioral/interaction-diagram-engineer`, `drawio-diagram-architect`, `mermaid-diagram-engineer` — verified against `knowledge-graph/uml-diagram-engineering/agents.json`'s actual 7-agent roster, the other 2 being `uml-from-code-engineer` [Brownfield-only, not needed here] and the auto-invoked `uml-diagram-mathematics-expert`) — no 10 separate diagram-type agent identities were invented; the 13 required diagram types are covered by these 5 real agents each handling multiple types, exactly as `knowledge-graph rule 45-uml-diagram-lifecycle` specifies.
@@ -93,7 +93,7 @@ frontmatter description, not the section headings, not a prior summary of it fro
 KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation, agent.md not read in full
 this session; sourced from claude-global-library/CLAUDE.md's authoritative Phase 0/2/6/8 roster entry):
 - requirements-elicitation-core -> This agent is the Phase 0 co-lead: gather FRs/NFRs for the 8-zone
-  Dashasan memory engine, numbered FR-NNN/NFR-NNN, with the 8 zones each getting FR-ZONE-01..08 plus 3
+  Dashanan memory engine, numbered FR-NNN/NFR-NNN, with the 8 zones each getting FR-ZONE-01..08 plus 3
   cross-cutting FRs (orchestrator routing, provenance/audit, storage-adapter pluggability) per the Team
   Alignment resolution already agreed with solution-architect (see AGREED CONTRACTS below).
 - prd-authoring-core -> Produce the 14-section PRD per pipelines/ba-pm-rnd-pipeline/PRD_TEMPLATE.md;
@@ -132,7 +132,7 @@ AGREED CONTRACTS:
   solution-architect, Phase 6) — your FR numbering should make this subset cleanly extractable.
 - Zone Capacity & Rotation Policy table is solution-architect's HLD section, not yours to re-derive.
 
-TASK: For Phase 0, co-author the PRD for Dashasan using the project summary and 8-zone taxonomy in
+TASK: For Phase 0, co-author the PRD for Dashanan using the project summary and 8-zone taxonomy in
 this document's Section 0 as your starting requirements input (validate or revise the taxonomy — it is
 explicitly flagged [INFERRED] and open for challenge). Produce FR-NNN/NFR-NNN numbered requirements,
 one FR per zone (FR-ZONE-01..08) plus 3 cross-cutting FRs, each with a WSJF-scorable priority note (hand
@@ -258,10 +258,10 @@ skills/technology-landscape-scanning-core/SKILL.md, skills/competitive-analysis-
 KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation):
 - technology-landscape-scanning-core -> Survey existing memory-for-LLM-agents products/papers (e.g.
   vector-DB-backed RAG memory, MemGPT-style hierarchical paging, agentic long-context frameworks) to
-  position Dashasan's 8-zone design against the field — this is direct input to solution-architect's
+  position Dashanan's 8-zone design against the field — this is direct input to solution-architect's
   ADRs (Alternatives Rejected column).
 - competitive-analysis-core -> Identify what an existing solution does NOT do well (e.g. flat context
-  stuffing, single-tier memory, no provenance tracking) — Dashasan's differentiators should map directly
+  stuffing, single-tier memory, no provenance tracking) — Dashanan's differentiators should map directly
   to gaps found here.
 
 If you hit a genuine knowledge gap, dispatch deep-web-researcher directly (quick path, 3-search
@@ -422,7 +422,7 @@ instead — e.g. if the 8-zone taxonomy itself needs revision, escalate that to 
 product-manager-agent via the orchestrator, do not silently redesign scope.
 
 Before writing, editing, or refactoring any file for this task: (1) EXPLORE — use the built-in Explore
-subagent type to confirm the Dashasan project directory truly has no prior architecture artifacts (it
+subagent type to confirm the Dashanan project directory truly has no prior architecture artifacts (it
 is Greenfield — verify, don't assume). (2) PLAN — write out your concrete HLD authoring approach before
 producing the final document. (3) REVIEW — dispatch your draft HLD to consensus-agent using the same
 nested-dispatch mechanism above (this IS the mandatory Phase 1 gate, not optional review). (4) IMPLEMENT
@@ -437,7 +437,7 @@ AGREED CONTRACTS:
 - 8 zones ↔ 13 total FRs (8 zone + 3 cross-cutting) is agreed with business-analyst-agent — your HLD
   component list must match this 13-component shape exactly, or flag the mismatch explicitly.
 
-TASK: Produce the full Solution Architecture HLD for Dashasan per pipelines/solution-architecture-
+TASK: Produce the full Solution Architecture HLD for Dashanan per pipelines/solution-architecture-
 pipeline/HLD_TEMPLATE.md's 12-section structure: system context + component diagrams for the Memory
 Orchestrator + 8 zones, ADRs for every major technology choice (storage adapters, event bus, retrieval
 index technology, wire protocol), DSA choices per component, design patterns per component (Strategy
@@ -646,7 +646,7 @@ KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation):
 - openapi-spec-authoring-core -> Produce openapi.yaml (3.1.0) with FR-NNN → operationId traceability
   comments for every endpoint, satisfying Phase 1.5's C_api ≥ 0.85 gate.
 
-Before writing any file: (1) EXPLORE — confirm no prior openapi.yaml exists in the Dashasan repo yet
+Before writing any file: (1) EXPLORE — confirm no prior openapi.yaml exists in the Dashanan repo yet
 (Greenfield). (2) PLAN — outline the endpoint list before drafting the spec. (3) REVIEW — dispatch the
 draft spec to consensus-agent (nested dispatch, same mechanism as elsewhere in this bundle; depth 0->1,
 dispatch_chain: ["python-backend-engineer"]). (4) IMPLEMENT — write the final openapi.yaml.
@@ -800,7 +800,7 @@ inline. Never dispatch the agent that dispatched you. Exception: a genuine busin
 still escalates to whoever dispatched you.
 
 Before writing, editing, or refactoring any file for this task: (1) EXPLORE — use the built-in
-Explore subagent type to confirm no prior Pact contracts/Testcontainers config exist in the Dashasan
+Explore subagent type to confirm no prior Pact contracts/Testcontainers config exist in the Dashanan
 repo (Greenfield). (2) PLAN — outline the per-zone integration-test isolation strategy before writing
 test code. (3) REVIEW — dispatch the draft Pact contract to consensus-agent (nested dispatch, depth
 0->1, dispatch_chain: ["integration-testing-engineer"]) alongside api-testing-engineer's coverage
@@ -1206,7 +1206,7 @@ AGREED CONTRACTS: Sprint 1 scope = Orchestrator core + Zones 1/2/6/7 (Team Align
 with solution-architect) — do not silently expand Sprint 1 beyond this without an explicit flagged
 reason.
 
-TASK: Draft the Dashasan backlog (SP.0, markdown, no tool calls yet) from the 13 SRS FRs, decomposed
+TASK: Draft the Dashanan backlog (SP.0, markdown, no tool calls yet) from the 13 SRS FRs, decomposed
 into INVEST stories with Smart ACs and Dev/QA/Review sub-task breakdown (70/20/10% story-point split,
 Fibonacci rounding). Compose Sprint 1 per the agreed scope. Hand off to agile-tooling-specialist for
 Jira creation once business-analyst-agent + product-manager-agent + solution-architect + finops-analyst
@@ -1256,7 +1256,7 @@ FIRST, before doing anything, READ these files in full and apply them — this i
 
 KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
 - jira-devops-tooling-core -> This project is Jira-only (per this agent's Operating Rule 11 — SP.5
-  never branches to GitHub Issues inside the pipeline). Create the `DASHASAN` Jira project, one Epic
+  never branches to GitHub Issues inside the pipeline). Create the `DASHANAN` Jira project, one Epic
   per SRS FR-NNN (13 total: 8 zone FRs + 3 cross-cutting), Stories under each Epic per scrum-master-
   agent's INVEST decomposition, and the Sprint 1 container scoped to Orchestrator core + Zones 1/2/6/7
   per the already-agreed Team Alignment.
@@ -1286,7 +1286,7 @@ Exception: a genuine business/scope decision escalates to whoever dispatched you
 AGREED CONTRACTS: Sprint 1 scope = Orchestrator core + Zones 1/2/6/7 (Team Alignment, scrum-master-
 agent <-> solution-architect) — create exactly this scope, no silent expansion.
 
-TASK: Using `mcp-jira-api`, create the `DASHASAN` Jira project (if it does not exist), 13 Epics
+TASK: Using `mcp-jira-api`, create the `DASHANAN` Jira project (if it does not exist), 13 Epics
 (FR-ZONE-01..08 + 3 cross-cutting), Stories per scrum-master-agent's backlog_draft.json under each
 Epic, the Sprint 1 container with the agreed scope, and the mandatory 3-way sub-task split per story.
 Record every created key in `fr_to_jira_map`.
@@ -1695,7 +1695,7 @@ KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
 Note on scope: the Phase F.2 "WCAG 2.2 AA" checklist item in this project's Phase 7 roster is
 inherited verbatim from `claude-global-library/CLAUDE.md`'s standard Phase 7 agent-roster entry for
 `security-testing-engineer`, which pairs P1 security + P2 accessibility review at this specific gate
-across ALL Phase-7-routed projects — for Dashasan specifically (a backend memory-orchestration
+across ALL Phase-7-routed projects — for Dashanan specifically (a backend memory-orchestration
 engine with no rendered UI surface in this bundle's scope, per STEP 3's DOMAINS DETECTED table),
 report the WCAG 2.2 AA check as `N/A — no UI surface in this bundle's scope` rather than fabricating
 an accessibility finding against non-existent UI code.

@@ -1,8 +1,8 @@
 ## 0. PROJECT SUMMARY
 
-**Dashasan** -- a reusable, embeddable *dynamic memory orchestration engine* for AI/LLM context systems, named after the ten-headed figure of Hindu epic tradition. The engine maintains **8 specialized, independently-governed memory zones** ("heads") across which context is rotated, promoted/demoted, compressed, and retrieved, so that any AI system plugging it in gets a much larger *effective* working context than its native window, backed by structured long-term memory rather than flat context stuffing.
+**Dashanan** -- a reusable, embeddable *dynamic memory orchestration engine* for AI/LLM context systems, named after the ten-headed figure of Hindu epic tradition. The engine maintains **8 specialized, independently-governed memory zones** ("heads") across which context is rotated, promoted/demoted, compressed, and retrieved, so that any AI system plugging it in gets a much larger *effective* working context than its native window, backed by structured long-term memory rather than flat context stuffing.
 
-`[REVISED after user architecture review, 2026-09-17: the original 10-zone taxonomy consolidated Temporal into Episodic (time-anchoring is now an attribute every Episodic entry carries, not a separate zone) and Summary/Compressed into Consolidation (compression is a mechanism Consolidation applies to aged content, not a separate storage zone it competes with). This is a deliberate engineering simplification of the original ten-heads concept -- the "Dashasan" mythology naming stays, the technical zone count is 8. This remains open for Phase 1 solution-architect to further validate or revise.]`
+`[REVISED after user architecture review, 2026-09-17: the original 10-zone taxonomy consolidated Temporal into Episodic (time-anchoring is now an attribute every Episodic entry carries, not a separate zone) and Summary/Compressed into Consolidation (compression is a mechanism Consolidation applies to aged content, not a separate storage zone it competes with). This is a deliberate engineering simplification of the original ten-heads concept -- the "Dashanan" mythology naming stays, the technical zone count is 8. This remains open for Phase 1 solution-architect to further validate or revise.]`
 
 | # | Zone (head) | Purpose |
 |---|---|---|
@@ -64,7 +64,7 @@ elif MemoryScore(item) < CompressThreshold:
 
 ## YOUR TASK
 
-Take Dashasan from a named idea through: (1) deep R&D into the state of the art for LLM memory/context-engineering systems, agentic long-context architectures, and rotation/compression/retrieval algorithms; (2) a Solution Architecture blueprint for the 8-zone Memory Orchestrator, validated to `consensus-agent` BINARY `APPROVED`; (3) a full OpenAPI 3.1.0 contract for the engine's embed/service API; (4) a joint BA+PM+SA validation pass; (5) formal SRS + 7 UML + 7 Draw.io documentation; (6) Jira sprint planning under a new `DASHASAN` project; (7) agent-task routing with CoT prompts for the first sprint; (8) pre-implementation alignment — and stop there for explicit user sign-off before any code is written.
+Take Dashanan from a named idea through: (1) deep R&D into the state of the art for LLM memory/context-engineering systems, agentic long-context architectures, and rotation/compression/retrieval algorithms; (2) a Solution Architecture blueprint for the 8-zone Memory Orchestrator, validated to `consensus-agent` BINARY `APPROVED`; (3) a full OpenAPI 3.1.0 contract for the engine's embed/service API; (4) a joint BA+PM+SA validation pass; (5) formal SRS + 7 UML + 7 Draw.io documentation; (6) Jira sprint planning under a new `DASHANAN` project; (7) agent-task routing with CoT prompts for the first sprint; (8) pre-implementation alignment — and stop there for explicit user sign-off before any code is written.
 
 Do **not** create the GitHub repository as part of this bundle — repo creation is a separate, explicitly-confirmed action the user must approve directly (organization-visible, public, irreversible-ish); it is out of scope for a prompt-generation deliverable and is called out again in the closing note below.
 
@@ -77,7 +77,7 @@ Scale:           [INFERRED — no numbers given] design for: embeddable in a sin
 Timeline:        Production-ready, iterative (R&D → architecture → consensus loop explicitly requested — no fixed deadline)
 Compliance:      DPDP Act 2023 (India) if any zone stores PII from conversations — flagged for Phase 1 threat model; no other regulation indicated
 Special Needs:   Pluggable/portable (any AI system), long-context support, offline-capable local mode, provenance/anti-hallucination tracking (Zone 7) is a first-class requirement, not an afterthought
-Hallucination Risk: MEDIUM (general AI infrastructure — a bug here degrades every downstream AI system's factual grounding, but Dashasan itself is not medical/legal/finance-regulated)
+Hallucination Risk: MEDIUM (general AI infrastructure — a bug here degrades every downstream AI system's factual grounding, but Dashanan itself is not medical/legal/finance-regulated)
 Security Risk:   HIGH (a memory engine is a prime target for prompt-injection-driven memory poisoning and cross-tenant data leakage — full Phase F depth required once implementation starts)
 Thinking Budget: AUTO — assigned per agent via STEP 4.5 below
 ```
