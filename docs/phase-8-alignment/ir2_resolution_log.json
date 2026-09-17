@@ -1,0 +1,45 @@
+{
+  "phase": 8,
+  "step": "IR.2",
+  "description": "Resolution log for every flag raised in ir1_agent_flags.json. All 4 flags were resolved by a targeted patch to implementation_execution_plan.json (single batched dispatch, 2026-09-17), independently re-verified by consensus-agent's IR.5 pass.",
+  "resolutions": [
+    {
+      "flag_id": "DASH-STORY-003_DPDP_LOCATABLE",
+      "raised_by": "business-analyst-agent",
+      "resolution": "Added an operational definition of 'locatable' to dev_prompt and qa_prompt: a fact is locatable if its item_id/episode_id resolves to its primary key (tenant_id, session_id, seq) via a direct B-tree PK lookup, never a full-zone BRIN scan -- grounded in HLD Section 3.3/12D.",
+      "resolved_by": "prompt-generation-expert",
+      "verified_by": "consensus-agent (IR.5 retry 2)",
+      "status": "RESOLVED"
+    },
+    {
+      "flag_id": "DASH-STORY-007_ZONE7_INDEX_MISMATCH",
+      "raised_by": "solution-architect",
+      "resolution": "Corrected AC-006 and all context labels in dev_prompt/qa_prompt/review_prompt from 'zones 2-5, 7, 8' to the HLD-accurate 'zones 2/3/4/5/8; Zone 7 never indexed', per HLD Section 3.7/3.10 Data Ownership Map. ar1_assignments.json checked -- already correct, no change needed there.",
+      "resolved_by": "prompt-generation-expert",
+      "verified_by": "consensus-agent (IR.5 retry 2, cross-checked against HLD 3.10's PROJECTS INTO lines)",
+      "status": "RESOLVED"
+    },
+    {
+      "flag_id": "DASH-STORY-001_R1_COVERAGE_GAP",
+      "raised_by": "solution-architect",
+      "resolution": "Added new AC-009-R1-1 to dev_prompt and qa_prompt requiring every /context/assemble response (success or degraded) to include a unique assembly_id and trace_id, per HLD's R-1 (repudiation) mitigation. Flagged as correctness/observability, not security-gated (no P1 change).",
+      "resolved_by": "prompt-generation-expert",
+      "verified_by": "consensus-agent (IR.5 retry 2)",
+      "status": "RESOLVED"
+    },
+    {
+      "flag_id": "DASH-STORY-008_ADR013_MISSING",
+      "raised_by": "solution-architect",
+      "resolution": "Added must-not-deviate line to dev_prompt and review_prompt: 'UserAffinity must NEVER function as a tenant-isolation mechanism (per ADR-013/threat I-2) -- tenant scoping is enforced structurally upstream (physical partition), UserAffinity is purely a within-tenant relevance signal.'",
+      "resolved_by": "prompt-generation-expert",
+      "verified_by": "consensus-agent (IR.5 retry 2, cross-checked against HLD ADR-013 and threat I-2)",
+      "status": "RESOLVED"
+    }
+  ],
+  "open_flags_remaining": 0,
+  "no_flags_stories": ["DASH-STORY-002", "DASH-STORY-004", "DASH-STORY-005", "DASH-STORY-006", "DASH-STORY-009", "DASH-STORY-010"],
+  "disclosed_non_blocking_notes": [
+    "DASH-STORY-007: BA noted the P1 gate is explicitly marked 'conditional' pending user acceptance of the AC-014 scope-extension deviation -- disclosed open decision, not an unresolved flag.",
+    "DASH-STORY-003: SA noted a minor, non-blocking omission of HLD Section 3.3's keyset-only/no-offset prohibition -- judged non-blocking, not patched."
+  ]
+}

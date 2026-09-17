@@ -1,0 +1,83 @@
+{
+  "phase": 8,
+  "step": "IR.1",
+  "description": "Self-review flags raised by each of the 4 Phase 8 review agents (BA/PM/SA/scrum-master) against the 30 CoT prompts in implementation_execution_plan.json, dispatched 2026-09-17.",
+  "reviewers": {
+    "business-analyst-agent": {
+      "verdict_per_story": {
+        "DASH-STORY-001": "CLEAR",
+        "DASH-STORY-002": "CLEAR",
+        "DASH-STORY-003": "ARCHITECTURE_GAP",
+        "DASH-STORY-004": "CLEAR",
+        "DASH-STORY-005": "CLEAR",
+        "DASH-STORY-006": "CLEAR",
+        "DASH-STORY-007": "CLEAR_CONDITIONAL",
+        "DASH-STORY-008": "CLEAR",
+        "DASH-STORY-009": "CLEAR",
+        "DASH-STORY-010": "CLEAR"
+      },
+      "flags_raised": [
+        {
+          "story": "DASH-STORY-003",
+          "type": "ARCHITECTURE_GAP",
+          "detail": "AC-002-DPDP-1 only required the schema be 'structurally possible' for erase/locate with no testable definition of 'locatable'. Genuine requirements underspecification (also independently surfaced by orchestrator-agent as routing gap AR1-G3)."
+        },
+        {
+          "story": "DASH-STORY-007",
+          "type": "DISCLOSED_OPEN_DECISION",
+          "detail": "P1 gate explicitly marked 'conditional' pending user acceptance of the AC-014 scope-extension deviation. Not an ambiguity, a disclosed decision point."
+        }
+      ]
+    },
+    "product-manager-agent": {
+      "verdict_per_story": {
+        "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
+        "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
+        "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
+        "DASH-STORY-010": "CLEAR"
+      },
+      "flags_raised": [],
+      "note": "No DEPENDENCY_CONFLICT found across any story; build-order groups (1->2->3->4->5) match sprint_plan.json's corrected dependency_graph; no prompt's TASK/must-not-deviate exceeds its story's AC set or locked FR; all 4 P1 gates confirmed maker_checker:true with a distinct reviewer of record."
+    },
+    "solution-architect": {
+      "verdict_per_story": {
+        "DASH-STORY-001": "COVERAGE_GAP",
+        "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR_MINOR",
+        "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
+        "DASH-STORY-007": "DESIGN_MISMATCH",
+        "DASH-STORY-008": "MISSING_CONSTRAINT",
+        "DASH-STORY-009": "CLEAR", "DASH-STORY-010": "CLEAR"
+      },
+      "flags_raised": [
+        {
+          "story": "DASH-STORY-007",
+          "type": "DESIGN_MISMATCH",
+          "detail": "AC-006 and context label stated indexed zones as '2-5, 7, 8'. HLD Section 3.7 and 3.10 ownership map state Zone 6 projects only from 2/3/4/5/8 -- Zone 7 (Provenance) is never indexed into Zone 6."
+        },
+        {
+          "story": "DASH-STORY-001",
+          "type": "COVERAGE_GAP",
+          "detail": "R-1's other half (every assembly returns assembly_id + trace_id) appeared in no story. Story 001 owns the response contract."
+        },
+        {
+          "story": "DASH-STORY-008",
+          "type": "MISSING_CONSTRAINT",
+          "detail": "Memory Score engine implements UserAffinity but carried no ADR-013/I-2 (cross-tenant isolation) must-not-deviate line."
+        }
+      ],
+      "note_minor": "DASH-STORY-003 non-blocking: omits HLD Section 3.3's keyset-only/no-offset prohibition (not patched, judged non-blocking by SA)."
+    },
+    "scrum-master-agent": {
+      "verdict_per_story": {
+        "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
+        "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
+        "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
+        "DASH-STORY-010": "CLEAR"
+      },
+      "flags_raised": [],
+      "note": "All 10 stories' dev/qa/review prompt trios genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns."
+    }
+  },
+  "total_flags_raised": 4,
+  "flags_list": ["DASH-STORY-003 (BA, ARCHITECTURE_GAP)", "DASH-STORY-007 (SA, DESIGN_MISMATCH)", "DASH-STORY-001 (SA, COVERAGE_GAP)", "DASH-STORY-008 (SA, MISSING_CONSTRAINT)"]
+}
