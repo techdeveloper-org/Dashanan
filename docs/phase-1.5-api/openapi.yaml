@@ -1,0 +1,1624 @@
+openapi: 3.1.0
+info:
+  title: Dashanan Memory Orchestration API
+  version: 1.0.0
+  summary: >-
+    Context-assembly and memory-write surface for the Dashanan 8-zone dynamic
+    memory orchestration engine. Sidecar (Shape B) wire contract per HLD-20260917-01
+    ADR-004; the in-process SDK facade (Shape A) bypasses this wire entirely.
+  description: >-
+    Traceability: every operation below carries a `# FR-NNN` comment tying it to
+    HLD-20260917-01 Section 7 (endpoint inventory) and the FR numbering established
+    there (FR-001..FR-008 = the eight zones, FR-009 = orchestrator, FR-010 =
+    provenance obligation, FR-011 = pluggable storage adapters, FR-012 =
+    scoring/rotation configurability, FR-013 = conflict-detection sweep, proposed
+    at OAQ-14, adopted here as REQUIRED scope since Zone 3/5 writes cannot satisfy
+    NFR-011 without it). NFR references trace to HLD Section 9.
+  x-hld-source: docs/phase-1-architecture/HLD.md#section-7-interface-contracts-and-endpoint-inventory-input-to-phase-15
+  x-consensus-gate-status: PENDING
+  license:
+    name: Proprietary
+servers:
+  - url: https://{tenant_host}/v1
+    description: >-
+      Shape B sidecar, versioned path segment. `/v1/` is the sole stable
+      versioning mechanism (ADR-004 consequence: two surfaces, gRPC .proto
+      package `dashanan.v1` and this generated REST gateway, cannot drift
+      because both are generated from the same source contract). A breaking
+      change ships as `/v2/` behind a new deployment, never as a mutation of
+      `/v1/`; additive fields follow the same FULL-compatibility rule as the
+      event contracts (Section 7.6).
+    variables:
+      tenant_host:
+        default: api.dashanan.example.com
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: context
+    description: Synchronous read path (FR-009, FR-006 retrieval fan-out)
+  - name: memory
+    description: Asynchronous-accepted write path (FR-009, FR-010, FR-013)
+  - name: items
+    description: Per-item read/update/delete surface spanning all zones (FR-009)
+  - name: zones
+    description: >-
+      Zone administration, scope admin:zones (FR-012, NFR-009). `ZoneId` is a
+      fixed global enum (the eight zone kinds), not a tenant identifier — every
+      operation under this tag is implicitly scoped to the CALLER'S OWN JWT
+      `tenant_id` claim (ADR-013), never cross-tenant. A zone admin read
+      returns only that tenant's items/config/stats for the named zone; there
+      is no way, via any `admin:zones`-scoped operation, to view another
+      tenant's zone data. This mirrors the `/tenants/{tenant_id}` invariant
+      (tenant_id is JWT-authoritative) with no path-level tenant_id exception.
+  - name: tenants
+    description: Tenancy and DPDP control plane, scope admin:tenants (NFR-006)
+  - name: operations
+    description: Liveness, readiness, metrics (NFR-002 deployment operability)
+
+paths:
+  # FR-009 (orchestrator: context assembly), FR-006 (Zone 6 fan-out), FR-007
+  # (provenance travels with every hit). POST form is primary per HLD 7.1:
+  # the query embedding exceeds practical URL length and query text is
+  # frequently PII that must not land in access/proxy logs.
+  /context/assemble:
+    post:
+      operationId: assembleContext
+      tags: [context]
+      summary: Assemble a budget-fitted, provenance-carrying context slice
+      description: >-
+        FR-009, FR-006, FR-007. Safe and idempotent in semantics; cacheable via
+        response Cache-Control. See NFR-004 read-path latency targets (Section 9)
+        — those targets are `[ASSUMED]` pending OAQ-13 confirmation and MUST be
+        reconfirmed before this contract is finalized past DRAFT.
+      security:
+        - bearerAuth: [context:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssembleContextRequest'
+      responses:
+        '200':
+          description: Context assembled (possibly degraded; see `degraded` field)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextAssembly'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/ServiceDegraded'
+    # FR-009. Simple form for q-only calls (debug, curl, simple hosts) —
+    # exists only because neither URL-length nor PII-in-logs reason applies
+    # to a bare `q` string.
+    get:
+      operationId: assembleContextSimple
+      tags: [context]
+      summary: Assemble context from a plain-text query (debug / simple hosts)
+      description: FR-009. Equivalent to assembleContext with only `task` and defaults set.
+      security:
+        - bearerAuth: [context:read]
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, maxLength: 2000 }
+        - name: token_budget
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 262144 }
+      responses:
+        '200':
+          description: Context assembled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextAssembly'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # FR-006. Advanced/debug: raw retrieval without assembly or budget-fitting.
+  # Cursor-paginated: this is a genuine list resource, unlike assembleContext's
+  # single budget-fitted snapshot (api-design-core M1).
+  /memory/search:
+    post:
+      operationId: searchMemory
+      tags: [context]
+      summary: Raw hybrid retrieval (vector + lexical, RRF-fused), no budget-fitting
+      description: FR-006. Advanced/debug surface; bypasses context-assembly scoring.
+      security:
+        - bearerAuth: [context:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchMemoryRequest'
+      responses:
+        '200':
+          description: Ranked candidate list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchMemoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # FR-009 (all zones, uniform item envelope), FR-012 (score terms attached).
+  /items/{item_id}:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    get:
+      operationId: getItem
+      tags: [items]
+      summary: Fetch one item with its current score terms
+      description: FR-009, FR-012.
+      security:
+        - bearerAuth: [context:read]
+      responses:
+        '200':
+          description: Item found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    # FR-010. Never mutates in place: appends a new provenance record and
+    # supersedes, per Section 3.6 (attribute-level provenance) and Section 3.8
+    # (append-only Zone 7, no UPDATE grant for any service role).
+    patch:
+      operationId: updateItem
+      tags: [items]
+      summary: Partial update (appends provenance, supersedes — never in-place)
+      description: FR-010, FR-013 (a Zone 3/5-targeting update re-enters the conflict-detection sweep).
+      security:
+        - bearerAuth: [memory:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateItemRequest'
+      responses:
+        '202':
+          description: Update accepted; new provenance record chained
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteReceipt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    # FR-009. Soft delete + tombstone propagation to Zone 6 (Section 3.7:
+    # Zone 6 is fully rebuildable, so tombstoning there is a projection
+    # update, not a primary-fact deletion).
+    delete:
+      operationId: deleteItem
+      tags: [items]
+      summary: Soft delete an item and propagate a tombstone to Zone 6
+      description: FR-009.
+      security:
+        - bearerAuth: [memory:write]
+      responses:
+        '202':
+          description: Delete accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteReceipt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # FR-010, FR-007. The full Zone 7 record chain for an item — append-only,
+  # SHA-256 prev_hash chain (Section 3.8, threat control T-2).
+  /items/{item_id}/provenance:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    get:
+      operationId: getItemProvenance
+      tags: [items]
+      summary: Full provenance record chain for an item
+      description: FR-010, FR-007.
+      security:
+        - bearerAuth: [context:read]
+      responses:
+        '200':
+          description: Provenance chain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvenanceChain'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # FR-012. Returns all six score terms, weights, weighted score, lifecycle
+  # state, and predicted threshold-crossing times (Section 3.2, 12A).
+  # NOTE: the colon suffix is a deliberate Google AIP-136 custom-method path
+  # (":explain" on the item resource), not an accidental typo or a
+  # sub-resource segment — same convention as /memory/write:batch below.
+  /items/{item_id}/score:explain:
+    parameters:
+      - $ref: '#/components/parameters/ItemId'
+    post:
+      operationId: explainItemScore
+      tags: [items]
+      summary: Explain the Memory Score computation for one item
+      description: FR-012.
+      security:
+        - bearerAuth: [context:read]
+      responses:
+        '200':
+          description: Score explanation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreExplanation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # FR-009, FR-010, FR-013 (Zone 3/5-targeting writes enter the conflict
+  # sweep), and the Zone 3/5 ownership routing of Section 3.4. 202 + write_id;
+  # Idempotency-Key REQUIRED and bound to a hash of the request body
+  # (api-design-core anti-pattern 2 — HLD Section 7.2).
+  /memory/write:
+    post:
+      operationId: writeMemory
+      tags: [memory]
+      summary: Write one memory item (accepted asynchronously)
+      description: >-
+        FR-009, FR-010, FR-013. A write without a resolvable `source_type` is
+        rejected 422 — FR-010 enforced at the API boundary, before any zone
+        sees the fact. The accepted write is placed in Zone 1 SYNCHRONOUSLY
+        before the 202 returns (ADR-002 consequence: read-your-own-write holds
+        within-session even though cross-zone visibility is eventual).
+      security:
+        - bearerAuth: [memory:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteMemoryRequest'
+      responses:
+        '202':
+          description: Write accepted; durability barrier crossed, indexing async
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/WriteRejectedNotDurable'
+
+  # FR-009, FR-010, FR-013. Up to 100 items; per-item receipts; explicit
+  # partial failure (HLD 7.2).
+  # NOTE: the colon suffix is a deliberate Google AIP-136 custom-method path
+  # (":batch" on the collection resource), not an accidental typo or a
+  # sub-resource segment — same convention as /items/{item_id}/score:explain
+  # above.
+  /memory/write:batch:
+    post:
+      operationId: writeMemoryBatch
+      tags: [memory]
+      summary: Write up to 100 memory items in one call
+      description: FR-009, FR-010, FR-013.
+      security:
+        - bearerAuth: [memory:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    $ref: '#/components/schemas/WriteMemoryRequest'
+      responses:
+        '202':
+          description: Batch accepted; per-item receipts, partial failure explicit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [receipts]
+                properties:
+                  receipts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchWriteReceiptItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # FR-009. Poll status of an accepted write (accepted / indexed / failed).
+  /writes/{write_id}:
+    get:
+      operationId: getWriteStatus
+      tags: [memory]
+      summary: Poll the status of an accepted write
+      description: FR-009.
+      security:
+        - bearerAuth: [memory:write]
+      parameters:
+        - name: write_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Write status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # FR-012, NFR-009: weights/thresholds/adapter bindings are per-deployment
+  # configuration, never compiled-in constants.
+  /zones:
+    get:
+      operationId: listZones
+      tags: [zones]
+      summary: All eight zones — health, item count, capacity, adapter, last sweep
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '200':
+          description: Zone summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zones:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ZoneSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /zones/{zone}:
+    parameters:
+      - $ref: '#/components/parameters/ZoneName'
+    get:
+      operationId: getZoneDetail
+      tags: [zones]
+      summary: Zone detail and rotation statistics
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '200':
+          description: Zone detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /zones/{zone}/config:
+    parameters:
+      - $ref: '#/components/parameters/ZoneName'
+    get:
+      operationId: getZoneConfig
+      tags: [zones]
+      summary: Read lambda_zone, thresholds, capacity cap, max age, TTL, adapter binding
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '200':
+          description: Zone configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      operationId: putZoneConfig
+      tags: [zones]
+      summary: Update zone configuration (Strategy pattern; no compiled-in constants)
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ZoneConfig'
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # FR-012. Force a rotation sweep. O(k log N) by construction (Section 12C,
+  # threat control D-2).
+  /zones/{zone}/sweep:
+    parameters:
+      - $ref: '#/components/parameters/ZoneName'
+    post:
+      operationId: forceZoneSweep
+      tags: [zones]
+      summary: Force a rotation sweep for this zone
+      description: FR-012.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '202':
+          description: Sweep queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # FR-009, FR-002 (Episodic zone's own cursor-pagination rule generalized to
+  # every zone's admin browse per api-design-core M1: offset pagination is
+  # forbidden at the item counts in Section 12D).
+  /zones/{zone}/items:
+    parameters:
+      - $ref: '#/components/parameters/ZoneName'
+    get:
+      operationId: listZoneItems
+      tags: [zones]
+      summary: Cursor-paginated admin browse of a zone's items
+      description: FR-009, FR-002.
+      security:
+        - bearerAuth: [admin:zones]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+      responses:
+        '200':
+          description: Page of zone items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ZoneItemsPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # FR-006. Zone 6 is fully rebuildable by design (Section 3.7).
+  /zones/{zone}/reindex:
+    parameters:
+      - $ref: '#/components/parameters/ZoneName'
+    post:
+      operationId: reindexZone
+      tags: [zones]
+      summary: Rebuild this zone's Zone 6 (vector + lexical) projection
+      description: FR-006.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '202':
+          description: Reindex queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # FR-012, NFR-009. w1..w6 + the three thresholds — per-deployment, never
+  # compiled in.
+  /config/scoring:
+    get:
+      operationId: getScoringConfig
+      tags: [zones]
+      summary: Read the Memory Score weights and thresholds
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '200':
+          description: Scoring configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      operationId: putScoringConfig
+      tags: [zones]
+      summary: Update the Memory Score weights and thresholds
+      description: FR-012, NFR-009.
+      security:
+        - bearerAuth: [admin:zones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoringConfig'
+      responses:
+        '200':
+          description: Scoring configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # FR-012. Async admin job status (sweep, reindex, DPDP erasure).
+  /jobs/{job_id}:
+    get:
+      operationId: getJobStatus
+      tags: [zones]
+      summary: Async admin job status
+      description: FR-012.
+      security:
+        - bearerAuth: [admin:zones]
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # NFR-006. Provisions physical partitions (ADR-013 hard-partition isolation).
+  /tenants:
+    post:
+      operationId: createTenant
+      tags: [tenants]
+      summary: Provision a tenant and its physical partitions
+      description: NFR-006, ADR-013.
+      security:
+        - bearerAuth: [admin:tenants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant provisioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    get:
+      operationId: listTenants
+      tags: [tenants]
+      summary: List provisioned tenants
+      description: NFR-006.
+      security:
+        - bearerAuth: [admin:tenants]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+      responses:
+        '200':
+          description: Page of tenants
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tenant'
+                  next_cursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # Control-plane scope-boundary invariant (resolves api-testing-review.md
+  # BOLA-9 / integration-testing-plan.md gap-table row): `admin:tenants` is a
+  # PLATFORM-LEVEL scope, not per-tenant-restricted — it is issued only to
+  # the platform operator, never to a tenant's own service account. The
+  # `tenant_id` path parameter here is therefore the sole endpoint family
+  # where tenant scoping is NOT purely JWT-derived (every other endpoint in
+  # this API takes tenant_id only from the verified JWT claim, ADR-013). The
+  # JWT's own `tenant_id` claim (present on every bearer token, including a
+  # platform-operator token) remains authoritative for AUTHENTICATION identity;
+  # the path `tenant_id` selects WHICH tenant's control-plane record is being
+  # operated on. Invariant: a caller presenting a token scoped to
+  # `admin:tenants` but whose `aud`/issuer marks it as a tenant-scoped (not
+  # platform-operator) credential MUST have its JWT `tenant_id` claim match
+  # the path `tenant_id`, or the request is rejected 403 (never 404 — the
+  # caller is authenticated and scoped, just not authorized for this tenant)
+  # with `error.code: TENANT_SCOPE_MISMATCH`. A true platform-operator token
+  # is exempt from this match check by design and may address any tenant_id.
+  /tenants/{tenant_id}:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+        description: >-
+          Target tenant's identifier. This is the only path in the API where
+          `tenant_id` appears outside the JWT. The JWT's `tenant_id` claim is
+          always authoritative for the caller's own identity; for a
+          tenant-scoped `admin:tenants` credential, this path value MUST
+          equal the JWT's `tenant_id` claim or the request is rejected with
+          403 `TENANT_SCOPE_MISMATCH` (see the operation descriptions below
+          and the `Forbidden` response). A platform-operator `admin:tenants`
+          credential is exempt and may target any tenant_id.
+    get:
+      operationId: getTenant
+      tags: [tenants]
+      summary: Tenant config, including embedding_residency (ADR-015)
+      description: >-
+        NFR-006. Path `tenant_id` must equal the JWT's own `tenant_id` claim
+        unless the caller holds a platform-operator `admin:tenants`
+        credential; on mismatch this returns 403 with
+        `error.code: TENANT_SCOPE_MISMATCH`, never 404 (see Forbidden below).
+      security:
+        - bearerAuth: [admin:tenants]
+      responses:
+        '200':
+          description: Tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >-
+            Credential valid but scope insufficient, OR path `tenant_id` does
+            not match the JWT's own `tenant_id` claim for a tenant-scoped
+            `admin:tenants` credential (`TENANT_SCOPE_MISMATCH`) — the JWT
+            claim is authoritative, the path value must match it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+              examples:
+                tenant_scope_mismatch:
+                  summary: Path tenant_id does not match the JWT tenant_id claim
+                  value:
+                    success: false
+                    data: null
+                    error:
+                      code: TENANT_SCOPE_MISMATCH
+                      message: You are not authorized to access this tenant.
+                      trace_id: '4b1e7e2a-...-c9d1'
+                    timestamp: '2026-09-17T10:00:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateTenant
+      tags: [tenants]
+      summary: Update tenant config
+      description: >-
+        NFR-006. Path `tenant_id` must equal the JWT's own `tenant_id` claim
+        unless the caller holds a platform-operator `admin:tenants`
+        credential; on mismatch this returns 403 `TENANT_SCOPE_MISMATCH`.
+      security:
+        - bearerAuth: [admin:tenants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deleteTenant
+      tags: [tenants]
+      summary: Deprovision a tenant
+      description: >-
+        NFR-006. Path `tenant_id` must equal the JWT's own `tenant_id` claim
+        unless the caller holds a platform-operator `admin:tenants`
+        credential; on mismatch this returns 403 `TENANT_SCOPE_MISMATCH`.
+      security:
+        - bearerAuth: [admin:tenants]
+      responses:
+        '202':
+          description: Deprovisioning accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # NFR-006 DPDP-2/3. Crypto-shredding erasure cascade across all 8 zones,
+  # the vector index, the lexical index and Zone 8 archives (OAQ-10: crypto-
+  # shredding-as-erasure requires legal confirmation; the endpoint contract
+  # is stable regardless of that confirmation's outcome).
+  /tenants/{tenant_id}/subjects/{subject_id}:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: subject_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      operationId: eraseSubject
+      tags: [tenants]
+      summary: DPDP erasure cascade for one data subject
+      description: NFR-006 (DPDP-2, DPDP-3). Cascades across all 8 zones, both retrieval indices, and Zone 8 archives via crypto-shredding.
+      security:
+        - bearerAuth: [admin:tenants]
+      responses:
+        '202':
+          description: Erasure cascade accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # NFR-006 DPDP data-portability.
+  /tenants/{tenant_id}/subjects/{subject_id}/export:
+    parameters:
+      - name: tenant_id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: subject_id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: exportSubjectData
+      tags: [tenants]
+      summary: DPDP data-portability export for one data subject
+      description: NFR-006.
+      security:
+        - bearerAuth: [admin:tenants]
+      responses:
+        '200':
+          description: Export bundle (synchronous for small subjects; 202 for large ones)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubjectExportBundle'
+        '202':
+          description: Export queued (large subject)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # NFR-002. Standard operability triad; no FR maps directly (deployment
+  # concern, not a product feature), noted here rather than silently omitted.
+  /healthz:
+    get:
+      operationId: getLiveness
+      tags: [operations]
+      summary: Liveness probe
+      description: NFR-002. No FR traceability — deployment/operability concern.
+      security: []
+      responses:
+        '200': { description: Alive }
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      tags: [operations]
+      summary: Readiness probe, per-adapter breakdown
+      description: NFR-002, Section 8.4 (per-dependency degradation reflected here). No FR traceability.
+      security: []
+      responses:
+        '200':
+          description: Ready (possibly degraded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessReport'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessReport'
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [operations]
+      summary: Prometheus metrics exposition
+      description: NFR-002. No FR traceability.
+      security:
+        - bearerAuth: [admin:zones]
+      responses:
+        '200':
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    # HLD Section 2 Communication Matrix: "mTLS + JWT with tenant_id claim".
+    # mTLS is enforced at the transport layer (not expressible in OpenAPI
+    # securitySchemes) and is a MANDATORY companion to bearerAuth in Shape B;
+    # see the `x-transport-security` note below. JWT (not a bare per-tenant
+    # API key) is required because S-1 (Section 10) demands tenant_id be
+    # derivable ONLY from a verified credential and absent from every request
+    # schema — a signed claim gives that guarantee natively, where a shared
+    # API key would require an out-of-band tenant lookup and reintroduce the
+    # spoofing surface S-1 closes.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        JWT bearer token. Required claims: `tenant_id` (authoritative source
+        of tenant scoping — no request body ever carries tenant_id, ADR-013),
+        `scope` (space-delimited: context:read, memory:write, admin:zones,
+        admin:tenants), `aud` (checked against the data-plane vs control-plane
+        audience per threat E-1, Section 10). Must be presented over an mTLS
+        connection in Shape B (x-transport-security).
+  x-transport-security:
+    mtls: REQUIRED in Shape B for all `/v1/*` traffic, terminated at dashanan-api.
+
+  parameters:
+    ItemId:
+      name: item_id
+      in: path
+      required: true
+      schema: { type: string }
+    ZoneName:
+      name: zone
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ZoneId'
+      description: >-
+        Selects a zone KIND (one of the eight global ZoneId values), not a
+        tenant. Every `/zones/{zone}/*` operation is scoped to the caller's
+        own JWT `tenant_id` claim server-side (ADR-013) — the response never
+        contains another tenant's items, config, or statistics for this zone,
+        regardless of which zone kind is requested. There is no cross-tenant
+        admin:zones view.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: >-
+        Bound server-side to a hash of the request body. Retained 24h. A
+        resend with the same key and a DIFFERENT body returns 409, never the
+        cached response for the original body (api-design-core anti-pattern 2).
+
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Missing or invalid credential
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Credential valid but scope insufficient (e.g. data-plane token at an admin endpoint — threat E-1)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource does not exist (or is outside the caller's tenant partition — never distinguished from true absence, to avoid a tenant-existence oracle)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyConflict:
+      description: Idempotency-Key reused with a different request body
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UnprocessableEntity:
+      description: Semantically invalid — e.g. a write with no resolvable source_type (FR-010 boundary enforcement)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Per-tenant token-bucket exhausted (threat D-1)
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceDegraded:
+      description: Read path degraded to working_only or unavailable (Section 8.4); response body still returned with degraded:true where possible
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    WriteRejectedNotDurable:
+      description: >-
+        Structured store unreachable; the write is rejected rather than
+        falsely acknowledged (Section 8.4 — the one accepted single point of
+        failure on the write path, by design, not by omission).
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    StaleCursor:
+      description: >-
+        The supplied `cursor` no longer resolves against the current
+        `assembly_id`/query basis — either it referenced a different
+        session/assembly than the one it is now being replayed against, or
+        the underlying result set it was issued for has expired/rotated
+        server-side. The caller must discard the cursor and re-issue the
+        original request without `cursor` to obtain a fresh first page.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            stale_cursor:
+              summary: Cursor does not belong to the current assembly/session
+              value:
+                success: false
+                data: null
+                error:
+                  code: STALE_CURSOR
+                  message: This cursor is no longer valid. Start a new request without a cursor.
+                  trace_id: '7f3a9c10-...-88e2'
+                timestamp: '2026-09-17T10:05:00Z'
+    MalformedCursor:
+      description: >-
+        The supplied `cursor` value is not a well-formed opaque cursor token
+        (corrupted, truncated, or tampered). Distinct from `StaleCursor`: this
+        is a syntactic/integrity failure detected before any lookup is
+        attempted, never surfaced as a 500.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            malformed_cursor:
+              summary: Cursor value is not a valid opaque token
+              value:
+                success: false
+                data: null
+                error:
+                  code: MALFORMED_CURSOR
+                  message: The cursor value is invalid.
+                  trace_id: 'a1c4e8b0-...-3f0d'
+                timestamp: '2026-09-17T10:06:00Z'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [success, error, timestamp]
+      properties:
+        success: { type: boolean, const: false }
+        data: { type: 'null' }
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, examples: [INVALID_SOURCE_TYPE, TENANT_SCOPE_MISMATCH, IDEMPOTENCY_KEY_REUSED, STALE_CURSOR, MALFORMED_CURSOR] }
+            message: { type: string, description: User-facing; never echoes payload content or internal storage detail (control I-6) }
+            trace_id: { type: string }
+        timestamp: { type: string, format: date-time }
+
+    ZoneId:
+      type: string
+      enum: [1-working, 2-episodic, 3-semantic, 4-procedural, 5-entity, 6-retrieval-index, 7-provenance, 8-consolidation]
+
+    ScoreTerms:
+      type: object
+      description: The six Memory Score terms (FR-012). Weights w1..w6 are deployment config, never compiled in.
+      required: [recency, frequency, importance, task_relevance, user_affinity, provenance_confidence]
+      properties:
+        recency: { type: number, minimum: 0, maximum: 1 }
+        frequency: { type: number, minimum: 0, maximum: 1 }
+        importance: { type: number, minimum: 0, maximum: 1 }
+        task_relevance:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Persisted as raw normalized cosine similarity, NOT the RRF-fused
+            rank score used during assembly ranking (OAQ-5 — RRF's min-max
+            normalization is relative to the candidate set and is therefore
+            unusable as a threshold-comparable persisted value).
+        user_affinity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Intra-tenant affinity only. Never a tenant-isolation signal (ADR-013, threat I-2).
+        provenance_confidence: { type: number, minimum: 0, maximum: 1 }
+
+    LifecycleState:
+      type: string
+      enum: [Active, Compressed, Archived]
+
+    Provenance:
+      type: object
+      required: [source_type, confidence, conflict_status, invalidation_flag, write_timestamp]
+      properties:
+        source_type:
+          type: string
+          enum: [user_stated, tool_output, llm_inferred, summarized_from_n, imported, system_derived]
+        source_refs:
+          type: array
+          items: { type: string }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        conflict_status:
+          type: string
+          enum: [none, disputed, resolved_superseded, resolved_confirmed]
+        invalidation_flag: { type: boolean }
+        write_timestamp: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [durable, pending]
+          description: >-
+            "pending" when the Zone 7 relay has not yet drained the journal
+            entry (Section 8.4 Zone 7 degradation) — the record IS durable in
+            the write-ahead journal regardless (ADR-010).
+
+    ProvenanceChain:
+      type: object
+      required: [item_id, records]
+      properties:
+        item_id: { type: string }
+        records:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Provenance'
+              - type: object
+                properties:
+                  provenance_id: { type: string }
+                  prev_provenance_id: { type: string, nullable: true }
+                  prev_hash: { type: string }
+                  record_hash: { type: string }
+                  update_history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ts: { type: string, format: date-time }
+                        actor: { type: string }
+                        change: { type: string }
+                        prev_provenance_id: { type: string, nullable: true }
+
+    MemoryItem:
+      type: object
+      required: [item_id, source_zone, payload, token_count, score, score_terms, lifecycle_state]
+      properties:
+        item_id: { type: string }
+        source_zone: { $ref: '#/components/schemas/ZoneId' }
+        payload: { type: object, description: Zone-shaped content; see WriteMemoryRequest.content for the write-side union }
+        token_count: { type: integer, minimum: 0 }
+        score: { type: number, minimum: 0, maximum: 1 }
+        score_terms: { $ref: '#/components/schemas/ScoreTerms' }
+        lifecycle_state: { $ref: '#/components/schemas/LifecycleState' }
+        provenance: { $ref: '#/components/schemas/Provenance' }
+
+    AssembleContextRequest:
+      type: object
+      required: [session_id, token_budget]
+      properties:
+        session_id: { type: string }
+        task: { type: string, description: Required unless query_embedding is given }
+        query_embedding:
+          type: array
+          items: { type: number }
+          minItems: 768
+          maxItems: 768
+          description: Skips the 20-80ms embedding step (ADR-015). Not URL-safe — this is why the endpoint is POST.
+        token_budget: { type: integer, minimum: 1, maximum: 262144, description: Hard server-side cap 256k (threat D-3) }
+        zones:
+          type: array
+          items: { $ref: '#/components/schemas/ZoneId' }
+          description: Default all readable zones
+        max_items: { type: integer, minimum: 1, maximum: 500, default: 50, description: Hard server-side cap 500 (threat D-3) }
+        min_provenance_conf: { type: number, minimum: 0, maximum: 1, default: 0.0 }
+        include_provenance:
+          type: boolean
+          default: true
+          description: >-
+            Defaults true per OAQ-11 recommendation (provenance-travels-with-
+            every-hit is the product's differentiator), pending Phase 1.5
+            confirmation of that default against the ~30% payload-size cost.
+        as_of: { type: string, format: date-time, description: Temporal query against Episodic }
+        cursor:
+          type: string
+          nullable: true
+          description: >-
+            Continuation cursor for `items_considered > items_returned` within
+            the SAME `assembly_id`. Ambiguity resolution: HLD Section 7.1
+            models assemble as a single budget-fitted snapshot bounded by
+            max_items<=500, not a paginated list; this field is added so a
+            caller can retrieve additional ranked candidates beyond the first
+            page's budget fit without re-running retrieval, while keeping the
+            snapshot's assembly_id and score basis stable. Absent on the first
+            call; echoed back in the response when more items exist.
+        # tenant_id is intentionally NOT a property here (ADR-013, threat S-1).
+
+    ContextAssembly:
+      type: object
+      required: [assembly_id, assembled_at, items, token_count_total, token_budget, items_considered, items_returned, degraded, retrieval_mode, trace_id]
+      properties:
+        assembly_id: { type: string }
+        assembled_at: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryItem' }
+        token_count_total: { type: integer }
+        token_budget: { type: integer }
+        items_considered: { type: integer }
+        items_returned: { type: integer }
+        degraded: { type: boolean }
+        zones_unavailable:
+          type: array
+          items: { $ref: '#/components/schemas/ZoneId' }
+        retrieval_mode:
+          type: string
+          enum: [hybrid_rrf, vector_only, lexical_only, working_only]
+        next_cursor:
+          type: string
+          nullable: true
+          description: Present when items_considered > items_returned; see AssembleContextRequest.cursor
+        trace_id: { type: string }
+
+    SearchMemoryRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string }
+        query_embedding:
+          type: array
+          items: { type: number }
+          minItems: 768
+          maxItems: 768
+        zones:
+          type: array
+          items: { $ref: '#/components/schemas/ZoneId' }
+        cursor: { type: string, nullable: true }
+        page_size: { type: integer, minimum: 1, maximum: 500, default: 50 }
+
+    SearchMemoryResponse:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryItem' }
+        next_cursor: { type: string, nullable: true }
+        retrieval_mode:
+          type: string
+          enum: [hybrid_rrf, vector_only, lexical_only]
+
+    ProvenanceWriteBlock:
+      type: object
+      required: [source_type, purpose]
+      description: FR-010's mandatory provenance block, enforced at the API boundary (422 if unresolvable).
+      properties:
+        source_type:
+          type: string
+          enum: [user_stated, tool_output, llm_inferred, summarized_from_n, imported, system_derived]
+        source_refs:
+          type: array
+          items: { type: string }
+        importance: { type: number, minimum: 0, maximum: 1, nullable: true }
+        purpose: { type: string, description: DPDP purpose-limitation tag (DPDP-1) }
+        subject_id: { type: string, nullable: true, description: Data-subject identifier for the DPDP erasure/export index (ADR-006) }
+
+    WriteMemoryRequest:
+      type: object
+      required: [session_id, content, provenance]
+      properties:
+        session_id: { type: string, description: Required — the write is placed in Zone 1 synchronously before the 202 returns (ADR-002) }
+        content:
+          type: object
+          description: >-
+            Zone-shaped payload. `zone_hint` is advisory for Zones 1/2/4;
+            Zone 3/5 facts are routed by EntityOwnershipSpecification
+            (HLD Section 3.4) regardless of any hint.
+          properties:
+            text: { type: string }
+            zone_hint: { $ref: '#/components/schemas/ZoneId' }
+            occurred_at: { type: string, format: date-time, description: Zone 2 (Episodic) only }
+            task_signature_hash: { type: string, description: Zone 4 (Procedural) only }
+            entity_refs:
+              type: array
+              items:
+                type: object
+                properties:
+                  role: { type: string, enum: [subject, object] }
+                  entity_id: { type: string }
+              description: Drives the Zone 3/5 ownership decision (Section 3.4)
+            index_reverse:
+              type: boolean
+              default: false
+              description: >-
+                Section 3.4: when a single-subject, single-object fact should
+                ALSO get a Zone 3 SemanticEdge for reverse traversal, on top of
+                its mandatory Zone 5 attribute write. Default false.
+        provenance: { $ref: '#/components/schemas/ProvenanceWriteBlock' }
+
+    WriteReceipt:
+      type: object
+      required: [write_id, status, accepted_at]
+      properties:
+        write_id: { type: string, format: uuid }
+        status: { type: string, enum: [accepted] }
+        accepted_at: { type: string, format: date-time }
+
+    BatchWriteReceiptItem:
+      type: object
+      required: [index, status]
+      properties:
+        index: { type: integer }
+        status: { type: string, enum: [accepted, rejected] }
+        write_id: { type: string, format: uuid, nullable: true }
+        error: { $ref: '#/components/schemas/ErrorResponse' }
+
+    WriteStatus:
+      type: object
+      required: [write_id, status]
+      properties:
+        write_id: { type: string, format: uuid }
+        status: { type: string, enum: [accepted, indexed, failed] }
+        item_id: { type: string, nullable: true }
+        failure_reason: { type: string, nullable: true }
+
+    UpdateItemRequest:
+      type: object
+      required: [content, provenance]
+      properties:
+        content: { type: object }
+        provenance: { $ref: '#/components/schemas/ProvenanceWriteBlock' }
+
+    ScoreExplanation:
+      type: object
+      required: [item_id, score, score_terms, weights, lifecycle_state]
+      properties:
+        item_id: { type: string }
+        score: { type: number }
+        score_terms: { $ref: '#/components/schemas/ScoreTerms' }
+        weights:
+          type: object
+          properties:
+            w1: { type: number }
+            w2: { type: number }
+            w3: { type: number }
+            w4: { type: number }
+            w5: { type: number }
+            w6: { type: number }
+        lifecycle_state: { $ref: '#/components/schemas/LifecycleState' }
+        predicted_crossings:
+          type: object
+          properties:
+            promote_at: { type: string, format: date-time, nullable: true }
+            compress_at: { type: string, format: date-time, nullable: true }
+            archive_at: { type: string, format: date-time, nullable: true }
+
+    ZoneSummary:
+      type: object
+      properties:
+        zone: { $ref: '#/components/schemas/ZoneId' }
+        health: { type: string, enum: [healthy, degraded, down] }
+        item_count: { type: integer }
+        capacity_utilization: { type: number, minimum: 0, maximum: 1 }
+        adapter_binding: { type: string }
+        last_sweep_at: { type: string, format: date-time, nullable: true }
+
+    ZoneDetail:
+      allOf:
+        - $ref: '#/components/schemas/ZoneSummary'
+        - type: object
+          properties:
+            rotation_stats:
+              type: object
+              properties:
+                promoted_24h: { type: integer }
+                compressed_24h: { type: integer }
+                archived_24h: { type: integer }
+                evicted_24h: { type: integer }
+                sweep_p99_ms: { type: number }
+
+    ZoneConfig:
+      type: object
+      properties:
+        zone: { $ref: '#/components/schemas/ZoneId' }
+        lambda_zone: { type: number, nullable: true, description: Half-life decay constant; null for Zone 6 (Section 3.7 — no independent lambda_zone) }
+        promote_threshold: { type: number, minimum: 0, maximum: 1 }
+        compress_threshold: { type: number, minimum: 0, maximum: 1 }
+        archive_threshold: { type: number, minimum: 0, maximum: 1 }
+        capacity_cap: { type: integer, description: NEW requirement, OAQ-4 }
+        max_age_seconds: { type: integer, nullable: true, description: NEW requirement, OAQ-4 forced archival backstop }
+        idle_ttl_seconds: { type: integer, nullable: true, description: Zone 1 only, TTL-primary (OAQ-7) }
+        adapter_binding: { type: string }
+
+    ScoringConfig:
+      type: object
+      properties:
+        w1: { type: number }
+        w2: { type: number }
+        w3: { type: number }
+        w4: { type: number }
+        w5: { type: number }
+        w6: { type: number }
+        promote_threshold: { type: number, minimum: 0, maximum: 1, default: 0.70, description: OAQ-2, lowered from 0.75 }
+        compress_threshold: { type: number, minimum: 0, maximum: 1 }
+        archive_threshold: { type: number, minimum: 0, maximum: 1, default: 0.25, description: OAQ-1 derived finding, raised from 0.15 }
+
+    ZoneItemsPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryItem' }
+        next_cursor: { type: string, nullable: true }
+
+    JobAccepted:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [queued] }
+
+    JobStatus:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        progress: { type: number, minimum: 0, maximum: 1, nullable: true }
+        error: { $ref: '#/components/schemas/ErrorResponse' }
+
+    CreateTenantRequest:
+      type: object
+      required: [display_name]
+      properties:
+        display_name: { type: string }
+        embedding_residency:
+          type: string
+          enum: [in-region, global]
+          default: in-region
+          description: ADR-015; in-region is the DPDP-clean default for India-scoped tenants.
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        display_name: { type: string }
+        embedding_residency: { type: string, enum: [in-region, global] }
+
+    Tenant:
+      type: object
+      required: [tenant_id, display_name, created_at]
+      properties:
+        tenant_id: { type: string }
+        display_name: { type: string }
+        embedding_residency: { type: string, enum: [in-region, global] }
+        created_at: { type: string, format: date-time }
+
+    SubjectExportBundle:
+      type: object
+      properties:
+        subject_id: { type: string }
+        exported_at: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/MemoryItem' }
+        provenance_chains:
+          type: array
+          items: { $ref: '#/components/schemas/ProvenanceChain' }
+
+    ReadinessReport:
+      type: object
+      required: [ready, adapters]
+      properties:
+        ready: { type: boolean }
+        adapters:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [healthy, degraded, down]
+
+  examples: {}
+
+x-internal-event-contracts:
+  # FR-013 (conflict_detected), FR-012 (promote/compress/archive/evicted),
+  # FR-009 (written). Not HTTP operations — documented per Section 7.6 for
+  # completeness of the async surface the task explicitly asked to cover.
+  # Transport: Redis Streams, one stream per event type, partitioned by
+  # tenant_id:item_id for per-item total ordering (ADR-003).
+  envelope:
+    event_id: { type: string, format: uuid, description: UUID v4 }
+    event_type: { type: string }
+    occurred_at: { type: string, format: date-time, description: ISO 8601 UTC }
+    correlation_id: { type: string }
+    causation_id: { type: string }
+    tenant_id: { type: string }
+    schema_version: { type: string, description: Additive-only evolution (EDA M6 FULL compatibility); field removal/retype requires a new event_type }
+  events:
+    memory.written:
+      publisher: Orchestrator
+      consumers: [index-worker, provenance-relay, rotation-worker]
+      key: 'tenant:item'
+      payload_fields: [item_id, zone, token_count, provenance_id, score_terms]
+    memory.promoted:
+      publisher: rotation-worker
+      consumers: [index-worker, metrics]
+      key: 'tenant:item'
+      payload_fields: [item_id, from_zone, to_zone, trigger, score]
+    memory.compressed:
+      publisher: rotation-worker
+      consumers: [index-worker, provenance-relay]
+      key: 'tenant:item'
+      payload_fields: [item_id, zone, generation, original_tokens, compressed_tokens]
+    memory.archived:
+      publisher: rotation-worker
+      consumers: [index-worker, consolidation]
+      key: 'tenant:item'
+      payload_fields: [item_id, from_zone, blob_id]
+    memory.evicted:
+      publisher: rotation-worker
+      consumers: [index-worker, metrics]
+      key: 'tenant:item'
+      payload_fields: [item_id, zone, reason]
+    memory.conflict_detected:
+      publisher: Orchestrator
+      consumers: [provenance-relay, metrics, alerting]
+      key: 'tenant:entity'
+      payload_fields: [item_ids, predicate, both_confidences]
+
+x-graphql-note: >-
+  Not offered. HLD ADR-004 rejects GraphQL for this API: there is one
+  dominant read shape (assemble a context), not a field-selection problem;
+  GraphQL's N+1 resolution and query-cost-analysis costs would be paid for
+  no benefit here. REST (this document) + gRPC (canonical, same operations)
+  per ADR-004 stands as-is; no ADR-004 override was found in the HLD.
