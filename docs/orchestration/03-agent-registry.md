@@ -70,7 +70,7 @@ PROMPT:
 ---persona---
 agent: business-analyst-agent
 kg_route: rnd-intelligence (D45)
-skills: [requirements-elicitation-core, prd-authoring-core, functional-requirements-core]
+skills: [business-requirements-analysis-core, requirements-traceability-core, user-story-mapping-core, acceptance-testing-bdd-core, product-analytics-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -84,25 +84,33 @@ Your output will be verified by hallucination-detector. Cite every factual claim
 FIRST, before doing anything, READ these files in full and apply them — this is mandatory, do not
 begin work from the agent/skill names alone:
 - agents/business-analyst-agent/agent.md
-- skills/requirements-elicitation-core/SKILL.md
-- skills/prd-authoring-core/SKILL.md
-- skills/functional-requirements-core/SKILL.md
+- skills/business-requirements-analysis-core/SKILL.md
+- skills/requirements-traceability-core/SKILL.md
+- skills/user-story-mapping-core/SKILL.md
+- skills/acceptance-testing-bdd-core/SKILL.md
+- skills/product-analytics-core/SKILL.md
 Read every M1–M6 derivation, every worked example, every Operating Rule, every Anti-Pattern — not the
 frontmatter description, not the section headings, not a prior summary of it from memory.
+(Corrected 2026-09-17: the previous 3-skill list — requirements-elicitation-core, prd-authoring-core,
+functional-requirements-core — does not exist in the library. Found and flagged by a live dispatch of
+this exact agent, which used its agent.md's real frontmatter skills list instead, verified against
+`agents/business-analyst-agent/agent.md`'s own `skills:` field.)
 
-KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation, agent.md not read in full
-this session; sourced from claude-global-library/CLAUDE.md's authoritative Phase 0/2/6/8 roster entry):
-- requirements-elicitation-core -> This agent is the Phase 0 co-lead: gather FRs/NFRs for the 8-zone
-  Dashanan memory engine, numbered FR-NNN/NFR-NNN, with the 8 zones each getting FR-ZONE-01..08 plus 3
-  cross-cutting FRs (orchestrator routing, provenance/audit, storage-adapter pluggability) per the Team
-  Alignment resolution already agreed with solution-architect (see AGREED CONTRACTS below).
-- prd-authoring-core -> Produce the 14-section PRD per pipelines/ba-pm-rnd-pipeline/PRD_TEMPLATE.md;
-  at Phase 2 you re-review this same PRD against the approved HLD for FR↔component 1:1 traceability;
-  at Phase 6 SP.0.5 you review the backlog draft for FR coverage + DPDP compliance of any PII-adjacent
-  zone (Episodic/Entity zones may retain conversational PII — flag explicitly); at Phase 8 you self-review
-  any BA-domain routed prompt for ambiguity.
-- functional-requirements-core -> background only, no task-specific extract beyond the FR numbering
-  convention already stated above.
+KNOWLEDGE DISTILLATION (5/5 skills covered — corrected to agent.md's real frontmatter skill list):
+- business-requirements-analysis-core -> This agent is the Phase 0 co-lead: gather FRs/NFRs for the
+  8-zone Dashanan memory engine, numbered FR-NNN/NFR-NNN, with the 8 zones each getting FR-ZONE-01..08
+  plus 3 cross-cutting FRs (orchestrator routing, provenance/audit, storage-adapter pluggability) per
+  the Team Alignment resolution already agreed with solution-architect (see AGREED CONTRACTS below).
+- requirements-traceability-core -> At Phase 2 you re-review this same PRD against the approved HLD for
+  1:1 FR↔component traceability, flagging any orphan FR or orphan HLD component.
+- user-story-mapping-core -> Where useful, express Sprint-1-scope FRs (Zones 1/2/6/7) as user stories
+  mapped to the orchestrator's core rotation loop, so scrum-master-agent's Phase 6 backlog can lift them
+  directly.
+- acceptance-testing-bdd-core -> Draft Given/When/Then-shaped acceptance criteria for each FR, especially
+  the Memory Score/rotation-state-machine FR (Active/Compressed/Archived transitions), so Phase 6 stories
+  inherit testable ACs rather than vague requirement prose.
+- product-analytics-core -> Flag which FRs need a success metric/telemetry hook (e.g. rotation-transition
+  counts per zone, retrieval-hit rate) so Phase 1's HLD includes observability for the Memory Score engine.
 
 If, while doing this task, you hit a genuine gap — either (a) a knowledge gap: a library/API/framework
 fact not in your skill files or this codebase, a fast-moving fact (pricing, a recent API change, a
@@ -173,7 +181,7 @@ PROMPT:
 ---persona---
 agent: product-manager-agent
 kg_route: rnd-intelligence (D45)
-skills: [product-strategy-core, wsjf-prioritization-core, kano-model-core]
+skills: [product-management-core, product-analytics-core, user-story-mapping-core, acceptance-testing-bdd-core, business-requirements-analysis-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -185,19 +193,32 @@ Your output will be verified by hallucination-detector. Cite every factual claim
 
 FIRST, before doing anything, READ these files in full and apply them — this is mandatory:
 - agents/product-manager-agent/agent.md
-- skills/product-strategy-core/SKILL.md
-- skills/wsjf-prioritization-core/SKILL.md
-- skills/kano-model-core/SKILL.md
+- skills/product-management-core/SKILL.md
+- skills/product-analytics-core/SKILL.md
+- skills/user-story-mapping-core/SKILL.md
+- skills/acceptance-testing-bdd-core/SKILL.md
+- skills/business-requirements-analysis-core/SKILL.md
+(Corrected 2026-09-17: the previous 3-skill list — product-strategy-core, wsjf-prioritization-core,
+kano-model-core — does not exist in the library. Found and flagged by a live dispatch of this exact
+agent, which used its agent.md's real frontmatter skills list instead.)
 
-KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation, agent.md not read in full this
-session; sourced from claude-global-library/CLAUDE.md's authoritative Phase 0/2/6 roster entry):
-- product-strategy-core -> Co-author the PRD's product-vision/market sections alongside
-  business-analyst-agent's requirements sections; delegate all WSJF/Kano numeric scoring to
-  ba-pm-mathematics-expert (opus, auto-invoked) rather than approximating it yourself.
-- wsjf-prioritization-core -> Score each FR-ZONE-01..08 for WSJF priority — Zones 1/2/6/7 (Sprint 1
-  scope, per Team Alignment) should score highest given the agreed MVP rotation loop.
-- kano-model-core -> Classify each FR as Must-Be / Performance / Delighter — Zone 7 (Provenance/Audit)
-  is a strong Must-Be candidate given the stated anti-hallucination-as-a-feature requirement.
+KNOWLEDGE DISTILLATION (5/5 skills covered — corrected to agent.md's real frontmatter skill list):
+- product-management-core -> Co-author the PRD's product-vision/market sections alongside
+  business-analyst-agent's requirements sections; apply the standard WSJF formula (WSJF = (User-Business
+  Value + Time Criticality + Risk Reduction/Opportunity Enablement) / Job Size) yourself, documenting
+  component scores per FR for auditability, and flag them as provisional pending mathematical-expert
+  formalization rather than treating them as committed roadmap numbers.
+- product-analytics-core -> Flag which FRs need a success-metric/telemetry hook (rotation-transition
+  counts, retrieval-hit rate) — corroborate business-analyst-agent's analytics flags, don't duplicate.
+- user-story-mapping-core -> Score each FR-ZONE-01..08 for WSJF priority — Zones 1/2/6/7 (Sprint 1
+  scope, per Team Alignment) should score highest given the agreed MVP rotation loop; map top-scored
+  FRs to a coherent Sprint 1 user-story sequence.
+- acceptance-testing-bdd-core -> Classify each FR as Must-Be / Performance / Delighter (Kano) — Zone 7
+  (Provenance/Audit) is a strong Must-Be candidate given the anti-hallucination-as-a-feature requirement
+  — and sanity-check that business-analyst-agent's Given/When/Then ACs match each Kano classification's
+  expected rigor (Must-Be needs unambiguous pass/fail ACs, Delighter can be looser).
+- business-requirements-analysis-core -> Validate your WSJF/Kano output stays traceable to the same FR
+  numbering business-analyst-agent used — never introduce a parallel numbering scheme.
 
 If, while doing this task, you hit a genuine gap — either (a) a knowledge gap or (b) a specialist gap —
 do NOT stop and report this as a blocker. Instead: (1) knowledge gap -> nested research dispatch
@@ -243,7 +264,7 @@ PROMPT (technology-scout-analyst):
 ---persona---
 agent: technology-scout-analyst
 kg_route: rnd-intelligence (D45)
-skills: [technology-landscape-scanning-core, competitive-analysis-core]
+skills: [technology-horizon-scanning-core, information-retrieval-mastery-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -253,16 +274,19 @@ Thinking configured at MEDIUM (budget_tokens: 5,000). Standard landscape-scan ta
 Your output will be verified by hallucination-detector. Cite every factual claim with its source chunk.
 
 FIRST, READ in full: agents/technology-scout-analyst/agent.md,
-skills/technology-landscape-scanning-core/SKILL.md, skills/competitive-analysis-core/SKILL.md.
+skills/technology-horizon-scanning-core/SKILL.md, skills/information-retrieval-mastery-core/SKILL.md.
+(Corrected 2026-09-17: the previous names technology-landscape-scanning-core/competitive-analysis-core
+do not exist in the library — found and flagged by a live dispatch of this exact agent, which used its
+own agent.md's real mandatory skills instead.)
 
 KNOWLEDGE DISTILLATION (2/2 skills covered — role-metadata distillation):
-- technology-landscape-scanning-core -> Survey existing memory-for-LLM-agents products/papers (e.g.
+- technology-horizon-scanning-core -> Survey existing memory-for-LLM-agents products/papers (e.g.
   vector-DB-backed RAG memory, MemGPT-style hierarchical paging, agentic long-context frameworks) to
   position Dashanan's 8-zone design against the field — this is direct input to solution-architect's
   ADRs (Alternatives Rejected column).
-- competitive-analysis-core -> Identify what an existing solution does NOT do well (e.g. flat context
-  stuffing, single-tier memory, no provenance tracking) — Dashanan's differentiators should map directly
-  to gaps found here.
+- information-retrieval-mastery-core -> Identify what an existing solution does NOT do well (e.g. flat
+  context stuffing, single-tier memory, no provenance tracking) — Dashanan's differentiators should map
+  directly to gaps found here.
 
 If you hit a genuine knowledge gap, dispatch deep-web-researcher directly (quick path, 3-search
 cooldown: search -> synthesize -> search). nesting_depth: 0, dispatch_chain: []; cap at depth 2.
