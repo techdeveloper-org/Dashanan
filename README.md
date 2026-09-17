@@ -4,7 +4,7 @@
 
 Named after the mythological figure with ten heads, Dashanan gives any AI system that plugs it in a form of **unlimited, structured memory**: instead of stuffing everything into one flat context window, it distributes and rotates context across **8 specialized, dynamically managed memory zones**, orchestrating what moves between them, what gets compressed, what gets promoted, and what gets retrieved — at a depth a single context window cannot sustain on its own.
 
-*(The "ten heads" naming is deliberately kept from the mythology even though the engineering zone count is 8 — two pairs of the original 10-zone concept were consolidated during architecture review: Temporal into Episodic, and Summary/Compressed into Consolidation. See `docs/phase-0-rnd/01-vision-and-prd.md` for the full rationale.)*
+*(The "ten heads" naming is deliberately kept from the mythology even though the engineering zone count is 8 — two pairs of the original 10-zone concept were consolidated during architecture review: Temporal into Episodic, and Summary/Compressed into Consolidation. See `docs/orchestration/01-vision-and-prd.md` for the full rationale.)*
 
 > ⚠️ **Status:** Early architecture & R&D phase. This repository currently holds the project scaffold. The full Software Requirements Specification, High-Level Design, ADRs, and UML/architecture diagrams are being produced through a structured multi-agent orchestration pipeline (BA/PM research → solution architecture → joint blueprint validation → API contract design → documentation → sprint planning). Those artifacts will land in `docs/` and `SRS.md` as they are approved.
 
@@ -27,7 +27,7 @@ Dashanan instead treats memory as a **living, orchestrated system** with multipl
 7. **Provenance / Audit** — where each piece of memory came from and how it was derived
 8. **Consolidation** — long-term, cross-session consolidated store (absorbs the former separate "Summary/Compressed" zone: compression is a mechanism Consolidation applies, not its own zone)
 
-A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency + w3·Importance + w4·UserAffinity + w5·TaskRelevance + w6·ProvenanceConfidence`) drives rotation between these zones — promoted, compressed, or archived — under an orchestration policy, rather than context living statically in one place. See `docs/phase-0-rnd/01-vision-and-prd.md` for the full formula and rotation-policy definition.
+A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency + w3·Importance + w4·UserAffinity + w5·TaskRelevance + w6·ProvenanceConfidence`) drives rotation between these zones — promoted, compressed, or archived — under an orchestration policy, rather than context living statically in one place. See `docs/orchestration/01-vision-and-prd.md` for the full formula and rotation-policy definition.
 
 ## Goals
 

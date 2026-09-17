@@ -60,7 +60,7 @@ elif MemoryScore(item) < CompressThreshold:
 # else: item stays in its current zone, unchanged
 ```
 
-`PromoteThreshold > CompressThreshold > ArchiveThreshold` by construction; exact numeric values are a **Phase 1 solution-architect + mathematics-engineer deliverable** (informed by the deep-research brief on promotion/demotion algorithms from Phase 0 -- see `phase-0-rnd/research-brief.md`), not fixed here. The rotation policy runs on a per-zone schedule (event-driven on write for Working Memory's fast churn; periodic sweep for Consolidation's slow churn) -- the exact trigger cadence per zone is also a Phase 1 deliverable.
+`PromoteThreshold > CompressThreshold > ArchiveThreshold` by construction; exact numeric values are a **Phase 1 solution-architect + mathematics-engineer deliverable** (informed by the deep-research brief on promotion/demotion algorithms from Phase 0 -- see the Phase 0 research brief once produced), not fixed here. The rotation policy runs on a per-zone schedule (event-driven on write for Working Memory's fast churn; periodic sweep for Consolidation's slow churn) -- the exact trigger cadence per zone is also a Phase 1 deliverable.
 
 ---
 
