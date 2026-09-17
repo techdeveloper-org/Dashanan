@@ -591,7 +591,7 @@ PROMPT:
 ---persona---
 agent: context-engineering-agent
 kg_route: context-engineering
-skills: [context-management-core, differential-gsd-core, pomdp-routing-core]
+skills: [context-window-optimization-core, differential-context-routing-core, multi-agent-context-isolation-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -602,18 +602,21 @@ task allocates budgets across 8 zones plus the orchestrator plus 7+ downstream P
 a genuine multi-component design problem.
 Your output will be verified by hallucination-detector. Cite every factual claim with its source chunk.
 
-FIRST, READ in full: agents/context-engineering-agent/agent.md, skills/context-management-core/SKILL.md,
-skills/differential-gsd-core/SKILL.md, skills/pomdp-routing-core/SKILL.md.
+FIRST, READ in full: agents/context-engineering-agent/agent.md,
+skills/context-window-optimization-core/SKILL.md, skills/differential-context-routing-core/SKILL.md,
+skills/multi-agent-context-isolation-core/SKILL.md.
+(Corrected 2026-09-17: the previous 3-skill list — context-management-core, differential-gsd-core,
+pomdp-routing-core — does not exist in the library. Fixed against agent.md's real frontmatter.)
 
-KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation):
-- context-management-core -> Consume solution-architect's "Zone Capacity & Rotation Policy" HLD table
-  directly (per Team Alignment — do not re-derive zone boundaries yourself) and produce the Context
+KNOWLEDGE DISTILLATION (3/3 skills covered — corrected to agent.md's real frontmatter skill list):
+- context-window-optimization-core -> Consume solution-architect's "Zone Capacity & Rotation Policy" HLD
+  table directly (per Team Alignment — do not re-derive zone boundaries yourself) and produce the Context
   Delivery Plan for every downstream Phase 1.5/2/5/6/7/8 agent in this bundle.
-- differential-gsd-core -> Design Differential GSD chunk names concretely per this project — e.g.
-  "hld-approved-delta", "prd-fr-delta", "srs-fr-delta", "zone-capacity-delta" — never placeholder names.
-- pomdp-routing-core -> At Phase 7 AR.3, design per-story isolated context windows for the eventual
-  Phase B implementation agents, excluding PII per DPDP §4 from any non-security-cleared agent's window
-  (relevant to Zone 2 Episodic / Zone 5 Entity stories specifically).
+- differential-context-routing-core -> Design Differential GSD chunk names concretely per this project —
+  e.g. "hld-approved-delta", "prd-fr-delta", "srs-fr-delta", "zone-capacity-delta" — never placeholder.
+- multi-agent-context-isolation-core -> At Phase 7 AR.3, design per-story isolated context windows for
+  the eventual Phase B implementation agents, excluding PII per DPDP §4 from any non-security-cleared
+  agent's window (relevant to Zone 2 Episodic / Zone 5 Entity stories specifically).
 
 TASK: (Phase 1, BLOCKING gate) After consensus-agent returns APPROVED on the HLD, produce the Context
 Delivery Plan for every agent in Phases 1.5/2/5/6/7/8 of this bundle — this document's own "Context
