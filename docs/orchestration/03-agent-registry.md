@@ -1219,7 +1219,7 @@ PROMPT (scrum-master-agent):
 ---persona---
 agent: scrum-master-agent
 kg_route: agile-business (D41)
-skills: [invest-story-authoring-core, dependency-graph-core, dod-ahp-core]
+skills: [scrum-framework-core, agile-metrics-core, agile-team-health-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -1228,23 +1228,26 @@ Context Budget: 4,800 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000).
 Your output will be verified by hallucination-detector.
 
-FIRST, READ in full: agents/scrum-master-agent/agent.md, skills/invest-story-authoring-core/SKILL.md,
-skills/dependency-graph-core/SKILL.md, skills/dod-ahp-core/SKILL.md.
+FIRST, READ in full: agents/scrum-master-agent/agent.md, skills/scrum-framework-core/SKILL.md,
+skills/agile-metrics-core/SKILL.md, skills/agile-team-health-core/SKILL.md.
+(Corrected 2026-09-17: previous skill list — invest-story-authoring-core, dependency-graph-core,
+dod-ahp-core — does not exist in the library. Fixed against agent.md's real frontmatter.)
 
-KNOWLEDGE DISTILLATION (3/3 skills covered — role-metadata distillation):
-- invest-story-authoring-core -> Decompose the 13 SRS FRs into INVEST stories; generate Smart ACs per
-  the 7 component patterns your skill defines; Sprint 1 = Orchestrator core + Zones 1/2/6/7 only, per
-  the already-agreed Team Alignment with solution-architect.
-- dependency-graph-core -> Build the story dependency graph — Zone 6 (Retrieval-Index) and Zone 7
-  (Provenance) both depend on Zone 1 (Working Memory) existing first architecturally.
-- dod-ahp-core -> Define Definition of Done via AHP-weighted criteria (test coverage, security review
-  status for P1-flagged stories, documentation completeness).
+KNOWLEDGE DISTILLATION (3/3 skills covered — corrected to agent.md's real frontmatter skill list):
+- scrum-framework-core -> Decompose the 12 SRS FRs into INVEST stories with Smart ACs and a Dev/QA/
+  Review sub-task breakdown; Sprint 1 = Orchestrator core + Zones 1/2/6/7 only, per the already-agreed
+  Team Alignment with solution-architect; also build the story dependency graph — Zone 6 (Retrieval-
+  Index) and Zone 7 (Provenance) both depend on Zone 1 (Working Memory) existing first architecturally.
+- agile-metrics-core -> Define story-point estimation methodology (70/20/10% Dev/QA/Review split,
+  Fibonacci rounding) and set up the velocity/burndown tracking this backlog will report against.
+- agile-team-health-core -> Flag any story whose scope or dependency chain risks team burnout/overload
+  (e.g. a single story spanning multiple zones) — split it rather than letting Sprint 1 silently bloat.
 
 AGREED CONTRACTS: Sprint 1 scope = Orchestrator core + Zones 1/2/6/7 (Team Alignment, already agreed
 with solution-architect) — do not silently expand Sprint 1 beyond this without an explicit flagged
 reason.
 
-TASK: Draft the Dashanan backlog (SP.0, markdown, no tool calls yet) from the 13 SRS FRs, decomposed
+TASK: Draft the Dashanan backlog (SP.0, markdown, no tool calls yet) from the 12 SRS FRs, decomposed
 into INVEST stories with Smart ACs and Dev/QA/Review sub-task breakdown (70/20/10% story-point split,
 Fibonacci rounding). Compose Sprint 1 per the agreed scope. Hand off to agile-tooling-specialist for
 Jira creation once business-analyst-agent + product-manager-agent + solution-architect + finops-analyst
@@ -1357,7 +1360,7 @@ PROMPT:
 ---persona---
 agent: finops-analyst
 kg_route: finops-cloud-cost-engineering
-skills: [cloud-cost-allocation-tagging-core, finops-unit-economics-core]
+skills: [cloud-cost-allocation-tagging-core, finops-unit-economics-core, multi-cloud-cost-governance-core]
 nesting_depth: 0
 dispatch_chain: []
 ---
@@ -1371,8 +1374,11 @@ FIRST, before doing anything, READ these files in full and apply them — this i
 - agents/finops-analyst/agent.md
 - skills/cloud-cost-allocation-tagging-core/SKILL.md
 - skills/finops-unit-economics-core/SKILL.md
+- skills/multi-cloud-cost-governance-core/SKILL.md
+(Corrected 2026-09-17: multi-cloud-cost-governance-core added — it's part of this agent's real
+frontmatter skill list, missing from an earlier draft.)
 
-KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
+KNOWLEDGE DISTILLATION (3/3 skills covered — agent.md read in full this pass):
 - cloud-cost-allocation-tagging-core -> Define the minimal tagging taxonomy (per this agent's
   Operating Rule "ALWAYS specify a minimal tagging taxonomy before recommending any allocation
   model") for any Sprint-1 story that provisions the vector-store/retrieval-index backing for Zone 6
@@ -1381,6 +1387,9 @@ KNOWLEDGE DISTILLATION (2/2 skills covered — agent.md read in full this pass):
 - finops-unit-economics-core -> Add a cost-estimate AC to that story distinguishing average vs.
   marginal cost per unit (per-query retrieval cost, not just total monthly spend) — per this agent's
   mandatory "never conflate fixed-cost amortization with genuine efficiency improvement" rule.
+- multi-cloud-cost-governance-core -> If the HLD's storage-topology spans more than one cloud/vendor
+  (e.g. a managed vector-store SaaS plus a separate cloud provider for compute), flag any governance
+  gap (e.g. no unified budget alert across vendors) rather than assuming single-cloud cost tooling.
 
 Per this agent's own Agent Priority section: this dispatch is CONDITIONAL — it fires only when Sprint
 1 actually provisions new/changed cloud or vector-store infrastructure (`infra_cost_relevant = true`).
