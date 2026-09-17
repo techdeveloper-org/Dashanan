@@ -23,9 +23,38 @@ Each zone has its own **rotation policy** (promotion/demotion thresholds), **com
 
 ---
 
+## ADR: Zone 3 (Semantic) vs. Zone 5 (Entity) ownership boundary
+
+`[ADDED after user architecture review, 2026-09-17: flagged as the biggest remaining ambiguity -- a fact like "Sachin lives in Mumbai" could plausibly be written to either zone, and without a strict ownership rule two zones would silently duplicate or fragment the same fact.]`
+
+**ADR: Ownership Rule**
+```
+Chosen:    Entity Memory (Zone 5) = per-entity RECORDS (attributes owned by exactly one entity).
+           Semantic Memory (Zone 3) = cross-entity RELATIONSHIPS and general facts not owned by
+           any single entity record.
+
+Why:       A record/relationship split is a well-established graph-modeling boundary (node
+           properties vs. edges) -- it gives every fact exactly one canonical home, which is
+           the actual requirement (avoid duplication/fragmentation), not just a naming choice.
+           It also composes cleanly with Zone 6 (Retrieval-Index): an entity lookup resolves to
+           one record; a relationship query traverses Semantic edges between records.
+
+Rejected:  Merge Zone 3 and Zone 5 into one zone -- rejected because entity records and general
+           semantic facts have different access patterns (point lookup by entity ID vs. similarity/
+           graph-traversal search) and different rotation/decay behavior (an entity's own profile
+           record should decay far slower than a one-off inferred relationship fact).
+           Classify by confidence/source instead of structure -- rejected because it doesn't
+           resolve the actual ambiguity (a low-confidence fact can still be entity-owned or
+           relational; confidence is already handled separately, by ProvenanceConfidence).
+```
+
+**Worked example:** `"Sachin lives in Mumbai"` decomposes as: `Entity Memory` gets/updates the record `Entity(Sachin).current_city = "Mumbai"` (an attribute of the Sachin entity record); `Semantic Memory` optionally gets the general relational fact `located_in(Sachin, Mumbai)` only if something downstream needs to query it as a graph edge independent of loading the full Sachin record (e.g. "who lives in Mumbai?" -- a query Entity Memory's per-entity lookup can't answer efficiently, but a Semantic relationship index can). In the common case, a single-entity attribute fact like this lives ONLY in Entity Memory; Semantic Memory is reserved for facts that genuinely span or relate multiple entities, or general world knowledge not owned by any one entity record (e.g. "Mumbai is a city in Maharashtra" -- a fact about Mumbai as a place, not about any person-entity). This exact rule -- **Entity = record, Semantic = relationship/general-fact, and single-entity attributes default to Entity-only** -- is the mandatory ownership test every write-path decision uses; Phase 1 solution-architect formalizes this into the HLD's data model with exact schema-level enforcement.
+
+---
+
 ## CORE ALGORITHM: Memory Scoring & Rotation Policy
 
-`[APPROVED by user review, 2026-09-17: the Memory Score formula SHAPE below (the 6 weighted terms, the per-zone-half-life Recency model, and the Promote/Compress/Archive threshold ordering) is locked in as the Phase 1 starting point. Explicitly still open for Phase 1: the exact numeric threshold values, weight-tuning strategy, and complexity/Big-O analysis -- those remain a mandatory solution-architect + mathematics-engineer deliverable, not fixed here. Also explicitly still open, scoped to Phase 1 (solution-architect) / Phase 1.5 (API contract): Retrieval-layer design detail, Provenance implementation detail, multi-tenant architecture, the OpenAPI contract, and storage-abstraction design -- none of these are gaps in this PRD, they are correctly deferred to their own phases, not yet due at Phase 0.]`
+`[APPROVED by user review, 2026-09-17: the Memory Score formula SHAPE below (the 6 weighted terms, the per-zone-half-life Recency model, and the Promote/Compressed/Archived STATE MACHINE -- fixed to a strict lifecycle after a second review round caught an ordering bug that could skip compression) is locked in as the Phase 1 starting point. Explicitly still open for Phase 1: the exact numeric threshold values, whether weights should be non-equal (Importance/TaskRelevance/ProvenanceConfidence weighted higher than Recency/Frequency is a flagged future ADR candidate, not decided yet), weight-tuning strategy, and complexity/Big-O analysis -- those remain a mandatory solution-architect + mathematics-engineer deliverable, not fixed here. Also explicitly still open, scoped to Phase 1 (solution-architect) / Phase 1.5 (API contract): Retrieval-layer design detail, Provenance implementation detail, multi-tenant architecture, the OpenAPI contract, and storage-abstraction design -- none of these are gaps in this PRD, they are correctly deferred to their own phases, not yet due at Phase 0.]`
 
 **This is the load-bearing algorithm of the entire engine -- without it, the zone taxonomy above is just a storage layout, not an orchestration system.** Flagged during architecture review as the single biggest gap in the first-pass bundle. This section seeds the algorithm's shape; **Phase 1 solution-architect's mandatory deliverable is to finalize exact threshold values, weight-tuning strategy, and a complexity/Big-O analysis, delegating the derivation to `mathematics-engineer` (opus, auto-invoked) per the Mathematical Delegation convention** -- do not treat the numbers below as final, treat the shape as final.
 
@@ -48,19 +77,31 @@ Each term, normalized to [0, 1]:
 
 **Default weights (MVP, equal-weighted -- tunable per deployment):** `w1=w2=w3=w4=w5=w6=1/6`, sum-to-1 normalized. Phase 1 should treat these as a starting baseline, not a final answer -- different host AI systems (a coding agent vs. a customer-support agent) will plausibly want different weight profiles, so the weights should be a configuration surface, not a hardcoded constant.
 
-### Rotation policy (promotion / compression / archive)
+### Rotation policy (promotion / compression / archive) -- explicit state machine
+
+`[FIXED after user architecture review, 2026-09-17: the original single if/elif score check had an ordering bug -- a fast-decaying item could score below ArchiveThreshold before it was ever compressed, skipping compression entirely and losing the summarized-but-recoverable intermediate form. Fixed by making compression and archival separate STATE transitions, not just separate score bands -- an item cannot reach Archived without having passed through Compressed first.]`
+
+Every item carries an explicit **lifecycle state**, not just a score: `Active -> Compressed -> Archived` (plus `Promoted`, a re-entry to a higher-retention zone from any state). State transitions are gated by BOTH the current state AND the score, so compression can never be skipped:
 
 ```
+# item.state in {Active, Compressed, Archived}; evaluated on each zone's rotation sweep
+
 if MemoryScore(item) > PromoteThreshold:
-    promote(item)      # move to a higher-retention / lower-latency zone (e.g. Episodic -> Working on re-access)
-elif MemoryScore(item) < ArchiveThreshold:
-    archive(item)       # move to Consolidation (Zone 8), compressed
-elif MemoryScore(item) < CompressThreshold:
-    compress(item)      # summarize in place (still in its current zone, footprint reduced)
-# else: item stays in its current zone, unchanged
+    promote(item)              # any state -> higher-retention/lower-latency zone (e.g. Episodic -> Working on re-access)
+                                # a promoted item's state resets to Active in its new zone
+
+elif item.state == Active and MemoryScore(item) < CompressThreshold:
+    compress(item)              # Active -> Compressed: summarize in place, footprint reduced, still recoverable
+                                # NOTE: item stays in its current zone at this step -- Compressed is a state, not Zone 8
+
+elif item.state == Compressed and MemoryScore(item) < ArchiveThreshold:
+    archive(item)                # Compressed -> Archived: move to Consolidation (Zone 8)
+                                  # only reachable from Compressed -- an Active item can never jump straight to Archived
+
+# else: item stays in its current state/zone, unchanged
 ```
 
-`PromoteThreshold > CompressThreshold > ArchiveThreshold` by construction; exact numeric values are a **Phase 1 solution-architect + mathematics-engineer deliverable** (informed by the deep-research brief on promotion/demotion algorithms from Phase 0 -- see the Phase 0 research brief once produced), not fixed here. The rotation policy runs on a per-zone schedule (event-driven on write for Working Memory's fast churn; periodic sweep for Consolidation's slow churn) -- the exact trigger cadence per zone is also a Phase 1 deliverable.
+`PromoteThreshold > CompressThreshold > ArchiveThreshold` by construction. This guarantees a strict **Active -> Compressed -> Archived** lifecycle even for an item whose score drops fast (e.g. across multiple rotation sweeps) -- it is compressed on the sweep where it first crosses `CompressThreshold`, and only archived on a later sweep once it is already `Compressed` and has further crossed `ArchiveThreshold`. Exact numeric threshold values, the per-sweep cadence, and whether extremely fast score-collapse should ever fast-track Compressed+Archived in one sweep (an explicit exception, not the default) are a **Phase 1 solution-architect + mathematics-engineer deliverable** (informed by the deep-research brief on promotion/demotion algorithms from Phase 0 -- see the Phase 0 research brief once produced), not fixed here. The rotation policy runs on a per-zone schedule (event-driven on write for Working Memory's fast churn; periodic sweep for Consolidation's slow churn) -- the exact trigger cadence per zone is also a Phase 1 deliverable.
 
 ---
 
