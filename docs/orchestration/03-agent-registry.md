@@ -654,7 +654,7 @@ range) to `mathematics-engineer` (opus, auto-invoked).
 ### AGENT: python-backend-engineer (A002) + api-testing-engineer + integration-testing-engineer (Phase 1.5 cell)
 Phase: 1.5
 Depends On: solution-architect's endpoint extraction
-Context Budget: 6,000 tokens each | Sources: [hld-api-delta]
+Context Budget: 4,500 tokens (python-backend-engineer) | Sources: [hld-endpoint-inventory-delta, hld-adr-004-wire-protocol-delta, hld-nfr-latency-targets-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000 each
 Jira Ticket: N/A (pre-Phase-6, no sprint yet exists)
 
@@ -668,7 +668,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000). Standard contract-authoring task from a clear
 HLD input.
 Your output will be verified by hallucination-detector.
@@ -708,7 +708,7 @@ C_api coverage >= 0.85 is a hard Phase 1.5 gate — under-cover and consensus-ag
 Phase: 1.5
 Parallel With: integration-testing-engineer
 Depends On: python-backend-engineer's openapi.yaml draft
-Context Budget: 6,000 tokens | Sources: [openapi-draft-delta]
+Context Budget: 4,500 tokens | Sources: [openapi-draft-delta, hld-security-i1-i2-i3-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000
 Thinking Override: Role default — no override needed
 Hallucination Risk: MEDIUM
@@ -723,7 +723,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000). Standard coverage-analysis task against a
 clear OpenAPI input, no cross-domain synthesis required.
 Your output will be verified by hallucination-detector.
@@ -790,7 +790,7 @@ CONSTRAINTS:
 Phase: 1.5
 Parallel With: api-testing-engineer
 Depends On: python-backend-engineer's openapi.yaml draft
-Context Budget: 6,000 tokens | Sources: [openapi-draft-delta]
+Context Budget: 4,500 tokens | Sources: [openapi-draft-delta, hld-event-contracts-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000
 Thinking Override: Role default — no override needed
 Hallucination Risk: MEDIUM
@@ -805,7 +805,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000). Standard contract-design task from a clear
 OpenAPI input.
 Your output will be verified by hallucination-detector.
@@ -870,7 +870,7 @@ CONSTRAINTS:
 ### AGENT: uml-structural-diagram-engineer + uml-behavioral-diagram-engineer + uml-interaction-diagram-engineer + drawio-diagram-architect + mermaid-diagram-engineer (Phase 5 cell)
 Phase: 5
 Depends On: business-analyst-agent's SRS.md, solution-architect's approved HLD
-Context Budget: 6,000 tokens each | Sources: [srs-fr-delta, hld-component-delta]
+Context Budget: 4,500 tokens (uml-structural-diagram-engineer) | Sources: [srs-fr-delta, hld-component-list-delta, hld-data-ownership-map-delta]
 Thinking Level: uml-*-engineer = MEDIUM (5,000) | drawio/mermaid = LOW (1,024)
 
 PROMPT (uml-structural-diagram-engineer, representative of the 5-agent cell):
@@ -883,7 +883,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000).
 Your output will be verified by hallucination-detector + context-faithfulness-engineer.
 
@@ -914,7 +914,7 @@ untraceable elements.
 Phase: 5
 Parallel With: uml-structural-diagram-engineer, uml-interaction-diagram-engineer
 Depends On: business-analyst-agent's SRS.md, solution-architect's approved HLD
-Context Budget: 6,000 tokens | Sources: [srs-fr-delta, hld-component-delta]
+Context Budget: 4,500 tokens | Sources: [srs-fr-delta, hld-rotation-state-machine-delta, hld-failure-mode-table-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000
 Hallucination Risk: MEDIUM — checked by hallucination-detector + context-faithfulness-engineer
 
@@ -928,7 +928,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000).
 Your output will be verified by hallucination-detector + context-faithfulness-engineer.
 
@@ -990,7 +990,7 @@ style issue.
 Phase: 5
 Parallel With: uml-structural-diagram-engineer, uml-behavioral-diagram-engineer
 Depends On: business-analyst-agent's SRS.md, solution-architect's approved HLD
-Context Budget: 6,000 tokens | Sources: [srs-fr-delta, hld-component-delta]
+Context Budget: 4,500 tokens | Sources: [srs-fr-delta, hld-endpoint-inventory-delta, hld-communication-matrix-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000
 Hallucination Risk: MEDIUM
 
@@ -1004,7 +1004,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,500 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000).
 Your output will be verified by hallucination-detector + context-faithfulness-engineer.
 
@@ -1062,7 +1062,7 @@ faithfulness violation, not a style nit.
 Phase: 5
 Parallel With: mermaid-diagram-engineer (both run after the structural/behavioral/interaction cell)
 Depends On: uml-structural-diagram-engineer, uml-behavioral-diagram-engineer, uml-interaction-diagram-engineer (all 7 Mermaid-or-spec diagram contents)
-Context Budget: 6,000 tokens | Sources: [uml-mermaid-output-delta]
+Context Budget: 900 tokens | Sources: [uml-mermaid-output-delta]
 Thinking Level: LOW | budget_tokens: 1,024
 Hallucination Risk: LOW — structural conversion, not generative content; still checked
 
@@ -1076,7 +1076,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 900 tokens.
 Thinking configured at LOW (budget_tokens: 1,024). Mechanical XML conversion from already-approved
 Mermaid/spec content — no open design judgment required.
 Your output will be verified by hallucination-detector.
@@ -1140,7 +1140,7 @@ COMPLETE, never after.
 Phase: 5
 Parallel With: drawio-diagram-architect
 Depends On: uml-structural-diagram-engineer, uml-behavioral-diagram-engineer, uml-interaction-diagram-engineer
-Context Budget: 6,000 tokens | Sources: [uml-mermaid-output-delta]
+Context Budget: 900 tokens | Sources: [uml-mermaid-output-delta]
 Thinking Level: LOW | budget_tokens: 1,024
 Hallucination Risk: LOW — syntax review, not generative content; still checked
 
@@ -1154,7 +1154,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 900 tokens.
 Thinking configured at LOW (budget_tokens: 1,024). Mechanical syntax validation of already-produced
 Mermaid diagrams — no open design judgment required.
 Your output will be verified by hallucination-detector.
@@ -1210,7 +1210,7 @@ until proven broken.
 ### AGENT: scrum-master-agent + agile-tooling-specialist + finops-analyst (Phase 6 cell)
 Phase: 6
 Depends On: Phase 5 DOCUMENTATION APPROVED (SRS.md + UML/Draw.io)
-Context Budget: 8,000 tokens each | Sources: [srs-fr-delta, uml-component-delta]
+Context Budget: 4,800 tokens (scrum-master-agent) | Sources: [srs-fr-delta, uml-component-delta, hld-nfr-compliance-delta]
 Thinking Level: scrum-master-agent = MEDIUM (5,000) | agile-tooling-specialist = LOW (1,024) |
   finops-analyst = MEDIUM (5,000)
 
@@ -1224,7 +1224,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 8,000 tokens.
+Context Budget: 4,800 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000).
 Your output will be verified by hallucination-detector.
 
@@ -1265,7 +1265,7 @@ Delegate PERT 3-point estimation, BCa-CI velocity baselining, and AHP CR validat
 Phase: 6
 Parallel With: scrum-master-agent (sequenced after DRAFT content exists)
 Depends On: scrum-master-agent's backlog_draft.json + sprint_plan.json, consensus-agent DRAFT APPROVED
-Context Budget: 8,000 tokens | Sources: [backlog-draft-delta, sprint-plan-delta]
+Context Budget: 950 tokens | Sources: [backlog-draft-delta, sprint-plan-delta]
 Thinking Level: LOW | budget_tokens: 1,024
 Thinking Override: Role default — no override needed (mechanical tool configuration against an
   already-approved draft, not an open design decision)
@@ -1282,7 +1282,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 8,000 tokens.
+Context Budget: 950 tokens.
 Thinking configured at LOW (budget_tokens: 1,024). Mechanical Jira configuration against an
 already-DRAFT-APPROVED backlog — no open design judgment required at this step.
 Your output will be verified by hallucination-detector.
@@ -1348,7 +1348,7 @@ Phase: 6 (SP.0.5 conditional reviewer)
 Parallel With: business-analyst-agent, product-manager-agent, solution-architect (SP.0.5 review cell)
 Depends On: scrum-master-agent's backlog_draft.json — triggered only if any Sprint 1 story provisions
   new/changed cloud or vector-store infrastructure (`infra_cost_relevant = true`)
-Context Budget: 6,000 tokens | Sources: [backlog-draft-delta]
+Context Budget: 4,800 tokens | Sources: [backlog-draft-delta, hld-storage-topology-delta]
 Thinking Level: MEDIUM | budget_tokens: 5,000
 Hallucination Risk: MEDIUM
 
@@ -1362,7 +1362,7 @@ nesting_depth: 0
 dispatch_chain: []
 ---
 Routed via decision tree + this agent's own domain KG (full Master KG stats: 528 agents, 1034 skills, 104 domains -- see document header; this project's own roster is ~24 agents, not 528).
-Context Budget: 6,000 tokens.
+Context Budget: 4,800 tokens.
 Thinking configured at MEDIUM (budget_tokens: 5,000). Standard tagging/cost-estimate review against a
 defined backlog, no cross-domain synthesis required.
 Your output will be verified by hallucination-detector.
@@ -1771,7 +1771,7 @@ CONSTRAINTS:
 ### AGENT: business-analyst-agent + product-manager-agent + solution-architect + scrum-master-agent (Phase 8 self-review cell)
 Phase: 8
 Depends On: Phase 7 ROUTING APPROVED (STOP 7 cleared by user)
-Context Budget: 6,000 tokens each | Sources: [ar1-assignments-delta, implementation-execution-plan-delta]
+Context Budget: 4,800 tokens each (business-analyst-agent, product-manager-agent, scrum-master-agent) | 6,000 tokens (solution-architect) | Sources: [ar1-assignments-delta, implementation-execution-plan-delta]
 Thinking Level: MEDIUM (business-analyst-agent, product-manager-agent, scrum-master-agent) | EXCELLENCE
   (solution-architect, for any ARCHITECTURE_GAP/DEPENDENCY_CONFLICT flags — same override reasoning as
   the Phase 1 block above)
