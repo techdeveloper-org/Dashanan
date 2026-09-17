@@ -93,6 +93,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '410':
+          $ref: '#/components/responses/StaleCursor'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -162,6 +164,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '410':
+          $ref: '#/components/responses/StaleCursor'
 
   # FR-009 (all zones, uniform item envelope), FR-012 (score terms attached).
   /items/{item_id}:
@@ -1037,10 +1041,24 @@ components:
 
   responses:
     BadRequest:
-      description: Malformed request
+      description: >-
+        Malformed request — includes a syntactically invalid opaque `cursor`
+        value (corrupted, truncated, or tampered; distinct from `410
+        StaleCursor`, which is a well-formed cursor that no longer resolves).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            malformed_cursor:
+              summary: Cursor value is not a valid opaque token
+              value:
+                success: false
+                data: null
+                error:
+                  code: MALFORMED_CURSOR
+                  message: The cursor value is invalid.
+                  trace_id: 'a1c4e8b0-...-3f0d'
+                timestamp: '2026-09-17T10:06:00Z'
     Unauthorized:
       description: Missing or invalid credential
       content:
@@ -1112,26 +1130,6 @@ components:
                   message: This cursor is no longer valid. Start a new request without a cursor.
                   trace_id: '7f3a9c10-...-88e2'
                 timestamp: '2026-09-17T10:05:00Z'
-    MalformedCursor:
-      description: >-
-        The supplied `cursor` value is not a well-formed opaque cursor token
-        (corrupted, truncated, or tampered). Distinct from `StaleCursor`: this
-        is a syntactic/integrity failure detected before any lookup is
-        attempted, never surfaced as a 500.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ErrorResponse' }
-          examples:
-            malformed_cursor:
-              summary: Cursor value is not a valid opaque token
-              value:
-                success: false
-                data: null
-                error:
-                  code: MALFORMED_CURSOR
-                  message: The cursor value is invalid.
-                  trace_id: 'a1c4e8b0-...-3f0d'
-                timestamp: '2026-09-17T10:06:00Z'
 
   schemas:
     ErrorResponse:
