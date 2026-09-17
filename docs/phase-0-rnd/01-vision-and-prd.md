@@ -25,6 +25,8 @@ Each zone has its own **rotation policy** (promotion/demotion thresholds), **com
 
 ## CORE ALGORITHM: Memory Scoring & Rotation Policy
 
+`[APPROVED by user review, 2026-09-17: the Memory Score formula SHAPE below (the 6 weighted terms, the per-zone-half-life Recency model, and the Promote/Compress/Archive threshold ordering) is locked in as the Phase 1 starting point. Explicitly still open for Phase 1: the exact numeric threshold values, weight-tuning strategy, and complexity/Big-O analysis -- those remain a mandatory solution-architect + mathematics-engineer deliverable, not fixed here. Also explicitly still open, scoped to Phase 1 (solution-architect) / Phase 1.5 (API contract): Retrieval-layer design detail, Provenance implementation detail, multi-tenant architecture, the OpenAPI contract, and storage-abstraction design -- none of these are gaps in this PRD, they are correctly deferred to their own phases, not yet due at Phase 0.]`
+
 **This is the load-bearing algorithm of the entire engine -- without it, the zone taxonomy above is just a storage layout, not an orchestration system.** Flagged during architecture review as the single biggest gap in the first-pass bundle. This section seeds the algorithm's shape; **Phase 1 solution-architect's mandatory deliverable is to finalize exact threshold values, weight-tuning strategy, and a complexity/Big-O analysis, delegating the derivation to `mathematics-engineer` (opus, auto-invoked) per the Mathematical Delegation convention** -- do not treat the numbers below as final, treat the shape as final.
 
 ### Memory Score formula
