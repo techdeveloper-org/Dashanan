@@ -18,9 +18,10 @@
       "DASH-STORY-006",
       "DASH-STORY-007",
       "DASH-STORY-008",
-      "DASH-STORY-009"
+      "DASH-STORY-009",
+      "DASH-STORY-010"
     ],
-    "total_story_points": 52,
+    "total_story_points": 55,
     "story_point_breakdown": {
       "DASH-STORY-001": 8,
       "DASH-STORY-002": 5,
@@ -30,7 +31,8 @@
       "DASH-STORY-006": 5,
       "DASH-STORY-007": 8,
       "DASH-STORY-008": 8,
-      "DASH-STORY-009": 5
+      "DASH-STORY-009": 5,
+      "DASH-STORY-010": 3
     },
     "fr_to_story_map": {
       "FR-009": ["DASH-STORY-001"],
@@ -39,18 +41,18 @@
       "FR-007": ["DASH-STORY-005"],
       "FR-010": ["DASH-STORY-006"],
       "FR-006": ["DASH-STORY-007"],
-      "FR-012": ["DASH-STORY-008", "DASH-STORY-009"]
+      "FR-012": ["DASH-STORY-008", "DASH-STORY-009", "DASH-STORY-010"]
     }
   },
   "dependency_graph": {
-    "note": "See backlog_draft.json dependency_graph for the full per-story adjacency list and promotion_reason.",
+    "note": "See backlog_draft.json dependency_graph for the full per-story adjacency list and promotion_reason. Build order corrected per SP.0.5 SA review: DASH-STORY-007 now roots at DASH-STORY-003 (not 002); DASH-STORY-004 now also depends on DASH-STORY-008, moving it from group 4 to group 5.",
     "root_stories": ["DASH-STORY-001"],
     "build_order_groups": [
       { "group": 1, "stories": ["DASH-STORY-001"] },
-      { "group": 2, "stories": ["DASH-STORY-002"] },
-      { "group": 3, "stories": ["DASH-STORY-003", "DASH-STORY-005", "DASH-STORY-007"] },
-      { "group": 4, "stories": ["DASH-STORY-004", "DASH-STORY-006", "DASH-STORY-008"] },
-      { "group": 5, "stories": ["DASH-STORY-009"] }
+      { "group": 2, "stories": ["DASH-STORY-002", "DASH-STORY-003"] },
+      { "group": 3, "stories": ["DASH-STORY-005", "DASH-STORY-007"] },
+      { "group": 4, "stories": ["DASH-STORY-006", "DASH-STORY-008"] },
+      { "group": 5, "stories": ["DASH-STORY-004", "DASH-STORY-009", "DASH-STORY-010"] }
     ]
   },
   "risk_flags": [
@@ -74,7 +76,7 @@
     {
       "flag_id": "RISK-04",
       "severity": "capacity-estimation-caveat",
-      "description": "52 total Sprint 1 story points is an unvalidated draft estimate (SP.0, no historical velocity or Focus Factor data exists yet for this team). Per scrum-framework-core M3, Focus Factor bootstrap CI requires >=6 historical sprints; none exist pre-Sprint-1. This total should NOT be treated as a committed capacity number until SP.2-SP.4 context-map and estimation passes run against real team capacity."
+      "description": "55 total Sprint 1 story points (52 SP.0 draft + 3 SP for DASH-STORY-010, added per SP.0.5 SA review C-4 for the previously-unowned ADR-012 deadline-invalidation wiring) is an unvalidated draft estimate (SP.0, no historical velocity or Focus Factor data exists yet for this team). Per scrum-framework-core M3, Focus Factor bootstrap CI requires >=6 historical sprints; none exist pre-Sprint-1. This total should NOT be treated as a committed capacity number until SP.2-SP.4 context-map and estimation passes run against real team capacity."
     }
   ],
   "promotion_reason": null,

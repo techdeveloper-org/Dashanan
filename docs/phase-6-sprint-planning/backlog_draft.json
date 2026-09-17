@@ -92,6 +92,11 @@
           "ac_id": "AC-002",
           "text": "Given multiple Episodic entries with distinct timestamps, When the host queries Zone 2 by recency, Then results are returned in strict chronological order and each entry exposes its own decay attribute.",
           "source": "SRS AC-002"
+        },
+        {
+          "ac_id": "AC-002-DPDP-1",
+          "text": "Given Zone 2 stores conversational content that may contain PII, When a DPDP Act 2023 erasure request or purpose-limitation constraint applies to a stored Episodic entry, Then Zone 2 SHALL support locating and erasing that entry (or the PII within it) on request, consistent with NFR-006 and the crypto-shredding mechanism referenced in AC-013.",
+          "source": "[DERIVED FROM SP.0.5 BA review - NFR-006 DPDP erasure obligation, Zone 2 is the persistence surface]"
         }
       ],
       "story_points": 5,
@@ -108,7 +113,7 @@
       "title": "Zone 2 capacity cap and MaxAge forced-archival backstop (OAQ-4)",
       "traces_to_fr": "FR-002",
       "invest": {
-        "independent": "A bounded add-on to Zone 2's storage layer; does not require FR-012's full rotation state machine to exist, only a capacity/age check on write.",
+        "independent": "A bounded add-on to Zone 2's storage layer; depends on DASH-STORY-008 (Memory Score engine) since eviction ranks by MemoryScore, per SP.0.5 SA review C-2, but does not require FR-012's full rotation state machine (DASH-STORY-009) to exist.",
         "negotiable": "Exact cap value and MaxAge threshold are operator-configurable (NFR-009).",
         "valuable": "HLD Section 12F names this the only mechanism preventing unbounded Zone 2 growth in a sprint with no Archived destination (Zone 8 out of scope) - a hard Sprint 1 dependency, not optional.",
         "estimable": "OAQ-4 defines the mechanism: per-zone capacity cap + MaxAge forced archival, converting Memory Score into a ranking function with a threshold fast-path.",
@@ -126,6 +131,11 @@
           "ac_id": "AC-002-CAP-2",
           "text": "Given the capacity cap and MaxAge values are deployment configuration (NFR-009), When an operator changes either value, Then the backstop sweep uses the new values on its next run without a code change.",
           "source": "[AUTO-AC: configuration_pattern]"
+        },
+        {
+          "ac_id": "AC-002-CAP-DPDP-1",
+          "text": "Given the capacity/MaxAge backstop sweep forcibly evicts Zone 2 items containing PII, When an eviction occurs, Then the eviction SHALL be treated as satisfying (not bypassing) any pending DPDP erasure obligation for that item, and SHALL NOT leave PII in an inconsistent or partially-erased state across Zone 2 and any indexing/audit zone that referenced it.",
+          "source": "[DERIVED FROM SP.0.5 BA review - secondary DPDP flag on forced eviction of PII-bearing content]"
         }
       ],
       "story_points": 3,
@@ -136,7 +146,7 @@
       ],
       "sub_task_sp_sum": 4,
       "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
-      "depends_on": ["DASH-STORY-003"]
+      "depends_on": ["DASH-STORY-003", "DASH-STORY-008"]
     },
     {
       "story_id": "DASH-STORY-005",
@@ -206,7 +216,7 @@
       "title": "Retrieval-Index zone (Zone 6) - hybrid vector + lexical index",
       "traces_to_fr": "FR-006",
       "invest": {
-        "independent": "Self-contained index zone; depends only on Zone 1 existing first per the promoted dependency graph, and indexes whichever zones exist (Zones 1, 2, 7 in Sprint 1).",
+        "independent": "Self-contained index zone; depends only on Zone 2 (Episodic) existing first, since Zone 6 indexes Zones 2-5, 7, 8 and explicitly not Zone 1 per HLD Section 3.7, and indexes whichever zones exist (Zones 2, 7 in Sprint 1).",
         "negotiable": "Concrete fusion algorithm (RRF for ranking) is swappable within the vector+lexical architecture (ADR-007, ADR-008).",
         "valuable": "WSJF rank 6 (tied, 4.60) - supplies the TaskRelevance/UserAffinity primitives every Memory Score computation needs (FR-012).",
         "estimable": "Fused vector+lexical index and per-tenant physical partitioning are fully specified in HLD ADR-007/ADR-008.",
@@ -217,8 +227,13 @@
       "acceptance_criteria": [
         {
           "ac_id": "AC-006",
-          "text": "Given an item exists in any of Zones 1-5, 7, 8, When the Retrieval-Index is queried with a task-relevant query, Then the vector + lexical fused result includes that item within the top-k candidates used to compute TaskRelevance for the Memory Score.",
-          "source": "SRS AC-006"
+          "text": "Given an item exists in any indexed zone (Zones 2-5, 7, 8; Zone 1 is deliberately unindexed per HLD Section 3.7 to protect write-path p99 latency and the embedding budget), When the Retrieval-Index is queried with a task-relevant query, Then the vector + lexical fused result includes that item within the top-k candidates used to compute TaskRelevance for the Memory Score.",
+          "source": "SRS AC-006 [CORRECTED per SP.0.5 SA review C-1 - HLD Section 3.7 excludes Zone 1 from the index]"
+        },
+        {
+          "ac_id": "AC-006-COST-1",
+          "text": "Given Zone 6's vector-index (Qdrant) and lexical-index (OpenSearch) infrastructure is provisioned for a target scale profile (Section 12D Profile A/B/C), When the sprint's cost estimate is produced, Then the estimate SHALL report (a) average cost per retrieval query = (C_fixed_vector + C_fixed_lexical + c_var*V) / V for the target query volume V, inclusive of both vendor surfaces, and (b) marginal cost per additional retrieval query = c_var (the incremental Qdrant + OpenSearch cost of one more query, holding provisioned capacity fixed), reported separately - average cost SHALL NOT be presented alone as an efficiency indicator, since at low Sprint-1 query volume it is dominated by fixed-capacity amortization rather than genuine per-query efficiency. Infrastructure SHALL be tagged with the resource-class (vector-index | lexical-index) and tenant_id tags, enforced preventively at provisioning time.",
+          "source": "[DERIVED FROM SP.0.5 FinOps review - finops-unit-economics-core M1]"
         },
         {
           "ac_id": "AC-014",
@@ -233,7 +248,7 @@
         { "type": "Review", "story_points": 1, "description": "Security review of tenant isolation controls (HLD I-1/I-2/I-3, ADR-007/ADR-013)." }
       ],
       "sub_task_sp_sum": 8,
-      "depends_on": ["DASH-STORY-002"]
+      "depends_on": ["DASH-STORY-003"]
     },
     {
       "story_id": "DASH-STORY-008",
@@ -302,6 +317,36 @@
       ],
       "sub_task_sp_sum": 5,
       "depends_on": ["DASH-STORY-008"]
+    },
+    {
+      "story_id": "DASH-STORY-010",
+      "title": "ADR-012 deadline-invalidation wiring on non-Recency term mutation",
+      "traces_to_fr": "FR-012",
+      "invest": {
+        "independent": "Cross-cutting wiring on top of the Memory Score engine's output (DASH-STORY-008); touches other stories' mutation paths but is testable as its own deadline-recompute contract.",
+        "negotiable": "Exact re-insert data structure (skip list vs. heap) for the O(log N) deadline update is an implementation choice within the O(log N) bound fixed by HLD Section 12C.",
+        "valuable": "HLD Section 12C names this explicitly part of the Sprint 1 definition of done; missing it produces a silent correctness bug (stale rotation deadlines), not a crash - the failure mode most likely to ship undetected.",
+        "estimable": "The three mutation paths requiring invalidation (Frequency-on-access, ProvenanceConfidence-on-conflict, Importance-on-override) and the O(log N) re-insert bound are fully specified in HLD Section 12C and ADR-012.",
+        "small": "Scoped to wiring the invalidation hook into the three named mutation paths only; does not re-implement the deadline-scheduled sweep itself (DASH-STORY-009).",
+        "testable": "New AC below, since ADR-012's invalidation wiring is an HLD-derived cross-cutting requirement not yet in the SRS ACs."
+      },
+      "persona": "Memory Orchestrator rotation sweep (consumer of correct deadlines)",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-012-INVAL-1",
+          "text": "Given a non-Recency MemoryScore term (Frequency, ProvenanceConfidence, or Importance) is mutated via access (Frequency), conflict detection (ProvenanceConfidence), or operator override (Importance), When the mutation occurs, Then the item's stored rotation deadline is invalidated and re-inserted in O(log N) on all three mutation paths (DASH-STORY-001 read path, DASH-STORY-005/006 conflict-detection path, DASH-STORY-008 configuration-override path), so no rotation decision is ever made against a stale deadline.",
+          "source": "[DERIVED FROM HLD Section 12C / ADR-012 - explicit Sprint 1 definition-of-done item, SP.0.5 SA review C-4]"
+        }
+      ],
+      "story_points": 3,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 2, "description": "Wire deadline-invalidation + O(log N) re-insert hooks into the three non-Recency mutation paths (Frequency-on-access, ProvenanceConfidence-on-conflict, Importance-on-override)." },
+        { "type": "QA", "story_points": 1, "description": "Test that a mutation on each of the three paths invalidates and correctly re-inserts the stored deadline, and that no rotation sweep acts on a stale deadline." },
+        { "type": "Review", "story_points": 1, "description": "Review that all three mutation paths (not a subset) are covered, per HLD Section 12C's 'must be wired into every term-mutation path' requirement." }
+      ],
+      "sub_task_sp_sum": 4,
+      "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
+      "depends_on": ["DASH-STORY-008"]
     }
   ],
   "future_sprints_backlog": {
@@ -318,12 +363,13 @@
     "DASH-STORY-001": [],
     "DASH-STORY-002": ["DASH-STORY-001"],
     "DASH-STORY-003": ["DASH-STORY-001"],
-    "DASH-STORY-004": ["DASH-STORY-003"],
+    "DASH-STORY-004": ["DASH-STORY-003", "DASH-STORY-008"],
     "DASH-STORY-005": ["DASH-STORY-002"],
     "DASH-STORY-006": ["DASH-STORY-001", "DASH-STORY-005"],
-    "DASH-STORY-007": ["DASH-STORY-002"],
+    "DASH-STORY-007": ["DASH-STORY-003"],
     "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
     "DASH-STORY-009": ["DASH-STORY-008"],
-    "promotion_reason": "DASH-STORY-002 (Working Memory, Zone 1) is the sole root dependency for DASH-STORY-005 (Zone 7) and DASH-STORY-007 (Zone 6) per the mandated 'Zone 6/Zone 7 both depend on Zone 1 existing first' constraint. DASH-STORY-001 (Orchestrator) is the sole root dependency for all zone stories since every write/read routes through its facade."
+    "DASH-STORY-010": ["DASH-STORY-008"],
+    "promotion_reason": "DASH-STORY-002 (Working Memory, Zone 1) is the sole root dependency for DASH-STORY-005 (Zone 7) per the mandated dependency graph. DASH-STORY-007 (Zone 6) depends on DASH-STORY-003 (Zone 2), corrected per SP.0.5 SA review C-3: Zone 6 indexes Zones 2-5, 7, 8 and explicitly not Zone 1 (HLD Section 3.7), so Zone 6's real content dependency is Zone 2, not Zone 1. DASH-STORY-004 depends additionally on DASH-STORY-008 per SP.0.5 SA review C-2, since its eviction ranks by MemoryScore. DASH-STORY-001 (Orchestrator) is the sole root dependency for all zone stories since every write/read routes through its facade."
   }
 }
