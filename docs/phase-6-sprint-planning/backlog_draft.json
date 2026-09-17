@@ -1,0 +1,329 @@
+{
+  "document_id": "SP0-BACKLOG-20260917-01",
+  "version": "1.0.0",
+  "author": "scrum-master-agent",
+  "phase": "Phase 6 - Sprint Planning (SP.0 draft)",
+  "date": "2026-09-17",
+  "source_of_truth": {
+    "srs": "SRS.md v1.0.0 (12 FRs, 17 ACs)",
+    "wsjf": "docs/phase-2-validation/pm-wsjf-revalidation.md v1.0.0",
+    "hld_coherence": "docs/phase-1-architecture/HLD.md Section 12F"
+  },
+  "estimation_method": "Sub-task split 70% Dev / 20% QA / 10% Review of parent story points, each rounded to nearest Fibonacci value {1,2,3,5,8,13}; tolerance +/-1 SP versus parent per scrum-framework-core Operating Rule 14.",
+  "sprint_1_stories": [
+    {
+      "story_id": "DASH-STORY-001",
+      "title": "Memory Orchestrator core facade and unified context-assembly API",
+      "traces_to_fr": "FR-009",
+      "invest": {
+        "independent": "Delivers the routing facade as its own deployable surface; other Sprint 1 zone stories register against it but it does not require any zone to exist first.",
+        "negotiable": "Concrete routing algorithm (e.g. rule table vs. capability registry) is an implementation choice within the Facade pattern locked by HLD Section 2.",
+        "valuable": "Gives the host AI system the single unified API that is the product's core integration contract (HLD Section 3.1).",
+        "estimable": "Facade pattern and API surface are fully specified in HLD Section 3.1 / Section 2 Container Architecture.",
+        "small": "Scoped to routing + API surface only; zone-internal logic is out of scope for this story.",
+        "testable": "AC-009 gives a concrete Given-When-Then."
+      },
+      "persona": "Host AI system integrator embedding Dashanan as a library or sidecar",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-009",
+          "text": "Given a host calls the unified context-assembly API, When the request does not name any individual zone, Then the Orchestrator resolves and returns assembled context sourced from the correct zones without the host needing zone-level knowledge.",
+          "source": "SRS AC-009"
+        },
+        {
+          "ac_id": "AC-009-SUPP-1",
+          "text": "Given the Orchestrator is called before any zone story lands, When a routing request targets an unimplemented zone, Then the facade returns a typed 'zone not available' response rather than an unhandled error, so later zone stories can register without a facade contract change.",
+          "source": "[AUTO-AC: API_pattern]"
+        }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Implement Facade routing table, ZoneRepository port wiring, and unified context-assembly endpoint." },
+        { "type": "QA", "story_points": 2, "description": "Contract tests for AC-009 across zone-present and zone-absent routing paths." },
+        { "type": "Review", "story_points": 1, "description": "Peer review of Facade pattern conformance against HLD Section 2/3.1." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": []
+    },
+    {
+      "story_id": "DASH-STORY-002",
+      "title": "Working Memory zone (Zone 1) - TTL-primary scratch context",
+      "traces_to_fr": "FR-001",
+      "invest": {
+        "independent": "Self-contained zone with its own storage adapter; only needs the Orchestrator facade to be routable.",
+        "negotiable": "Concrete backend (in-process LRU vs. Redis, ADR-005) is deployment-profile-specific.",
+        "valuable": "Highest single-item WSJF (8.33) in the corrected 12-FR table; the zone nothing else can function without.",
+        "estimable": "TTL-primary eviction mechanism is fully specified (OAQ-7 adopted).",
+        "small": "Scoped to Zone 1 read/write/TTL-eviction only.",
+        "testable": "AC-001 gives a concrete Given-When-Then."
+      },
+      "persona": "Host AI system session/turn handler",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-001",
+          "text": "Given a host session writes to Working Memory, When the item's TTL expires without promotion, Then the item is evicted from Zone 1 without requiring an explicit delete call, and no other zone is mutated as a side effect.",
+          "source": "SRS AC-001"
+        }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement Zone 1 storage adapter (ADR-005), TTL-primary eviction, and write path via ZoneRepository port." },
+        { "type": "QA", "story_points": 1, "description": "TTL-expiry-without-side-effect test per AC-001, including no-mutation-of-other-zones assertion." },
+        { "type": "Review", "story_points": 1, "description": "Review TTL eviction correctness and adapter port compliance." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-001"]
+    },
+    {
+      "story_id": "DASH-STORY-003",
+      "title": "Episodic Memory zone (Zone 2) - chronological recency store",
+      "traces_to_fr": "FR-002",
+      "invest": {
+        "independent": "Self-contained zone with its own storage adapter and recency index.",
+        "negotiable": "Concrete decay function implementation is deployment-tunable within the locked half-life defaults.",
+        "valuable": "WSJF rank 3 (6.00) - Performance-classified requirement the product depends on for time-anchored recall.",
+        "estimable": "Recency ordering and per-entry decay attribute are fully specified.",
+        "small": "Scoped to Zone 2 write/query-by-recency only; capacity cap is split into its own story (DASH-STORY-004).",
+        "testable": "AC-002 gives a concrete Given-When-Then."
+      },
+      "persona": "Host AI system conversation-history subsystem",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-002",
+          "text": "Given multiple Episodic entries with distinct timestamps, When the host queries Zone 2 by recency, Then results are returned in strict chronological order and each entry exposes its own decay attribute.",
+          "source": "SRS AC-002"
+        }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement Zone 2 chronological store, recency query path, per-entry decay attribute." },
+        { "type": "QA", "story_points": 1, "description": "Strict-chronological-order and decay-attribute-exposure test per AC-002." },
+        { "type": "Review", "story_points": 1, "description": "Review recency query correctness and decay attribute schema." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-001"]
+    },
+    {
+      "story_id": "DASH-STORY-004",
+      "title": "Zone 2 capacity cap and MaxAge forced-archival backstop (OAQ-4)",
+      "traces_to_fr": "FR-002",
+      "invest": {
+        "independent": "A bounded add-on to Zone 2's storage layer; does not require FR-012's full rotation state machine to exist, only a capacity/age check on write.",
+        "negotiable": "Exact cap value and MaxAge threshold are operator-configurable (NFR-009).",
+        "valuable": "HLD Section 12F names this the only mechanism preventing unbounded Zone 2 growth in a sprint with no Archived destination (Zone 8 out of scope) - a hard Sprint 1 dependency, not optional.",
+        "estimable": "OAQ-4 defines the mechanism: per-zone capacity cap + MaxAge forced archival, converting Memory Score into a ranking function with a threshold fast-path.",
+        "small": "Scoped to Zone 2 only for Sprint 1 (per-zone generalization to other zones is out of Sprint 1 scope).",
+        "testable": "New AC below, since OAQ-4 is a HLD-derived requirement not yet in the SRS ACs."
+      },
+      "persona": "Platform operator running Dashanan without Zone 8 available",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-002-CAP-1",
+          "text": "Given Zone 2 reaches its configured capacity cap or an item exceeds its configured MaxAge while in the Compressed state, When the capacity/age backstop sweep runs, Then the lowest-ranked-by-MemoryScore item(s) are forcibly evicted from Zone 2 so the zone never grows unbounded, even though no Archived destination exists in Sprint 1.",
+          "source": "[DERIVED FROM HLD Section 12F / OAQ-4 - explicit Sprint 1 dependency, not silently deferred]"
+        },
+        {
+          "ac_id": "AC-002-CAP-2",
+          "text": "Given the capacity cap and MaxAge values are deployment configuration (NFR-009), When an operator changes either value, Then the backstop sweep uses the new values on its next run without a code change.",
+          "source": "[AUTO-AC: configuration_pattern]"
+        }
+      ],
+      "story_points": 3,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 2, "description": "Implement capacity-cap + MaxAge forced-eviction sweep for Zone 2, configurable per NFR-009." },
+        { "type": "QA", "story_points": 1, "description": "Test capacity-cap trigger, MaxAge trigger, and lowest-MemoryScore eviction ordering." },
+        { "type": "Review", "story_points": 1, "description": "Review that this backstop is documented as a Sprint 1 hard dependency (HLD Section 12F), not an optional nice-to-have." }
+      ],
+      "sub_task_sp_sum": 4,
+      "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
+      "depends_on": ["DASH-STORY-003"]
+    },
+    {
+      "story_id": "DASH-STORY-005",
+      "title": "Provenance/Audit zone (Zone 7) - source, confidence, edit history",
+      "traces_to_fr": "FR-007",
+      "invest": {
+        "independent": "Self-contained append-only zone; depends only on Zone 1 existing first per the promoted dependency graph.",
+        "negotiable": "Concrete hash-chain implementation (SHA-256 prev_hash) is an ADR-locked but internally swappable detail.",
+        "valuable": "WSJF rank 5 (4.80) and the strongest single memory-poisoning control (HLD T-1) - the audit chain every other zone's writes depend on.",
+        "estimable": "Append-only, no-UPDATE-grant, source/confidence/edit-history schema is fully specified in HLD ADR-010.",
+        "small": "Scoped to the Zone 7 store and its query path; the cross-cutting write-path enforcement is its own story (DASH-STORY-006).",
+        "testable": "AC-007 gives a concrete Given-When-Then."
+      },
+      "persona": "Compliance/audit consumer verifying fact provenance",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-007",
+          "text": "Given any fact is written to any zone, When the Provenance/Audit zone is queried for that fact's item_id, Then a source attribution, confidence score, and edit history entry exists and is retrievable.",
+          "source": "SRS AC-007"
+        }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement append-only Zone 7 store, SHA-256 prev_hash chain, source/confidence/edit-history schema, no-UPDATE role enforcement." },
+        { "type": "QA", "story_points": 1, "description": "Test retrievability by item_id and append-only/no-UPDATE enforcement per AC-007 and HLD T-2." },
+        { "type": "Review", "story_points": 1, "description": "Review hash-chain tamper-detectability and DB role least-privilege." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-002"]
+    },
+    {
+      "story_id": "DASH-STORY-006",
+      "title": "Cross-cutting provenance write-path enforcement (WAL/outbox gate)",
+      "traces_to_fr": "FR-010",
+      "invest": {
+        "independent": "A gate on the Orchestrator's existing write path; testable independently of any single zone's internal logic.",
+        "negotiable": "Synchronous-vs-WAL/outbox-relayed enforcement mechanism is an ADR-010 implementation choice (OAQ-8), while the guarantee itself is fixed.",
+        "valuable": "WSJF rank 2 (6.25), Must-Be Kano - the PRD's stated enforcement mechanism for the product's entire anti-hallucination thesis.",
+        "estimable": "422-rejection contract and WAL/outbox durability barrier are fully specified in HLD Section 7.2 / Section 8.4 / ADR-010.",
+        "small": "Scoped to the write-path gate only; does not re-implement Zone 7 itself.",
+        "testable": "AC-010 and AC-016 give concrete Given-When-Thens."
+      },
+      "persona": "Host AI system write-path caller",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-010",
+          "text": "Given a write request to any zone omits a resolvable source_type, When the Orchestrator's write path processes it, Then the write is rejected (HTTP 422) and no fact is persisted without a corresponding Provenance/Audit entry, consistent with the WAL/outbox durability barrier.",
+          "source": "SRS AC-010"
+        },
+        {
+          "ac_id": "AC-016",
+          "text": "Given a zone write bypasses provenance recording, When the write path is exercised, Then the write is rejected before persistence (same enforcement path as AC-010).",
+          "source": "SRS AC-016"
+        }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement WAL/outbox write-path gate on the Orchestrator (FR-009), 422 rejection on unresolvable source_type." },
+        { "type": "QA", "story_points": 1, "description": "Test rejection-before-persistence for missing/unresolvable source_type per AC-010/AC-016, across all Sprint 1 zones." },
+        { "type": "Review", "story_points": 1, "description": "Review that the gate is structurally unbypassable (HLD's stated design intent) rather than a per-call convention." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-001", "DASH-STORY-005"]
+    },
+    {
+      "story_id": "DASH-STORY-007",
+      "title": "Retrieval-Index zone (Zone 6) - hybrid vector + lexical index",
+      "traces_to_fr": "FR-006",
+      "invest": {
+        "independent": "Self-contained index zone; depends only on Zone 1 existing first per the promoted dependency graph, and indexes whichever zones exist (Zones 1, 2, 7 in Sprint 1).",
+        "negotiable": "Concrete fusion algorithm (RRF for ranking) is swappable within the vector+lexical architecture (ADR-007, ADR-008).",
+        "valuable": "WSJF rank 6 (tied, 4.60) - supplies the TaskRelevance/UserAffinity primitives every Memory Score computation needs (FR-012).",
+        "estimable": "Fused vector+lexical index and per-tenant physical partitioning are fully specified in HLD ADR-007/ADR-008.",
+        "small": "Scoped to the index and its similarity primitives; the Memory Score computation itself is a separate story (DASH-STORY-008).",
+        "testable": "AC-006 and AC-014 give concrete Given-When-Thens."
+      },
+      "persona": "Host AI system context-assembly caller needing task-relevant recall",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-006",
+          "text": "Given an item exists in any of Zones 1-5, 7, 8, When the Retrieval-Index is queried with a task-relevant query, Then the vector + lexical fused result includes that item within the top-k candidates used to compute TaskRelevance for the Memory Score.",
+          "source": "SRS AC-006"
+        },
+        {
+          "ac_id": "AC-014",
+          "text": "Given two tenants A and B each store semantically similar content, When tenant A performs a retrieval query, Then the Retrieval-Index returns results only from tenant A's physically partitioned vector/lexical collection, UserAffinity never acts as a tenant-isolation term, and no shared cache key leaks a hit/miss signal about tenant B's content.",
+          "source": "SRS AC-014"
+        }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Implement per-tenant physically-partitioned vector + lexical index, RRF-based ranking fusion, tenant_id-prefixed cache keys." },
+        { "type": "QA", "story_points": 2, "description": "Test top-k inclusion per AC-006, and cross-tenant isolation (physical partition + no cache-oracle leak) per AC-014." },
+        { "type": "Review", "story_points": 1, "description": "Security review of tenant isolation controls (HLD I-1/I-2/I-3, ADR-007/ADR-013)." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": ["DASH-STORY-002"]
+    },
+    {
+      "story_id": "DASH-STORY-008",
+      "title": "Memory Score computation engine (six-term formula)",
+      "traces_to_fr": "FR-012",
+      "invest": {
+        "independent": "A computation service consuming inputs from Zones 6 and 7; does not itself own storage.",
+        "negotiable": "Default weight profile (1/6 each) is operator-overridable per NFR-009; the term formula itself is locked.",
+        "valuable": "WSJF rank 6 (tied, 4.60) - the scoring backbone every rotation and read-filter decision depends on.",
+        "estimable": "MemoryScore = w1*Recency + w2*Frequency + w3*Importance + w4*UserAffinity + w5*TaskRelevance + w6*ProvenanceConfidence is fully specified in FR-012 and HLD Section 3.1/12A-12C.",
+        "small": "Scoped to score computation only; the rotation state machine that consumes the score is a separate story (DASH-STORY-009).",
+        "testable": "AC-012 and AC-017 give concrete Given-When-Thens; Importance defaulting is a named HLD gap made explicit here."
+      },
+      "persona": "Memory Orchestrator rotation/read-filter subsystem",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-017",
+          "text": "Given a deployment operator sets a non-default weight profile (w1..w6) or rotation thresholds, When the Orchestrator computes MemoryScore for that deployment, Then the configured values are used instead of the MVP defaults, without a code change.",
+          "source": "SRS AC-017"
+        },
+        {
+          "ac_id": "AC-012-SCORE-1",
+          "text": "Given Zone 4 (Procedural) is out of Sprint 1 scope, When Importance is computed for a Sprint 1 item, Then Importance is sourced from an explicit tag only and defaults to 0.5 when no tag is present, per HLD Section 12F's stated recommendation (not silently discovered later).",
+          "source": "[DERIVED FROM HLD Section 12F]"
+        }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Implement six-term MemoryScore computation, per-deployment weight/threshold configuration surface (NFR-009), explicit-tag-only Importance with 0.5 default." },
+        { "type": "QA", "story_points": 2, "description": "Test configured-weight substitution per AC-017 and Importance default-to-0.5 behavior." },
+        { "type": "Review", "story_points": 1, "description": "Review normalization of all six terms to [0,1] and the structural score-floor implications noted in OAQ-3." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": ["DASH-STORY-005", "DASH-STORY-007"]
+    },
+    {
+      "story_id": "DASH-STORY-009",
+      "title": "Rotation state machine - Active to Compressed (Archived deferred)",
+      "traces_to_fr": "FR-012",
+      "invest": {
+        "independent": "Consumes the Memory Score engine's output; does not require Zone 8 (Archived destination) to exist, per HLD Section 12F's explicit Sprint 1 recommendation.",
+        "negotiable": "Deadline-scheduling implementation detail (O(k log N), Section 12C) is swappable within the state-machine contract.",
+        "valuable": "Completes the gated lifecycle guarantee (compression can never be skipped) that the product's memory-management promise depends on.",
+        "estimable": "PromoteThreshold > CompressThreshold > ArchiveThreshold gating is locked by construction (FR-012), and HLD Section 12F specifies Sprint 1 stops at Compressed.",
+        "small": "Scoped to Active -> Compressed only for Sprint 1; Compressed -> Archived is explicitly out of scope until the sprint that delivers Zone 8.",
+        "testable": "AC-012 gives a concrete Given-When-Then, scoped to the Compressed transition."
+      },
+      "persona": "Memory Orchestrator rotation sweep",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-012",
+          "text": "Given an item's MemoryScore crosses CompressThreshold but not ArchiveThreshold, When the rotation sweep runs, Then the item transitions to Compressed and remains retrievable in compressed form; it SHALL NOT be able to reach Archived without having passed through Compressed, per PromoteThreshold > CompressThreshold > ArchiveThreshold.",
+          "source": "SRS AC-012"
+        },
+        {
+          "ac_id": "AC-012-ROT-1",
+          "text": "Given Zone 8 (Consolidation) is out of Sprint 1 scope, When an item's MemoryScore would otherwise cross ArchiveThreshold, Then the item remains in Compressed indefinitely (bounded only by DASH-STORY-004's capacity/MaxAge backstop) rather than the Orchestrator attempting an Archived transition with no destination, per HLD Section 12F.",
+          "source": "[DERIVED FROM HLD Section 12F]"
+        }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement Active -> Compressed transition with deadline-scheduled sweep (O(k log N)), gated construction preventing Archived-without-Compressed, and Compressed-indefinite-dwell behavior for Sprint 1." },
+        { "type": "QA", "story_points": 1, "description": "Test Compress-threshold-crossing transition per AC-012 and the Compressed-indefinite-dwell behavior per AC-012-ROT-1." },
+        { "type": "Review", "story_points": 1, "description": "Review that no code path attempts an Archived transition in Sprint 1 (Zone 8 absent) and that DASH-STORY-004's backstop is the sole bound on Compressed growth." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-008"]
+    }
+  ],
+  "future_sprints_backlog": {
+    "note": "Not detailed into INVEST stories yet - candidates for a subsequent Phase 6 sprint planning pass.",
+    "remaining_frs": [
+      { "fr_id": "FR-003", "title": "Semantic Memory zone (Zone 3)", "wsjf_rank": 10 },
+      { "fr_id": "FR-004", "title": "Procedural Memory zone (Zone 4)", "wsjf_rank": 12, "note": "Also the eventual source of inferred Importance salience, currently defaulted to 0.5 in DASH-STORY-008." },
+      { "fr_id": "FR-005", "title": "Entity Memory zone (Zone 5)", "wsjf_rank": 9 },
+      { "fr_id": "FR-008", "title": "Consolidation Memory zone (Zone 8)", "wsjf_rank": 11, "note": "Unblocks the Compressed -> Archived transition deferred in DASH-STORY-009." },
+      { "fr_id": "FR-011", "title": "Pluggable storage-adapter interface (remaining zone coverage beyond Sprint 1 adapters)", "wsjf_rank": 8 }
+    ]
+  },
+  "dependency_graph": {
+    "DASH-STORY-001": [],
+    "DASH-STORY-002": ["DASH-STORY-001"],
+    "DASH-STORY-003": ["DASH-STORY-001"],
+    "DASH-STORY-004": ["DASH-STORY-003"],
+    "DASH-STORY-005": ["DASH-STORY-002"],
+    "DASH-STORY-006": ["DASH-STORY-001", "DASH-STORY-005"],
+    "DASH-STORY-007": ["DASH-STORY-002"],
+    "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
+    "DASH-STORY-009": ["DASH-STORY-008"],
+    "promotion_reason": "DASH-STORY-002 (Working Memory, Zone 1) is the sole root dependency for DASH-STORY-005 (Zone 7) and DASH-STORY-007 (Zone 6) per the mandated 'Zone 6/Zone 7 both depend on Zone 1 existing first' constraint. DASH-STORY-001 (Orchestrator) is the sole root dependency for all zone stories since every write/read routes through its facade."
+  }
+}
