@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashanan.internal/schemas/hld-to-context-delivery-plan.schema.json",
+  "title": "solution-architect -> context-engineering-agent handoff",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 1.",
+  "type": "object",
+  "required": ["from", "to", "input", "output", "assumes", "must_not"],
+  "properties": {
+    "from": { "const": "solution-architect" },
+    "to": { "const": "context-engineering-agent" },
+    "context_budget_tokens": { "const": 10000 },
+    "input": {
+      "type": "object",
+      "required": ["approved_hld_ref", "component_diagram_zones", "adrs", "capacity_estimation"],
+      "properties": {
+        "approved_hld_ref": { "type": "string", "description": "Pointer to the frozen HLD.md revision for this iteration" },
+        "component_diagram_zones": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "type": "string" },
+          "description": "The 8-zone component diagram; count is fixed per the HLD's locked shape"
+        },
+        "adrs": { "type": "array", "items": { "type": "string" } },
+        "capacity_estimation": { "type": "object" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["context_delivery_plan"],
+      "properties": {
+        "context_delivery_plan": {
+          "type": "object",
+          "description": "Per-agent token budgets for all Phase 1.5/2/5/6/7/8 agents",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["agent_name", "context_budget_tokens", "sources"],
+            "properties": {
+              "agent_name": { "type": "string" },
+              "context_budget_tokens": { "type": "integer", "minimum": 0 },
+              "sources": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "assumes": {
+      "const": "HLD is final for this iteration (no further architecture changes mid-Phase-1.5)"
+    },
+    "must_not": {
+      "const": "re-derive zone boundaries -- those are solution-architect's decision, not context-engineering-agent's"
+    }
+  }
+}

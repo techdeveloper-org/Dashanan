@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashanan.internal/schemas/srs-to-backlog.schema.json",
+  "title": "Phase 5 (SRS.md + UML) -> scrum-master-agent (Phase 6) handoff",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 3.",
+  "type": "object",
+  "required": ["from", "to", "input", "output", "assumes", "must_not"],
+  "properties": {
+    "from": { "const": "Phase 5 (SRS.md + UML)" },
+    "to": { "const": "scrum-master-agent" },
+    "context_budget_tokens": { "const": 8000 },
+    "input": {
+      "type": "object",
+      "required": ["srs_fr_list", "uml_diagrams"],
+      "properties": {
+        "srs_fr_list": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^FR-[0-9]{3}$" }
+        },
+        "uml_diagrams": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["backlog_draft"],
+      "properties": {
+        "backlog_draft": {
+          "type": "string",
+          "const": "docs/phase-6-sprint-planning/backlog_draft.json"
+        }
+      }
+    },
+    "assumes": {
+      "const": "every FR in SRS.md is implementable within the approved HLD"
+    },
+    "must_not": {
+      "const": "introduce stories with no FR traceability"
+    }
+  }
+}

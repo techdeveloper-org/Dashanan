@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashanan.internal/schemas/hld-to-api-spec.schema.json",
+  "title": "solution-architect -> python-backend-engineer / api-testing-engineer handoff",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 2.",
+  "type": "object",
+  "required": ["from", "to", "input", "output", "assumes", "must_not"],
+  "properties": {
+    "from": { "const": "solution-architect" },
+    "to": {
+      "type": "array",
+      "items": { "enum": ["python-backend-engineer", "api-testing-engineer"] },
+      "minItems": 1
+    },
+    "context_budget_tokens": { "const": 5000 },
+    "input": {
+      "type": "object",
+      "required": ["hld_interface_contracts", "data_ownership_map"],
+      "properties": {
+        "hld_interface_contracts": {
+          "type": "string",
+          "description": "Per-zone read/write API definitions from the approved HLD"
+        },
+        "data_ownership_map": { "type": "string" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["openapi_spec", "error_catalog", "pagination_contracts"],
+      "properties": {
+        "openapi_spec": {
+          "type": "string",
+          "const": "docs/phase-1.5-api/openapi.yaml",
+          "description": "Must declare openapi: 3.1.0"
+        },
+        "error_catalog": { "type": "string", "const": "error_catalog.json" },
+        "pagination_contracts": { "type": "string", "const": "pagination_contracts.json" }
+      }
+    },
+    "assumes": {
+      "const": "sync REST/gRPC read path, async write path (per Team Alignment section)"
+    },
+    "must_not": {
+      "const": "introduce new endpoints not traceable to an HLD component"
+    }
+  }
+}

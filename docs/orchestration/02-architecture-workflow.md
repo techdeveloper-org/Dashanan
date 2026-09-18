@@ -285,6 +285,13 @@ ASSUMES: every FR in SRS.md is implementable within the approved HLD
 MUST NOT: introduce stories with no FR traceability
 ```
 
+**Machine-readable schemas:** the three contracts above are also encoded as JSON Schema files in
+`docs/orchestration/schemas/` for tooling that needs to validate a handoff payload rather than parse
+prose: `hld-to-context-delivery-plan.schema.json`, `hld-to-api-spec.schema.json`,
+`srs-to-backlog.schema.json`. These schemas are a machine-readable mirror of the contracts above, not a
+separate source of truth — if the two ever disagree, this prose section is authoritative and the schema
+file is stale and must be updated to match.
+
 ---
 
 ## RESILIENCE & QA RULES (applied throughout, per STEP 12)
