@@ -1419,6 +1419,16 @@ One process. No network. Adapters: in-process LRU, SQLite, hnswlib, FTS5, local 
 
 Availability arithmetic (system-design M3): three stateless API replicas in parallel at 99.9% each gives `1 - (0.001)^3` = 99.9999% for that tier, so the API tier is not the binding constraint — the storage tier is (Section 12E).
 
+### 8.2a Rotation-worker split-brain / double-rotation prevention
+
+Each `rotation-worker` replica in Shape B owns a subset of partitions via `hash(tenant_id) mod partitions`; ownership is assigned by the Redis Streams consumer group, not by a separate leader-election service. This section specifies the exact mechanism used to prevent two replicas from committing conflicting rotation transitions for the same item during a rebalance (partition reassignment after a replica joins, leaves, or is marked dead by `XAUTOCLAIM`'s idle-time threshold).
+
+**Fencing primitive:** the consumer group's own generation/ownership state, read via `XCLAIM`/`XAUTOCLAIM`, is the sole source of truth — no external lock service (Redlock, Raft, ZooKeeper) is introduced. Redis is already the queue backend (Section 8.3); adding a second coordination system for the same guarantee would violate the Technology Selection discipline of not introducing unjustified new components.
+
+**Check point:** a worker that claims a partition (via `XAUTOCLAIM`) records the claim's generation. Immediately before it commits a zone-transition write for an item on that partition (the conditional `UPDATE ... WHERE state = ? AND version = ?` from Section 8.3), it re-reads the partition's current claim ownership. If ownership has moved to a different consumer (generation advanced — i.e., the partition was reclaimed from this worker during the in-flight operation), the worker **aborts the write** rather than committing it; the message remains unacknowledged and is picked up by the new owner on its next claim. This makes the existing per-item conditional-write idempotency (Section 8.3) the actual correctness backstop, and the ownership re-check the fencing gate that prevents a stale worker from even attempting a conflicting write in the first place.
+
+This is deliberately scoped to *prevention*, not detection-after-the-fact: because the check happens before commit, a rebalanced-away worker never produces a conflicting transition for the new owner's conditional write to reject.
+
 ### 8.3 Queue topology, retry and DLQ
 
 Five streams, one per event type, each partitioned by `tenant_id:item_id` to guarantee **per-item total ordering** (non-negotiable: a `compressed` event processed after an `archived` event for the same item would corrupt the lifecycle).
@@ -1447,6 +1457,21 @@ Idempotency: every consumer is idempotent by construction — state transitions 
 | **Rotation worker** | All replicas down | Sweep-lag metric | Nothing rotates. Zones grow. Reads and writes fully unaffected. | Unbounded zone growth if prolonged — the capacity caps (Section 12A) become the backstop that prevents it from becoming a storage incident. | Restart; timer wheel rebuilt from persisted deadlines. |
 
 **Single points of failure, explicitly accepted:** none on the read path (every dependency degrades). **One on the write path:** the structured store. Accepted with justification — a memory engine that accepts writes it cannot durably record is worse than one that rejects them, and fabricating acceptance would violate FR-010 and NFR-008. Mitigated by replication, not by relaxing the guarantee.
+
+### 8.5 Disaster Recovery Targets (RPO/RTO)
+
+These targets are scoped as **regional backup/restore** — recovery from a regional infrastructure incident (storage-node loss, AZ failure) via backup/replica promotion — not cross-region live failover. This is deliberate: per DPDP-4 Residency (Section 10; `embedding_residency` per-tenant policy, ADR-015, plus the broader in-region requirement below), a tenant handling Indian personal data has all of its stores held in-region, so a cross-region active-active topology is out of scope (SRS §5 item 4) and would in fact contradict the residency guarantee. RPO/RTO below are therefore same-region targets.
+
+| Persistent store | RPO (max acceptable data loss) | RTO (max acceptable time to restore) | Basis |
+|---|---|---|---|
+| PostgreSQL (structured store, rotation state) | <= 5 min (continuous WAL shipping to standby/read replica) | <= 15 min (replica promotion, Section 8.4) | Replica promotion path already specified in 8.4's failure-mode row for the structured store |
+| Redis (bus + Zone 1 hot store) | <= 1 min (AOF `everysec` persistence + replication) | <= 5 min (restart + journal replay, per 8.4's Redis failure-mode row) | Writes are not lost on Redis failure — buffered to the local journal (8.4) — bounding RPO to the journal's own fsync interval |
+| Qdrant (vector index, Zone 6) | N/A as durability loss — index is derived/rebuildable from source zones (8.4) | <= 4 h for a full rebuild from source zones at Section 12D's assumed scale; <= 15 min via snapshot restore where a recent snapshot exists | Zone 6 is explicitly non-authoritative (8.4: "Index rebuildable from other zones") |
+| OpenSearch (lexical index, Zone 6) | Same as Qdrant — derived/rebuildable | Same as Qdrant | Same as Qdrant |
+| Object store (Zone 8 archives) | <= 15 min (versioned, object-locked per Section 10 India Layer requirement) | <= 1 h (managed object store regional restore) | Object store is provider-managed with versioning already required for the audit window (Section 10) |
+| Provenance journal (Zone 7 + ADR-010 WAL) | 0 (the journal fsync is the durability barrier for every write — ADR-010) | <= 15 min (relay replays from last acknowledged offset, per 8.4's provenance-store failure-mode row) | The journal is the system's actual write-durability guarantee; it cannot itself have a non-zero RPO without violating FR-010 |
+
+These are architectural targets to be validated against the assumed-scale profiles in Section 12D once real traffic data exists; they are not yet load-tested commitments (same caveat as NFR-004's `[ASSUMED]` targets, Section 9).
 
 ---
 
@@ -1854,6 +1879,8 @@ The clamp is new; the base values and modifiers are not. It exists because compo
 
 **Global invariant:** `sum(w1..w6) = 1`. Already true by construction at the Sprint 1 default (six weights of `1/6`, §12A), but not previously stated as a validated constraint. `PUT /v1/config/scoring` (§7.3) MUST reject a weight set that does not sum to 1 (within float epsilon) — this is new: prior to this subsection, nothing in the API contract enforced it.
 
+**Tie-break rule for equal/zero MemoryScore (per SRS AC-023):** when the rotation sweep or an eviction/ordering decision must choose between two or more items with an identical computed `MemoryScore` — including the degenerate case where every term is at its cold-start/default value and the scores are trivially equal — the tie is broken deterministically, in this order: (1) most recent `updated_at` wins (is retained/promoted preferentially over the older item); (2) if `updated_at` is also tied, the item with the lowest `item_id` (i.e., earlier insertion order) is evicted/deprioritized first. This rule is independent of, and does not change, the UserAffinity cold-start default (`0.5`, above) — it resolves *ordering* between already-scored items, not the score computation itself. **Like the UserAffinity default it accompanies, this rule is proposed here and remains subject to OAQ-19's consensus-gate sign-off before being locked; OAQ-19 itself is not resolved by this subsection.**
+
 ---
 
 ## Revision History
@@ -1861,3 +1888,4 @@ The clamp is new; the base values and modifiers are not. It exists because compo
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-09-17 | solution-architect (opus) | Initial HLD from locked Phase 0 inputs. 15 ADRs, finalized thresholds and half-lives, deadline-scheduled rotation complexity analysis, 3-profile capacity estimation, STRIDE with cross-tenant focus, 16 OAQs (6 derived findings). Status: PENDING CONSENSUS GATE. |
+| 1.1.0 | 2026-09-18 | solution-architect (opus) | Closed 3 verified gaps from a follow-up documentation audit (#5): §8.2a rotation-worker split-brain/double-rotation prevention (Redis consumer-group generation fencing, no new coordination service introduced); §8.5 RPO/RTO disaster-recovery targets per persistent store, scoped regional per the DPDP-4 residency requirement; §12G tie-break rule for equal/zero MemoryScore (recency, then item_id), proposed alongside the existing UserAffinity cold-start default — both remain subject to OAQ-19's consensus-gate sign-off, which stays open. |

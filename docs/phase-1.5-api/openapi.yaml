@@ -392,6 +392,55 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+  # FR-009, FR-012 (closes doc-gap #5: multi-zone bulk retrieve, symmetric to
+  # /memory/write:batch above). Up to 100 item_ids; per-item receipts;
+  # explicit partial failure, same shape as the write-side batch endpoint.
+  # NOTE: the colon suffix is the same deliberate Google AIP-136 custom-method
+  # convention as /memory/write:batch and /items/{item_id}/score:explain.
+  /items:batchGet:
+    post:
+      operationId: batchGetItems
+      tags: [items]
+      summary: Fetch up to 100 items (with current score terms) in one call
+      description: >-
+        FR-009, FR-012. Mirrors /memory/write:batch's partial-failure
+        contract: a missing or inaccessible item_id does not fail the whole
+        request, it is reported as a per-item 'not_found' receipt alongside
+        the successfully retrieved items.
+      security:
+        - bearerAuth: [context:read]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item_ids]
+              properties:
+                item_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Batch retrieved; per-item receipts, partial failure explicit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [receipts]
+                properties:
+                  receipts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchGetItemReceiptItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   # FR-009. Poll status of an accepted write (accepted / indexed / failed).
   /writes/{write_id}:
     get:
@@ -1409,6 +1458,15 @@ components:
         index: { type: integer }
         status: { type: string, enum: [accepted, rejected] }
         write_id: { type: string, format: uuid, nullable: true }
+        error: { $ref: '#/components/schemas/ErrorResponse' }
+
+    BatchGetItemReceiptItem:
+      type: object
+      required: [item_id, status]
+      properties:
+        item_id: { type: string }
+        status: { type: string, enum: [found, not_found] }
+        item: { $ref: '#/components/schemas/MemoryItem' }
         error: { $ref: '#/components/schemas/ErrorResponse' }
 
     WriteStatus:

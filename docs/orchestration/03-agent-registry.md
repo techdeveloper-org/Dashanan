@@ -495,6 +495,30 @@ event bus, retrieval-scoring/embedding-similarity math, promotion/demotion thres
 `mathematics-engineer` (opus, auto-invoked) — do not self-derive formulas.
 ```
 
+### ADDENDUM: Schema-Validation Circuit Breaker & DLQ for Malformed Sub-Agent Output (closes doc-gap #5)
+
+The `error-handling-patterns` circuit-breaker instruction above (line 424, "design circuit breakers between the Orchestrator and each pluggable storage adapter") and the `message-queues-core` DLQ instruction above (line 432-433, "dead-letter handling for failed promotions") both target the **Dashanan product's own** storage-adapter/event-bus failures — implemented in `HLD.md` §8.4/§8.3. This addendum is a distinct concern: what this SDLC pipeline itself does when a sub-agent in this registry (e.g. `solution-architect`, `python-backend-engineer`) emits output that fails JSON-schema/parse validation before it can even be evaluated by a quality gate.
+
+This is explicitly **not** the same mechanism as the SC.1-3 self-correction protocol (ADR-9, `02-architecture-workflow.md`): SC.1-3 governs a gate *evaluating* well-formed output and rejecting it on merit (consensus REJECTED, hallucination score < 0.95). The breaker below governs output that is too structurally broken to reach a gate at all.
+
+**State machine (per producing agent, per pipeline phase):**
+- **CLOSED** (default): sub-agent output is parsed/schema-validated normally; each parse failure increments a trip counter.
+- **OPEN**: trips after 3 consecutive schema-validation failures from the same agent within the same phase. While OPEN, the orchestrator does not re-invoke that agent for that task; it **fails fast** — returns an explicit typed error (`AGENT_OUTPUT_CONTRACT_VIOLATION`, naming the agent, phase, and schema that failed) to whichever agent or human is waiting on the output. It never silently drops the failure and never synthesizes a fallback response in place of structurally invalid data — a fabricated stand-in for broken output is worse than an explicit failure.
+- **HALF-OPEN**: after a cooldown of 2 minutes, the orchestrator allows exactly one probe re-invocation. A schema-valid result closes the breaker (counter resets); another schema-validation failure re-opens it and doubles the cooldown (capped at 30 minutes), mirroring the existing exponential-backoff-with-jitter pattern already used for queue retries (`HLD.md` §8.3).
+
+**DLQ routing:** every schema-invalid output (whether the breaker is CLOSED or OPEN) is routed to a `pipeline.dlq.malformed_output` record (producing agent, phase, raw output, validation error, timestamp) for later inspection — mirroring the product's own `dashanan.dlq.{event_type}` convention (`HLD.md` §8.3). **DLQ-unavailable degradation:** if the DLQ sink itself cannot accept the record, the breaker does not drop the output silently and does not block the pipeline indefinitely — it escalates directly to the existing SC.3 bounded-escalation path (human/orchestrator notification, `02-architecture-workflow.md`), the same path SC.1-3 already uses after its own 3-iteration retry budget is exhausted. This reuses an existing escalation channel rather than inventing a second one, and avoids reintroducing the exact "silently stuck" failure mode this breaker exists to close.
+
+### ADDENDUM: Tenant Onboarding / Cold-Start Bootstrap (closes doc-gap #5)
+
+Distinct from the cross-tenant isolation/security content elsewhere in this registry (lines 434-436) and in `HLD.md` §10 (STRIDE, tenant partitioning): this addendum specifies what happens the first time a new tenant is provisioned, before it has written any content.
+
+On tenant creation (`POST /v1/tenants`, per `HLD.md` §7's admin surface), the orchestrator seeds:
+1. **Per-zone initial state**: all 8 zones start empty; no placeholder/synthetic content is written — an empty zone is a valid, correctly-represented starting state, not a gap to fill.
+2. **Default base-profile weights**: the tenant's `w1..w6` MemoryScore weights are initialized to the SRS's existing locked MVP default — **equal-weighted `1/6` each** (SRS §6 Out-of-Scope item 6; `HLD.md` §12A/§12G's global invariant `sum(w1..w6) = 1`). This section documents *how* that already-fixed default is seeded per tenant via `PUT /v1/config/scoring` at provisioning time; it does not define a new or different default weight set.
+3. **`embedding_residency` policy flag** (ADR-015): set at tenant-creation time per the tenant's declared jurisdiction, defaulting to `in_region` for any tenant declaring Indian personal-data handling, per `HLD.md`'s DPDP-4 Residency statement (§10, and now also §8.5's RPO/RTO framing).
+
+No rotation, compression, or archival activity occurs for a newly onboarded tenant until its first write — the rotation-sweep timer wheel (`HLD.md` §8.4, Rotation-worker failure-mode row) has nothing to schedule for an empty zone set.
+
 ===================================================================
 
 ### AGENT: consensus-agent (BINARY gate — recurs at Phase 1, 1.5, 2, 5, 6×2, 7, 8)

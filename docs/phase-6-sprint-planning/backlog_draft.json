@@ -347,6 +347,33 @@
       "sub_task_sp_sum": 4,
       "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
       "depends_on": ["DASH-STORY-008"]
+    },
+    {
+      "story_id": "DASH-STORY-011",
+      "title": "SPIKE: Qdrant client library version/compatibility pinning validation",
+      "type": "spike",
+      "traces_to_fr": "FR-006",
+      "invest": {
+        "independent": "A timeboxed research task on top of the already-ADR-007-locked vector-store choice; does not require any zone story to be complete first, only DASH-STORY-007's planned adapter shape.",
+        "negotiable": "This spike does NOT reopen the vendor decision (Qdrant is locked by ADR-007) - scope is strictly compatibility/version validation of the client library, not vendor selection.",
+        "valuable": "Closes a residual doc-gap: no story previously validated that the pinned Qdrant client library version is compatible with the target Qdrant server version and the project's Python 3.12+ runtime (NFR-001) before DASH-STORY-007's Dev sub-task starts building against it.",
+        "estimable": "Timeboxed at 3 story points (spike convention: capped effort, not a full estimate of unknown work).",
+        "small": "Scoped to the client library only - compatibility matrix (client version x server version x Python 3.12+), breaking-change review since the version ADR-007 originally evaluated, and a pinned-version recommendation.",
+        "testable": "Spike exit criterion below is concrete and checkable, per spike convention (a spike's 'AC' is its exit criterion, not a product behavior)."
+      },
+      "persona": "DASH-STORY-007 implementer (needs a validated, pinned client library version before writing adapter code)",
+      "spike_exit_criteria": [
+        "A documented client-library-version x Qdrant-server-version x Python-3.12+ compatibility matrix exists, covering at minimum the version ADR-007 originally evaluated and the current latest stable release.",
+        "Any breaking changes between those versions are identified and a specific version is recommended and pinned (e.g. in a requirements/lockfile reference), with rationale.",
+        "The recommendation is handed to DASH-STORY-007's Dev sub-task as an input, not left as an open question during that story's implementation.",
+        "Explicitly out of scope: re-evaluating Qdrant against pgvector/Milvus/other vector stores - that decision is closed per ADR-007 and is not reopened by this spike."
+      ],
+      "story_points": 3,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Research and document the client/server/runtime compatibility matrix; produce the pinned-version recommendation." }
+      ],
+      "sub_task_sp_sum": 3,
+      "depends_on": []
     }
   ],
   "future_sprints_backlog": {
@@ -370,6 +397,7 @@
     "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
     "DASH-STORY-009": ["DASH-STORY-008"],
     "DASH-STORY-010": ["DASH-STORY-008"],
+    "DASH-STORY-011": [],
     "promotion_reason": "DASH-STORY-002 (Working Memory, Zone 1) is the sole root dependency for DASH-STORY-005 (Zone 7) per the mandated dependency graph. DASH-STORY-007 (Zone 6) depends on DASH-STORY-003 (Zone 2), corrected per SP.0.5 SA review C-3: Zone 6 indexes Zones 2-5, 7, 8 and explicitly not Zone 1 (HLD Section 3.7), so Zone 6's real content dependency is Zone 2, not Zone 1. DASH-STORY-004 depends additionally on DASH-STORY-008 per SP.0.5 SA review C-2, since its eviction ranks by MemoryScore. DASH-STORY-001 (Orchestrator) is the sole root dependency for all zone stories since every write/read routes through its facade."
   }
 }

@@ -78,6 +78,7 @@ point-allocation metadata.
 | 5 | HLD §12C Sprint-1 DoD item — ADR-012 deadline-invalidation wiring — verified against **all three** mutation paths it must cover, per C-4's resolution note | DASH-STORY-010 |
 | 6 | No story merges with a `depends_on` edge unresolved (dependency story not yet Done) | All stories, DAG-enforced |
 | 7 | Story's `traces_to_fr` still holds after implementation — no undocumented FR drift | All stories |
+| 8 | Any DB schema migration the story introduces ships with a tested, executable down/rollback script (not just a forward migration) — verified by actually running the down script against a migrated database in CI, not merely reviewing it | Stories introducing structured-store schema changes (DASH-STORY-002, -005, -006, -007, -008, -009, -010 — any story whose Dev sub-task creates or alters a PostgreSQL table/index) |
 
 ## Not doing
 

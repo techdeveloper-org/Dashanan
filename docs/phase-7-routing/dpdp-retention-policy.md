@@ -69,6 +69,53 @@ pointing at PII that Zone 2 has already dropped, or vice versa. This is currentl
 obligation on DASH-STORY-004 (`security-defense-architect`, 0.79 review fit), not an implemented
 locking/coordination mechanism.
 
+## Erasure verification runbook (target-state — closes doc-gap #5, does not close AR1-G3)
+
+**This runbook describes how erasure completeness would be verified once AR1-G3's open decision is
+resolved and an implementation exists.** It is written now so the verification procedure is not
+invented ad hoc post-implementation, but per the "current implementation status" section above, none of
+the steps below can be executed against a real system today — there is no shipped erasure mechanism to
+audit yet. Each step below is marked `[TARGET]`.
+
+Given a completed erasure request for `subject_id` under `tenant_id`:
+
+1. `[TARGET]` **Zone 1 (Working).** Confirm no live key referencing `subject_id` remains in the Redis hot
+   store for that tenant: `SCAN` the tenant's Zone 1 keyspace for any value whose `subject_id` field
+   matches: `redis-cli --scan --pattern "zone1:{tenant_id}:*" | xargs -I{} redis-cli HGET {} subject_id`,
+   expect zero matches. (Low-risk zone given TTL-primary eviction, but a request that lands mid-TTL must
+   still be checked, not assumed expired.)
+2. `[TARGET]` **Zones 2-5, 8 (structured store).** Query PostgreSQL directly for any row keyed to
+   `subject_id` still holding non-tombstoned PII: `SELECT count(*) FROM zone_items WHERE tenant_id = ?
+   AND subject_id = ? AND crypto_shred_key IS NOT NULL`, expect `0` — a crypto-shredded row's encryption
+   key column is null by definition of the crypto-shredding mechanism (item 2 of the workflow above), so
+   a non-null key on a supposedly-erased row is the audit failure signal.
+3. `[TARGET]` **Zone 6 vector index (Qdrant).** Confirm no vector point tagged with `subject_id` remains
+   in the tenant's physically partitioned collection: the Qdrant `scroll` API filtered on the
+   `subject_id` payload field against the tenant's collection, expect zero points returned.
+4. `[TARGET]` **Zone 6 lexical index (OpenSearch).** Symmetric check: `GET
+   /{tenant_collection}/_search` with a `term` query on `subject_id`, expect `hits.total.value == 0`.
+5. `[TARGET]` **Zone 8 archives (object store).** Confirm the versioned, object-locked archive objects
+   for `subject_id` are either absent or their encryption key has been destroyed (crypto-shredding
+   applies to object-store content the same as structured-store rows, per item 2 of the workflow above) —
+   check via the object store's key-management audit log for a key-destruction event tied to
+   `subject_id`'s archive key ID, not by attempting to read the (now unrecoverable) object content itself.
+6. `[TARGET]` **Zone 7 (Provenance/Audit) — the boundary this runbook must NOT cross.** Confirm the
+   provenance chain's structural record (hashes, timestamps, an entry noting an erasure occurred) remains
+   intact and verifiable (per `AC-013`'s existing requirement), while confirming the erased PII payload
+   itself is not recoverable from Zone 7. **This step is blocked on the audit-log-preservation boundary
+   already flagged `[NEEDS INPUT]` above** — the exact query to run here cannot be specified until that
+   boundary is defined, so this step remains a placeholder pending that decision, not a false claim of
+   completeness.
+7. `[TARGET]` **Cross-zone race check.** Re-run steps 1-6 a second time after the capacity/MaxAge
+   backstop sweep (`AC-002-CAP-DPDP-1`) has had a chance to run at least once post-erasure, to catch the
+   race condition already named in "Cross-zone eviction interaction" above — a forced eviction racing an
+   erasure must not leave one zone erased and another still referencing the pre-erasure state.
+
+**Audit command reference (illustrative, not yet runnable):** each `[TARGET]` step above names the
+concrete check; a future implementer should wire these into a single `dashanan-admin verify-erasure
+--tenant <id> --subject <id>` command that runs all 7 checks and reports pass/fail per zone, rather than
+requiring an auditor to run each check by hand.
+
 ## Open decision (blocks closing AR1-G3)
 
 > Decide whether DPDP erasure needs its own backlog story (implementation) or stays a review-only
