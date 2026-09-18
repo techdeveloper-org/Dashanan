@@ -1122,6 +1122,131 @@ ADR-017: Write-gate regulated-identifier scrub
       tenant with `embedding_residency` set to an Indian region (ADR-015).
 ```
 
+### ADR-018: Zone 1 concurrency control
+
+```
+ADR-018: Zone 1 (Working) concurrency control
+  Status:    PROPOSED  [tightens ADR-005; see OAQ-21]
+  Chosen:    AN EXPLICIT CONCURRENCY-CONTROL MECHANISM per storage shape, guarding
+             ONLY Zone 1's own hot-buffer read-modify-write (not the rotation state
+             machine, which ADR-006/Section 8.3 already covers with its own SQL CAS):
+             Shape B (Redis): a `WATCH`/`MULTI`-`EXEC` transaction, or an atomic Lua
+               script, wrapping every read-modify-write against a session's Zone 1
+               hash + sorted-set (get -> update score/TTL -> put as one atomic step).
+             Shape A (in-process): a per-session `asyncio.Lock`, or a lock table
+               striped by `hash(session_id) mod N` for bounded memory overhead,
+               serializing concurrent access to one session's LRU entry.
+             Both shapes: on contention, retry a bounded number of times with
+               exponential backoff; if the retry budget is exhausted, reject the
+               write explicitly with `503` + `Retry-After` rather than blocking
+               indefinitely on the synchronous write path (ADR-002).
+  Why:
+    1. Zone 1 is read and written on every turn (ADR-005) and is on the SYNCHRONOUS
+       write path (ADR-002 consequences). Fast multi-turn tool calling can issue
+       concurrent reads/writes against the SAME session's Zone 1 entry; without an
+       explicit mechanism, a read-modify-write race (e.g. two concurrent score/TTL
+       updates) can silently lose an update -- an external review correctly
+       identified this as unaddressed.
+    2. This is a DIFFERENT concern from the CAS already documented at Section 8.3
+       (`UPDATE ... WHERE state = 'Active' AND version = ?`), which is a SQL
+       conditional update on the PostgreSQL/SQLite store (ADR-006) guarding the
+       rotation state machine's Active -> Compressed -> Archived transitions for
+       Zones 2/3/4/5/7. That mechanism does not run against Zone 1 at all. ADR-018
+       is conceptually consistent with it (both are compare-and-swap-shaped
+       optimistic concurrency), but mechanically distinct: different engine
+       (Redis/in-process vs. relational), different guarantee (hot-buffer
+       read-modify-write vs. lifecycle-state transition).
+    3. Shape A's mechanism is grounded in what Section 8.1 already states: the
+       rotation engine "runs as an asyncio background task with a bounded
+       concurrency semaphore so a sweep cannot starve the host's own event loop."
+       A per-session lock is the natural extension of that same single-process
+       asyncio model -- NOT a "session affinity" mechanism, which does not exist
+       anywhere in this HLD and would contradict Section 8.2's explicit statement
+       that the Shape B API tier is "stateless, no session affinity needed" (and
+       would not even be meaningful for Shape A's single process).
+    4. A bounded retry-then-reject policy is required, not optional: Zone 1's
+       whole reason for existing on the synchronous path is sub-millisecond
+       latency (ADR-005); an unbounded retry loop under contention would silently
+       convert a hot-path operation into an unbounded-latency one, which is itself
+       a new failure mode this ADR must close, not just move the race elsewhere.
+  Rejected:
+    A single global lock across all sessions -- rejected: serializes unrelated
+      sessions against each other, destroying Zone 1's O(1) per-turn latency
+      target for every tenant, not just the contended one.
+    Relying on Redis's own single-threaded command execution as sufficient --
+      rejected: a single Redis command (e.g. `HSET`) is atomic, but Zone 1's
+      operation is read-score -> compute new score/TTL -> write-back, a
+      multi-command sequence that is NOT atomic without `WATCH`/`MULTI`-`EXEC`
+      or a Lua script wrapping it.
+  Consequences:
+    Accepted trade-offs: a small latency cost under genuine contention (retry +
+      backoff) on an operation that is otherwise sub-millisecond; bounded and
+      rare in practice since contention requires two concurrent calls against the
+      SAME session, not the general per-turn case.
+    Risks: retry budget and backoff parameters (count, base delay, jitter) are a
+      tuning question, not decided here -- flagged in OAQ-21 for architect
+      sign-off.
+  India Layer: N/A -- this is a correctness/concurrency invariant, not a
+      residency or compliance concern.
+```
+
+### ADR-019: `context.assemble` RPC transport shape at large token budgets
+
+```
+ADR-019: Assemble RPC transport shape
+  Status:    PROPOSED  [tightens ADR-004; see OAQ-22]
+  Chosen:    `context.assemble` REMAINS A UNARY gRPC RPC at all token budgets up to
+             the existing hard cap (`token_budget` max 262144, threat D-3), relying
+             on the already-existing `cursor`/`next_cursor` mechanism (Section 7.1
+             request/response shape; openapi.yaml `AssembleContextRequest.cursor` /
+             `ContextAssembly.next_cursor`) for a caller that needs more items than
+             fit in one budget-fitted page. This ADR does NOT introduce or reopen
+             pagination -- that mechanism already exists. It decides ONLY the
+             wire-level transport for transmitting ONE already cursor-bounded page.
+  Why:
+    1. An external review raised "streaming/chunked context assembly" as a gap,
+       framing it as an absent pagination/continuation contract. On inspection,
+       that contract already exists (`cursor`/`next_cursor`): a caller retrieves
+       additional ranked candidates beyond the first page's budget fit without
+       re-running retrieval, keeping the same `assembly_id` and score basis
+       stable. The genuinely undecided question is narrower: whether transmitting
+       ONE page (up to ~256k tokens' worth of assembled context) should be a
+       single unary response or a server-streamed sequence of chunks.
+    2. ADR-004 already established gRPC as the canonical transport specifically
+       because protobuf is 3-10x smaller than JSON and the assembled context is
+       the single biggest payload on the wire (~8 KB median per Section 12D, but
+       unbounded up to the 256k-token cap at the high end). A unary RPC at the
+       cap's upper bound is still one bounded, protobuf-encoded message -- large,
+       but not unbounded, and gRPC's default max-message-size limits are a
+       deployment-config concern, not an architectural gap.
+    3. Server-streaming would add complexity (partial-result handling, a
+       resumability contract of its own, client complexity) for a case that the
+       existing cursor mechanism already lets a well-behaved client avoid
+       entirely by requesting a smaller `max_items`/`token_budget` and paging via
+       `cursor` if it needs more -- the two mechanisms are not both needed for
+       the common case.
+  Rejected:
+    Server-streaming for all assemble calls -- rejected: unwarranted complexity
+      for the median ~8 KB response; would also require every client to handle
+      partial/interrupted streams even in the common case.
+    A NEW pagination contract distinct from `cursor`/`next_cursor` -- rejected:
+      would duplicate a mechanism that already exists and is already documented
+      in openapi.yaml; the actual gap is only the transport shape, not the
+      continuation semantics.
+  Consequences:
+    Accepted trade-offs: at the extreme high end of the token-budget cap, a
+      single unary response can be large; mitigated by protobuf's existing
+      3-10x size advantage over JSON (ADR-004) and by the cursor mechanism
+      already letting a caller request a smaller page.
+    Risks: if a future deployment profile needs assemble responses meaningfully
+      larger than gRPC's practical unary message-size ceiling, this decision
+      would need revisiting -- flagged in OAQ-22 for architect sign-off on
+      whether a token-count threshold should make streaming mandatory rather
+      than optional.
+  India Layer: N/A -- this is a transport-layer decision, not a residency or
+      compliance concern.
+```
+
 ---
 
 ## Section 5 — DSA Choices per Component
@@ -1403,7 +1528,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 
 ## Section 11 — Open Architectural Questions
 
-Twenty items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract. Items marked **Proposed** without that tag are new decisions this HLD introduces in its own later sections (not Phase 0 gaps) and still need consensus-gate sign-off.
+Twenty-two items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract. Items marked **Proposed** without that tag are new decisions this HLD introduces in its own later sections (not Phase 0 gaps) and still need consensus-gate sign-off.
 
 | # | Item | Decision taken here | Why it needs review |
 |---|---|---|---|
@@ -1427,6 +1552,8 @@ Twenty items for the consensus gate. Items marked **[DERIVED FINDING]** are defe
 | OAQ-18 | **Proposed:** regulated-identifier detection at the write gate (ADR-017) | Proposed, needs approval | Narrows ADR-014's log-tier-only PII filter to also cover a small, explicit class of regulated structured identifiers in persisted/indexed content — deliberately not general redaction (see ADR-017 Why §3 and its interaction with DPDP-1/DPDP-2). Needs: (a) legal/compliance confirmation of the exact identifier set per deployment jurisdiction, (b) a decision on the detector-unavailable fail-open vs. fail-closed posture, deferred to Phase 1.5 per ADR-017's Consequences. |
 | OAQ-19 | **Proposed:** UserAffinity session-aggregation method + cosine-mapping validity (§12G) | Proposed, needs approval | UserAffinity and TaskRelevance both had no formula anywhere in this HLD before §12G. Needs sign-off on: (a) `mean(last N=5 same-user prior sessions)` as the aggregation method versus an alternative (e.g. max, exponentially-weighted), (b) whether `N=5` is right, (c) whether `(cosine+1)/2` is the correct `[0,1]` mapping for every ADR-015 embedding adapter or needs to be adapter-specific — no guarantee of non-negative cosine exists anywhere in this HLD. |
 | OAQ-20 | **Proposed:** Frequency `f_cap` per-zone default values (§12G) | Proposed, needs approval | The Frequency log-saturation formula (`log(1+access_count)/log(1+f_cap)`) is new in §12G; the per-zone `f_cap` values themselves are a tuning question analogous to §12A's threshold-tuning exercise and are not set here. Needs a Phase 6 (Sprint Planning) or Phase 1.5 pass with representative access-count distributions per zone before defaults are locked. |
+| OAQ-21 | **Proposed:** Zone 1 concurrency control (ADR-018) | Proposed, needs approval | Tightens ADR-005 by specifying the concurrency mechanism for Zone 1's own hot-buffer read-modify-write (Redis WATCH/Lua in Shape B, per-session asyncio.Lock in Shape A) and its bounded-retry-then-503 contention behavior. Not a Phase 0 gap — surfaced by external review of ADR-005's silence on concurrent access. Needs architect sign-off on the retry budget and backoff parameters. |
+| OAQ-22 | **Proposed:** `context.assemble` RPC transport shape at large token budgets (ADR-019) | Proposed, needs approval | Tightens ADR-004 by deciding unary vs. server-streaming gRPC for one cursor-bounded assembly page at the 256k token-budget cap; does not reopen the existing cursor/pagination mechanism (openapi.yaml), only the wire-level transport for a single page. Needs architect sign-off on which shape, and at what token-count threshold (if any) streaming becomes mandatory rather than optional. |
 
 ---
 
