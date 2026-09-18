@@ -40,6 +40,19 @@ A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency +
 - **Scales to long-running context**: designed to support much longer effective sessions/tasks than a single context window allows.
 - **Reusable as a product**: a general-purpose memory engine other AI products can adopt.
 
+## Getting started
+
+This repository is currently **pre-implementation** — Phases 0 through 8 (architecture and planning) are complete, but Phase B (actual code) has not started yet (see the Status callout above). There is no package to install or server to run yet; getting started today means getting oriented in the design, not running code.
+
+Recommended reading order for someone new to the project:
+1. **This README** — problem statement, the 8-zone model, goals.
+2. [`SRS.md`](SRS.md) — the canonical requirements specification (12 FRs, 11 NFRs, 17+ ACs): what the system is required to do.
+3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 15+ ADRs covering every major technology and mechanism choice.
+4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
+5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
+
+Local development / build / run instructions will be added here once Phase B implementation begins and there is actual code to set up.
+
 ## Repository layout
 
 ```
@@ -62,4 +75,4 @@ Dashanan/
 
 ## License
 
-TBD.
+Licensed under the [MIT License](LICENSE).
