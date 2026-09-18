@@ -4,41 +4,38 @@
   "context_budget_tokens": 5000,
   "input": {
     "hld_interface_contracts": {
-      "endpoints": [
-        {
-          "path": "/v1/context/assemble",
-          "method": "POST",
+      "/context/assemble": {
+        "POST": {
           "purpose": "Assemble a budget-fitted, provenance-carrying context slice",
           "auth_scope": "context:read"
-        },
-        {
-          "path": "/v1/memory/write",
-          "method": "POST",
+        }
+      },
+      "/memory/write": {
+        "POST": {
           "purpose": "Write one memory item, returns 202 + write_id",
           "auth_scope": "memory:write"
         }
-      ],
-      "events": ["memory.written", "memory.compressed", "memory.archived"]
+      }
     },
     "data_ownership_map": "docs/phase-1-architecture/HLD.md#section-7-interface-contracts-and-endpoint-inventory-input-to-phase-15"
   },
   "output": {
     "openapi_spec": "docs/phase-1.5-api/openapi.yaml",
     "openapi_version": "3.1.0",
-    "endpoints": [
-      {
-        "operation_id": "assembleContext",
-        "method": "POST",
-        "path": "/context/assemble",
-        "fr_refs": ["FR-009", "FR-006", "FR-007"]
+    "endpoints": {
+      "/context/assemble": {
+        "POST": {
+          "operation_id": "assembleContext",
+          "fr_refs": ["FR-009", "FR-006", "FR-007"]
+        }
       },
-      {
-        "operation_id": "writeMemory",
-        "method": "POST",
-        "path": "/memory/write",
-        "fr_refs": ["FR-009", "FR-010"]
+      "/memory/write": {
+        "POST": {
+          "operation_id": "writeMemory",
+          "fr_refs": ["FR-009", "FR-010"]
+        }
       }
-    ],
+    },
     "error_catalog": "error_catalog.json",
     "pagination_contracts": "pagination_contracts.json"
   },

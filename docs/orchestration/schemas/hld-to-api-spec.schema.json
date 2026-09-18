@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/hld-to-api-spec.schema.json",
   "title": "solution-architect -> python-backend-engineer / api-testing-engineer handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 2. fr_refs/FR-pattern fields validate structural presence of an FR reference, not that the referenced FR exists in SRS.md -- referential integrity across documents is out of scope for this schema.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 2. fr_refs/FR-pattern fields validate structural presence of an FR reference, not that the referenced FR exists in SRS.md -- referential integrity across documents is intentionally out of scope for this schema: the payload carries no master FR list to check against (would require bundling srs_fr_list into this contract, or a separate SRS.md-reading script).",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -19,26 +19,20 @@
       "properties": {
         "hld_interface_contracts": {
           "type": "object",
-          "description": "Per-zone read/write API definitions from the approved HLD, mirroring HLD.md Section 7's per-endpoint table (Endpoint, Method, Purpose, Auth scope).",
-          "required": ["endpoints"],
-          "properties": {
-            "endpoints": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "object",
-                "required": ["path", "method", "purpose"],
-                "properties": {
-                  "path": { "type": "string" },
-                  "method": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
-                  "purpose": { "type": "string" },
-                  "auth_scope": { "type": "string" }
-                }
+          "description": "Per-zone read/write API definitions from the approved HLD, keyed path -> method -> {purpose, auth_scope}. Mirrors the real openapi.yaml paths: shape (path-only outer key, HTTP method nested one level under each path) and HLD.md Section 7's per-endpoint table. Object keys are unique by construction, so no two entries can share the same path, and no two methods can collide under the same path.",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^/\\S*$" },
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
+            "additionalProperties": {
+              "type": "object",
+              "required": ["purpose", "auth_scope"],
+              "properties": {
+                "purpose": { "type": "string" },
+                "auth_scope": { "type": "string" }
               }
-            },
-            "events": {
-              "type": "array",
-              "items": { "type": "string" }
             }
           }
         },
@@ -59,20 +53,24 @@
           "description": "Structured assertion mirroring the openapi_spec file's declared version -- a JSON Schema validating this handoff payload cannot inspect the referenced YAML file's content directly, so the payload must carry this fact explicitly."
         },
         "endpoints": {
-          "type": "array",
-          "minItems": 1,
-          "description": "Every operation emitted into openapi_spec, each carrying at least one FR reference -- mirrors how the real openapi.yaml tags every operation/tag with FR-NNN in its description/tags block.",
-          "items": {
+          "type": "object",
+          "description": "Every operation emitted into openapi_spec, keyed path -> method -> {...} (same native-uniqueness shape as the input block). Each operation carries at least one FR reference, mirroring how the real openapi.yaml tags every operation/tag with FR-NNN in its description/tags block.",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^/\\S*$" },
+          "additionalProperties": {
             "type": "object",
-            "required": ["operation_id", "method", "path", "fr_refs"],
-            "properties": {
-              "operation_id": { "type": "string" },
-              "method": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
-              "path": { "type": "string" },
-              "fr_refs": {
-                "type": "array",
-                "minItems": 1,
-                "items": { "type": "string", "pattern": "^FR-[0-9]{3}$" }
+            "minProperties": 1,
+            "propertyNames": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
+            "additionalProperties": {
+              "type": "object",
+              "required": ["operation_id", "fr_refs"],
+              "properties": {
+                "operation_id": { "type": "string" },
+                "fr_refs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "pattern": "^FR-[0-9]{3}$" }
+                }
               }
             }
           }

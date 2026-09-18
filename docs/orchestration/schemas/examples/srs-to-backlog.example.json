@@ -16,9 +16,8 @@
   },
   "output": {
     "backlog_draft": "docs/phase-6-sprint-planning/backlog_draft.json",
-    "stories": [
-      {
-        "story_id": "DASH-STORY-001",
+    "stories": {
+      "DASH-STORY-001": {
         "traces_to_fr": "FR-009",
         "story_points": 8,
         "acceptance_criteria": [
@@ -38,8 +37,7 @@
         },
         "depends_on": []
       },
-      {
-        "story_id": "DASH-STORY-002",
+      "DASH-STORY-002": {
         "traces_to_fr": "FR-001",
         "story_points": 5,
         "acceptance_criteria": [
@@ -49,9 +47,37 @@
             "source": "SRS AC-001"
           }
         ],
+        "invest": {
+          "independent": "Self-contained zone with its own storage adapter.",
+          "negotiable": "Concrete backend (in-process LRU vs. Redis) is deployment-profile-specific.",
+          "valuable": "Highest single-item WSJF in the corrected FR table.",
+          "estimable": "TTL-primary eviction mechanism is fully specified.",
+          "small": "Scoped to Zone 1 read/write/TTL-eviction only.",
+          "testable": "AC-001 gives a concrete Given-When-Then."
+        },
+        "depends_on": ["DASH-STORY-001"]
+      },
+      "DASH-STORY-003": {
+        "traces_to_fr": "FR-002",
+        "story_points": 5,
+        "acceptance_criteria": [
+          {
+            "ac_id": "AC-002",
+            "text": "Given multiple Episodic entries with distinct timestamps, When the host queries Zone 2 by recency, Then results are returned in strict chronological order and each entry exposes its own decay attribute.",
+            "source": "SRS AC-002"
+          }
+        ],
+        "invest": {
+          "independent": "Self-contained zone with its own storage adapter and recency index.",
+          "negotiable": "Concrete decay function implementation is deployment-tunable.",
+          "valuable": "Performance-classified requirement for time-anchored recall.",
+          "estimable": "Recency ordering and per-entry decay attribute fully specified.",
+          "small": "Scoped to Zone 2 write/query-by-recency only.",
+          "testable": "AC-002 gives a concrete Given-When-Then."
+        },
         "depends_on": ["DASH-STORY-001"]
       }
-    ]
+    }
   },
   "assumes": "every FR in SRS.md is implementable within the approved HLD",
   "must_not": "introduce stories with no FR traceability"

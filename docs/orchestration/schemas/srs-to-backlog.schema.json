@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/srs-to-backlog.schema.json",
   "title": "Phase 5 (SRS.md + UML) -> scrum-master-agent (Phase 6) handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 3. traces_to_fr validates structural presence of an FR reference (pattern match), not that the referenced FR exists in SRS.md -- referential integrity across documents is out of scope for this schema.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 3. traces_to_fr validates structural presence of an FR reference (pattern match), not that the referenced FR exists in SRS.md -- referential integrity across documents is out of scope for this schema. Full FR-coverage completeness (every input.srs_fr_list entry covered by >=1 story) and circular depends_on detection are out of JSON-Schema's expressive power (they need cross-array/graph logic) and are checked instead by the companion script docs/orchestration/schemas/validate_handoff.py, not silently unchecked.",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -47,15 +47,19 @@
           "const": "docs/phase-6-sprint-planning/backlog_draft.json"
         },
         "stories": {
-          "type": "array",
-          "minItems": 1,
-          "description": "Mirrors backlog_draft.json's sprint_1_stories[] shape; named generically as 'stories' (not 'sprint_1_stories') since this schema covers every sprint, not just Sprint 1 -- the field name intentionally does not match the real file's sprint-numbered key.",
-          "items": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^DASH-STORY-[0-9]{3}$" },
+          "description": "Keyed by story_id (moved from a separate property into the object key itself, matching the endpoints design in hld-to-api-spec.schema.json) so no two stories can share an ID -- object keys are unique by construction. Still deliberately named generically as 'stories', not 'sprint_1_stories', since this schema covers every sprint, not just Sprint 1; this further diverges from backlog_draft.json's literal array shape, intentionally, for native story_id uniqueness enforcement.",
+          "additionalProperties": {
             "type": "object",
-            "required": ["story_id", "traces_to_fr", "story_points", "acceptance_criteria"],
+            "required": ["traces_to_fr", "story_points", "acceptance_criteria", "invest"],
             "properties": {
-              "story_id": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" },
-              "traces_to_fr": { "type": "string", "pattern": "^FR-[0-9]{3}$" },
+              "traces_to_fr": {
+                "type": "string",
+                "pattern": "^FR-[0-9]{3}$",
+                "description": "Required, pattern-constrained FR traceability -- the machine-enforced 'no story without an FR' guarantee. FR-coverage completeness (every FR in srs_fr_list mapped to >=1 story) is checked by validate_handoff.py, not this schema."
+              },
               "story_points": { "type": "integer", "minimum": 1 },
               "acceptance_criteria": {
                 "type": "array",
@@ -65,25 +69,31 @@
                   "required": ["ac_id", "text"],
                   "properties": {
                     "ac_id": { "type": "string" },
-                    "text": { "type": "string" },
+                    "text": {
+                      "type": "string",
+                      "minLength": 20,
+                      "description": "minLength is a triviality guard (rejects placeholder text like 'ok'), not a true semantic-quality check."
+                    },
                     "source": { "type": "string" }
                   }
                 }
               },
               "invest": {
                 "type": "object",
+                "required": ["independent", "negotiable", "valuable", "estimable", "small", "testable"],
                 "properties": {
-                  "independent": { "type": "string" },
-                  "negotiable": { "type": "string" },
-                  "valuable": { "type": "string" },
-                  "estimable": { "type": "string" },
-                  "small": { "type": "string" },
-                  "testable": { "type": "string" }
+                  "independent": { "type": "string", "minLength": 10 },
+                  "negotiable": { "type": "string", "minLength": 10 },
+                  "valuable": { "type": "string", "minLength": 10 },
+                  "estimable": { "type": "string", "minLength": 10 },
+                  "small": { "type": "string", "minLength": 10 },
+                  "testable": { "type": "string", "minLength": 10 }
                 }
               },
               "depends_on": {
                 "type": "array",
-                "items": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" }
+                "items": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" },
+                "description": "Circular-dependency detection (Kahn's-algorithm cycle check over story_id -> depends_on) is out of JSON-Schema's expressive power and is checked by validate_handoff.py, not this schema."
               }
             }
           }

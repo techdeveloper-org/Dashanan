@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/hld-to-context-delivery-plan.schema.json",
   "title": "solution-architect -> context-engineering-agent handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 1. The component_diagram_zones enum validates structural presence of a canonical zone name, not that the plan's sources are actually sufficient for that zone -- referential/semantic sufficiency across documents is out of scope for this schema.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 1. The component_diagram_zones enum/contains clauses validate structural presence of the canonical zone names, not that the plan's sources are actually sufficient for that zone -- semantic sufficiency is out of scope for this schema.",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -32,9 +32,22 @@
               "Consolidation Memory"
             ]
           },
-          "description": "The 8-zone component diagram; count and canonical zone names are fixed per the HLD's locked shape (docs/orchestration/01-vision-and-prd.md 8-zone taxonomy table)"
+          "allOf": [
+            { "contains": { "const": "Working Memory" } },
+            { "contains": { "const": "Episodic Memory" } },
+            { "contains": { "const": "Semantic Memory" } },
+            { "contains": { "const": "Procedural Memory" } },
+            { "contains": { "const": "Entity Memory" } },
+            { "contains": { "const": "Retrieval-Index Memory" } },
+            { "contains": { "const": "Provenance/Audit Memory" } },
+            { "contains": { "const": "Consolidation Memory" } }
+          ],
+          "description": "The 8-zone component diagram; count and canonical zone names are fixed per the HLD's locked shape (docs/orchestration/01-vision-and-prd.md 8-zone taxonomy table). The 8 explicit `contains` clauses are redundant with enum+uniqueItems+minItems:8/maxItems:8 (which already force exactly this 8-element set), but make the 'all 8 present, no dupes' guarantee an explicit, self-documenting assertion rather than an implicit consequence of the other constraints."
         },
-        "adrs": { "type": "array", "items": { "type": "string" } },
+        "adrs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^ADR-[0-9]{3}$" }
+        },
         "capacity_estimation": { "type": "object" }
       }
     },
@@ -44,7 +57,33 @@
       "properties": {
         "context_delivery_plan": {
           "type": "object",
-          "description": "Per-agent token budgets for all Phase 1.5/2/5/6/7/8 agents",
+          "description": "Per-agent token budgets for all Phase 1.5/2/5/6/7/8 agents. Agents named explicitly in `properties` below are pinned to their real ceiling from docs/orchestration/02-architecture-workflow.md's STEP 4.5 thinking-level table via `const`; any other agent name falls through to `additionalProperties`'s generic 1-64000 sanity range. MAINTENANCE COUPLING: these per-agent `const` values must be updated by hand if the STEP 4.5 table ever changes -- nothing enforces the two stay in sync automatically.",
+          "minProperties": 1,
+          "properties": {
+            "business-analyst-agent": { "$ref": "#/$defs/budgetEntry5000" },
+            "product-manager-agent": { "$ref": "#/$defs/budgetEntry5000" },
+            "python-backend-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "api-testing-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "integration-testing-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "scrum-master-agent": { "$ref": "#/$defs/budgetEntry5000" },
+            "finops-analyst": { "$ref": "#/$defs/budgetEntry5000" },
+            "uml-structural-diagram-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "uml-behavioral-diagram-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "uml-interaction-diagram-engineer": { "$ref": "#/$defs/budgetEntry5000" },
+            "context-engineering-agent": { "$ref": "#/$defs/budgetEntry10000" },
+            "agile-tooling-specialist": { "$ref": "#/$defs/budgetEntry1024" },
+            "drawio-diagram-architect": { "$ref": "#/$defs/budgetEntry1024" },
+            "mermaid-diagram-engineer": { "$ref": "#/$defs/budgetEntry1024" },
+            "consensus-agent": { "$ref": "#/$defs/budgetEntry20000" },
+            "prompt-generation-expert": { "$ref": "#/$defs/budgetEntry16000" },
+            "hallucination-detector": { "$ref": "#/$defs/budgetEntry32000" },
+            "context-faithfulness-engineer": { "$ref": "#/$defs/budgetEntry32000" },
+            "reliability-auditor": { "$ref": "#/$defs/budgetEntry16000" },
+            "security-testing-engineer": { "$ref": "#/$defs/budgetEntry16000" },
+            "orchestrator-agent": { "$ref": "#/$defs/budgetEntry32000" },
+            "solution-architect": { "$ref": "#/$defs/budgetEntry64000" },
+            "agile-business-mathematics-expert": { "$ref": "#/$defs/budgetEntry64000" }
+          },
           "additionalProperties": {
             "type": "object",
             "required": ["agent_name", "context_budget_tokens", "sources"],
@@ -54,12 +93,12 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 64000,
-                "description": "64,000 is reused as a sanity ceiling from docs/orchestration/02-architecture-workflow.md's STEP 4.5 thinking-budget table (its highest defined tier, EXCELLENCE); the repo does not define a dedicated context-delivery-budget ceiling, so this is a deliberate cross-concept proxy, not a domain-precise bound."
+                "description": "64,000 is reused as a sanity ceiling from docs/orchestration/02-architecture-workflow.md's STEP 4.5 thinking-budget table (its highest defined tier, EXCELLENCE); the repo does not define a dedicated context-delivery-budget ceiling, so this is a deliberate cross-concept proxy, not a domain-precise bound. Applies only to agent names not explicitly pinned above."
               },
               "sources": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "type": "string" }
+                "items": { "type": "string", "minLength": 3 }
               }
             }
           }
@@ -72,5 +111,26 @@
     "must_not": {
       "const": "re-derive zone boundaries -- those are solution-architect's decision, not context-engineering-agent's"
     }
+  },
+  "$defs": {
+    "budgetEntryBase": {
+      "type": "object",
+      "required": ["agent_name", "context_budget_tokens", "sources"],
+      "properties": {
+        "agent_name": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 3 }
+        }
+      }
+    },
+    "budgetEntry1024": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 1024 } } }] },
+    "budgetEntry5000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 5000 } } }] },
+    "budgetEntry10000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 10000 } } }] },
+    "budgetEntry16000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 16000 } } }] },
+    "budgetEntry20000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 20000 } } }] },
+    "budgetEntry32000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 32000 } } }] },
+    "budgetEntry64000": { "allOf": [{ "$ref": "#/$defs/budgetEntryBase" }, { "properties": { "context_budget_tokens": { "const": 64000 } } }] }
   }
 }

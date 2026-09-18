@@ -29,7 +29,7 @@
       },
       "scrum-master-agent": {
         "agent_name": "scrum-master-agent",
-        "context_budget_tokens": 8000,
+        "context_budget_tokens": 5000,
         "sources": ["srs-fr-delta", "uml-component-delta"]
       }
     }
