@@ -1014,7 +1014,7 @@ ADR-015: Embedding provider
 
 ```
 ADR-016: Promotion/eviction ordering
-  Status:    PROPOSED  [tightens ADR-002/ADR-005; see OAQ-17]
+  Status:    ADOPTED  [tightens ADR-002/ADR-005; consensus-gate sign-off 2026-09-18, OAQ-17 closed]
   Chosen:    A ROTATION-WORKER-ENFORCED ORDERING INVARIANT: when an item's score crosses
              `PromoteThreshold` (deadline-scheduled per ADR-009) or a read-triggered
              promotion fires (ADR-012), the target-zone write MUST be durably committed
@@ -1060,6 +1060,18 @@ ADR-016: Promotion/eviction ordering
       implicit assumption.
   India Layer: N/A -- this is a correctness invariant, not a residency or compliance
       concern.
+  Sign-off:  OAQ-17 asked for a fresh comparison against a grace-period-on-eviction
+      alternative before adopting this mechanism as-is. Verdict: a fixed grace period N
+      only matches this invariant's guarantee if N >= the true promotion-completion
+      delay, which the HLD does not bound with a hard ceiling (Section 9's 50 ms/500 ms/
+      5 s figures are percentiles, not worst-case bounds) -- so a static N is a
+      probabilistic guarantee, risking silent re-eviction of a mid-promotion item under
+      load, exactly the race this ADR exists to close. A grace period also adds new
+      per-item timer bookkeeping the ordering constraint above does not need, since it
+      reuses the sweep's existing guarded-transition pattern. The ordering invariant's
+      failure mode (a stalled sweep) is a visible liveness failure caught by existing
+      monitoring; a miscalibrated grace period's failure mode is a silent correctness
+      regression. Conclusion: this ADR's mechanism stands unchanged.
 ```
 
 ### ADR-017: Regulated-identifier detection at the write gate
@@ -1126,7 +1138,7 @@ ADR-017: Write-gate regulated-identifier scrub
 
 ```
 ADR-018: Zone 1 (Working) concurrency control
-  Status:    PROPOSED  [tightens ADR-005; see OAQ-21]
+  Status:    ADOPTED  [tightens ADR-005; consensus-gate sign-off 2026-09-18, OAQ-21 closed]
   Chosen:    AN EXPLICIT CONCURRENCY-CONTROL MECHANISM per storage shape, guarding
              ONLY Zone 1's own hot-buffer read-modify-write (not the rotation state
              machine, which ADR-006/Section 8.3 already covers with its own SQL CAS):
@@ -1188,13 +1200,30 @@ ADR-018: Zone 1 (Working) concurrency control
       sign-off.
   India Layer: N/A -- this is a correctness/concurrency invariant, not a
       residency or compliance concern.
+  Sign-off:  OAQ-21's retry/backoff parameters, decided: 3 retries, base delay 2 ms,
+      exponential backoff with full jitter (`sleep = random(0, min(max_delay,
+      base * 2^attempt))`), max delay 8 ms/attempt, worst-case cumulative wait
+      ~14 ms before the 503 + Retry-After reject. Full jitter (not fixed
+      exponential) matches this HLD's existing anti-thundering-herd reasoning
+      elsewhere. Grounding and an explicit caveat, per consensus-gate review: the
+      14 ms worst-case is close to Profile B's 15 ms write-accept p99 target and
+      exceeds Profile A's 5 ms target outright (Section 9). This ADR's own "bounded
+      and rare in practice" claim above is NOT backed by any contention-rate model
+      elsewhere in this HLD -- no evidence here bounds how often two concurrent
+      writers land on the same session. The 14 ms retry-path latency is therefore
+      an explicitly accepted tail-latency exception under genuine contention, NOT
+      a value silently folded into or guaranteed by Section 9's p99 SLOs
+      (especially Profile A's). A real contention-rate measurement, once available,
+      may require revisiting this budget.
 ```
 
 ### ADR-019: `context.assemble` RPC transport shape at large token budgets
 
 ```
 ADR-019: Assemble RPC transport shape
-  Status:    PROPOSED  [tightens ADR-004; see OAQ-22]
+  Status:    ADOPTED (transport shape only)  [tightens ADR-004; consensus-gate
+             sign-off 2026-09-18, OAQ-22 PARTIALLY closed -- the streaming-
+             mandatory threshold sub-question below remains OPEN]
   Chosen:    `context.assemble` REMAINS A UNARY gRPC RPC at all token budgets up to
              the existing hard cap (`token_budget` max 262144, threat D-3), relying
              on the already-existing `cursor`/`next_cursor` mechanism (Section 7.1
@@ -1245,6 +1274,17 @@ ADR-019: Assemble RPC transport shape
       than optional.
   India Layer: N/A -- this is a transport-layer decision, not a residency or
       compliance concern.
+  Sign-off:  OAQ-22 PARTIALLY closed. Unary transport is confirmed correct and
+      sufficient at all budgets up to the 262144-token cap -- this part of the
+      decision stands and needed no change. The specific streaming-mandatory
+      token-count threshold CANNOT be responsibly set from evidence in this HLD:
+      Section 12D's only serialize-cost figure (5 ms) is scoped to the median
+      ~8 KB case, and no figure anywhere in this document measures serialize or
+      transmit time at large/max-size (near-256k-token) payloads. Setting a
+      specific flip threshold now would be an invented number, not a derived
+      one. This sub-question stays explicitly OPEN pending a measured p99
+      serialize+transmit time at large assembled payloads (a Phase 1.5/2
+      benchmarking task, not a documentation-pass decision).
 ```
 
 ---
@@ -1575,12 +1615,12 @@ Twenty-two items for the consensus gate. Items marked **[DERIVED FINDING]** are 
 | OAQ-14 | **NEW SCOPE:** conflict-detection sweep on Zone 3/5 writes | Proposed | From research brief §4. Not in the PRD's FRs. It is what makes `ProvenanceConfidence` a live computation instead of a write-once constant, and it is the strongest memory-poisoning control (T-1). Recommend adopting as **FR-013**. |
 | OAQ-15 | **Embedding provider is a hard dependency Phase 0 never named** | Addressed by ADR-015 | Zone 6 cannot exist without it. It is also the read path's dominant latency cost and a DPDP cross-border transfer surface. Should appear explicitly in the PRD's dependency list. |
 | OAQ-16 | **8-zone taxonomy: NO revision proposed.** One structural observation. | Taxonomy holds | The taxonomy survives contact with the architecture. **Observation, not a revision request:** Zones 6 and 7 are categorically different from Zones 1-5 and 8 — they are *derived, cross-cutting layers* over the other six, not independent memory stores. Consequences already reflected here: they have no independent `lambda_zone`, Zone 6 needs no independent durability, and neither participates in the `Active -> Compressed -> Archived` lifecycle as a *source*. The count stays 8; the HLD models them as a distinct tier. |
-| OAQ-17 | **Proposed:** promotion-before-eviction ordering invariant (ADR-016) | Proposed, needs approval | Tightens ADR-002/ADR-005 by resolving the one race they leave open (an item's promotion and its Zone 1 eviction both pending at once). Not a Phase 0 gap — it is a gap in this HLD's own later sections, surfaced by external review of the read-your-own-writes contract (new §7.7). Needs architect sign-off that the rotation-worker ordering constraint is the right mechanism versus an alternative (e.g. a grace period on eviction). |
+| OAQ-17 | **Proposed:** promotion-before-eviction ordering invariant (ADR-016) | **Resolved: Adopted** (consensus-gate sign-off, 2026-09-18) | Tightens ADR-002/ADR-005 by resolving the one race they leave open (an item's promotion and its Zone 1 eviction both pending at once). Not a Phase 0 gap — it is a gap in this HLD's own later sections, surfaced by external review of the read-your-own-writes contract (new §7.7). Sign-off compared the ordering constraint fresh against a grace-period-on-eviction alternative (ADR-016's own Sign-off note) and confirmed the ordering constraint as correct; no change to the mechanism. |
 | OAQ-18 | **Proposed:** regulated-identifier detection at the write gate (ADR-017) | Proposed, needs approval | Narrows ADR-014's log-tier-only PII filter to also cover a small, explicit class of regulated structured identifiers in persisted/indexed content — deliberately not general redaction (see ADR-017 Why §3 and its interaction with DPDP-1/DPDP-2). Needs: (a) legal/compliance confirmation of the exact identifier set per deployment jurisdiction, (b) a decision on the detector-unavailable fail-open vs. fail-closed posture, deferred to Phase 1.5 per ADR-017's Consequences. |
 | OAQ-19 | **Proposed:** UserAffinity session-aggregation method + cosine-mapping validity (§12G) | Proposed, needs approval | UserAffinity and TaskRelevance both had no formula anywhere in this HLD before §12G. Needs sign-off on: (a) `mean(last N=5 same-user prior sessions)` as the aggregation method versus an alternative (e.g. max, exponentially-weighted), (b) whether `N=5` is right, (c) whether `(cosine+1)/2` is the correct `[0,1]` mapping for every ADR-015 embedding adapter or needs to be adapter-specific — no guarantee of non-negative cosine exists anywhere in this HLD. |
 | OAQ-20 | **Proposed:** Frequency `f_cap` per-zone default values (§12G) | Proposed, needs approval | The Frequency log-saturation formula (`log(1+access_count)/log(1+f_cap)`) is new in §12G; the per-zone `f_cap` values themselves are a tuning question analogous to §12A's threshold-tuning exercise and are not set here. Needs a Phase 6 (Sprint Planning) or Phase 1.5 pass with representative access-count distributions per zone before defaults are locked. |
-| OAQ-21 | **Proposed:** Zone 1 concurrency control (ADR-018) | Proposed, needs approval | Tightens ADR-005 by specifying the concurrency mechanism for Zone 1's own hot-buffer read-modify-write (Redis WATCH/Lua in Shape B, per-session asyncio.Lock in Shape A) and its bounded-retry-then-503 contention behavior. Not a Phase 0 gap — surfaced by external review of ADR-005's silence on concurrent access. Needs architect sign-off on the retry budget and backoff parameters. |
-| OAQ-22 | **Proposed:** `context.assemble` RPC transport shape at large token budgets (ADR-019) | Proposed, needs approval | Tightens ADR-004 by deciding unary vs. server-streaming gRPC for one cursor-bounded assembly page at the 256k token-budget cap; does not reopen the existing cursor/pagination mechanism (openapi.yaml), only the wire-level transport for a single page. Needs architect sign-off on which shape, and at what token-count threshold (if any) streaming becomes mandatory rather than optional. |
+| OAQ-21 | **Proposed:** Zone 1 concurrency control (ADR-018) | **Resolved: Adopted** (consensus-gate sign-off, 2026-09-18) | Tightens ADR-005 by specifying the concurrency mechanism for Zone 1's own hot-buffer read-modify-write (Redis WATCH/Lua in Shape B, per-session asyncio.Lock in Shape A) and its bounded-retry-then-503 contention behavior. Not a Phase 0 gap — surfaced by external review of ADR-005's silence on concurrent access. Sign-off set concrete retry/backoff parameters (ADR-018's Sign-off note): 3 retries, 2 ms base, full jitter, 8 ms/attempt cap, ~14 ms worst case — with an explicit caveat that this is an accepted tail-latency exception under contention, not proven bounded against Section 9's Profile A/B p99 SLOs, since no contention-rate model exists in this HLD. |
+| OAQ-22 | **Proposed:** `context.assemble` RPC transport shape at large token budgets (ADR-019) | **Partially resolved: transport shape adopted; threshold sub-question stays OPEN** (consensus-gate sign-off, 2026-09-18) | Tightens ADR-004 by deciding unary vs. server-streaming gRPC for one cursor-bounded assembly page at the 256k token-budget cap; does not reopen the existing cursor/pagination mechanism (openapi.yaml), only the wire-level transport for a single page. Sign-off confirmed unary as correct/sufficient at all budgets up to the cap (ADR-019's Sign-off note), but could not responsibly set a specific streaming-mandatory token-count threshold — no HLD evidence measures serialize/transmit cost at large payloads, only at the median ~8 KB case. That threshold question remains open pending a Phase 1.5/2 benchmarking pass. |
 
 ---
 
@@ -1891,3 +1931,5 @@ The clamp is new; the base values and modifiers are not. It exists because compo
 |---|---|---|---|
 | 1.0.0 | 2026-09-17 | solution-architect (opus) | Initial HLD from locked Phase 0 inputs. 15 ADRs, finalized thresholds and half-lives, deadline-scheduled rotation complexity analysis, 3-profile capacity estimation, STRIDE with cross-tenant focus, 16 OAQs (6 derived findings). Status: PENDING CONSENSUS GATE. |
 | 1.1.0 | 2026-09-18 | solution-architect (opus) | Closed 3 verified gaps from a follow-up documentation audit (#5): §8.2a rotation-worker split-brain/double-rotation prevention (Redis consumer-group generation fencing, no new coordination service introduced); §8.5 RPO/RTO disaster-recovery targets per persistent store, scoped regional per the DPDP-4 residency requirement; §12G tie-break rule for equal/zero MemoryScore (recency, then item_id), proposed alongside the existing UserAffinity cold-start default — both remain subject to OAQ-19's consensus-gate sign-off, which stays open. |
+| 1.1.1 | 2026-09-18 | solution-architect (opus) | Added a Manual-replay procedure to §8.3's DLQ paragraph (#6): on-call/operator-only authorization, root-cause-fixed precondition, and a partition-preserving redrive step for `dashanan.dlq.{event_type}` messages. |
+| 1.2.0 | 2026-09-18 | solution-architect + consensus-agent (real consensus-gate sign-off, not a documentation pass) | Closed OAQ-17 (ADR-016 adopted as written, after fresh comparison against a grace-period-on-eviction alternative), OAQ-21 (ADR-018 adopted with concrete retry/backoff parameters: 3 retries, 2 ms base, full jitter, 8 ms/attempt cap, ~14 ms worst case — flagged as an accepted tail-latency exception not proven bounded against Section 9's p99 SLOs, since no contention-rate model exists in this HLD), and partially closed OAQ-22 (ADR-019's unary transport shape confirmed correct; the specific streaming-mandatory token-count threshold stays open pending a future benchmarking pass, since no HLD evidence measures large-payload serialize/transmit cost). OAQ-4, OAQ-18, OAQ-19, and OAQ-20 remain open: OAQ-19 by prior deliberate deferral, OAQ-4 as out of this round's requested scope, OAQ-18 pending legal/compliance confirmation no agent can supply, and OAQ-20 pending real access-count data that does not exist pre-implementation. |
