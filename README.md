@@ -46,7 +46,7 @@ This repository is currently **pre-implementation** — Phases 0 through 8 (arch
 
 Recommended reading order for someone new to the project:
 1. **This README** — problem statement, the 8-zone model, goals.
-2. [`SRS.md`](SRS.md) — the canonical requirements specification (12 FRs, 11 NFRs, 17+ ACs): what the system is required to do.
+2. [`SRS.md`](SRS.md) — the canonical requirements specification (13 FRs, 11 NFRs, 17+ ACs): what the system is required to do.
 3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 15+ ADRs covering every major technology and mechanism choice.
 4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
 5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
@@ -58,7 +58,7 @@ Local development / build / run instructions will be added here once Phase B imp
 ```
 Dashanan/
 ├── README.md                    <- this file
-├── SRS.md                       <- Software Requirements Specification (12 FRs, 11 NFRs, 17 ACs)
+├── SRS.md                       <- Software Requirements Specification (13 FRs, 11 NFRs, 17 ACs)
 ├── docs/
 │   ├── orchestration_prompt.md  <- index into the 3-file orchestration bundle
 │   ├── orchestration/           <- 01-vision-and-prd.md, 02-architecture-workflow.md, 03-agent-registry.md

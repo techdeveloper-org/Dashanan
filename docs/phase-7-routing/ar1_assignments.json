@@ -249,6 +249,27 @@
         "position": "Advisory - may run in parallel with implementation."
       },
       "logging_note": "Cite as AR1-010. HLD 12C names this an explicit Sprint 1 definition-of-done item; its failure mode is silent, not a crash."
+    },
+    {
+      "story_id": "DASH-STORY-011",
+      "title": "SPIKE: Qdrant client library version/compatibility pinning validation",
+      "story_points": 3,
+      "assigned_agent": "ai-engineer",
+      "model": "sonnet",
+      "score": 0.765,
+      "runner_up": {"agent": "python-backend-engineer", "score": 0.5425},
+      "margin": 0.2225,
+      "rationale": "This is a timeboxed research spike validating the pinned Qdrant client library version against the target server version and Python 3.12+ (NFR-001), ahead of DASH-STORY-007's Dev sub-task. ai-engineer's vector-database-core skill and existing ownership of DASH-STORY-007 make it the candidate best placed to assess client/server breaking changes without re-litigating the ADR-007 vendor decision.",
+      "hld_ownership_crosscheck": "N/A - spike, not an HLD-owned component. See ar0_routing_index.json's honesty note on the hld_component_ownership signal for this entry.",
+      "must_not_deviate": [
+        "Does NOT reopen the vendor decision - Qdrant is locked by ADR-007 (backlog_draft.json invest.negotiable)",
+        "Scope is client-library compatibility/version validation only, not vendor selection",
+        "Out of scope: re-evaluating Qdrant against pgvector/Milvus/other vector stores (spike_exit_criteria)"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no storage-adapter port implementation, no tenant-isolation logic. This is a documentation/research deliverable (a compatibility matrix and a version recommendation) with no write path and no code shipped to any zone.",
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-011. Single-subtask spike (Dev only, no QA/Review split per spike convention - see jira_setup_report.json _note_dshn_53). Feeds DASH-STORY-007 as an input, not a blocking dependency in the DAG (depends_on: [] per backlog_draft.json), but DASH-STORY-007's Dev sub-task should not start writing Qdrant client adapter code before this spike's recommendation lands. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit - DASH-STORY-011 existed in backlog_draft.json since 2026-09-17 but was absent from this file at initial authoring."
     }
   ],
   "dependency_integrity_check": {
@@ -263,12 +284,13 @@
       "DASH-STORY-007": ["DASH-STORY-003"],
       "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
       "DASH-STORY-009": ["DASH-STORY-008"],
-      "DASH-STORY-010": ["DASH-STORY-008"]
+      "DASH-STORY-010": ["DASH-STORY-008"],
+      "DASH-STORY-011": []
     },
-    "cycle_detection": "PASS - no cycle. Every edge points from a later story to a strictly earlier-resolvable one. Longest chain: 001 -> 002 -> 005 -> 006 (depth 4) and 001 -> 003 -> 007 -> 008 -> 004 (depth 5).",
-    "assignment_induced_deadlock": "NONE. No two stories are mutually blocked by holding each other's assigned agent. python-backend-engineer's 7 stories are all on a consistent topological order (001, 002, 006, 008, 009, 010 sequential-compatible; 004 after 008).",
+    "cycle_detection": "PASS - no cycle. Every edge points from a later story to a strictly earlier-resolvable one. Longest chain: 001 -> 002 -> 005 -> 006 (depth 4) and 001 -> 003 -> 007 -> 008 -> 004 (depth 5). DASH-STORY-011 is a second root node alongside 001 (no depends_on entries per backlog_draft.json's dependency_graph), unaffected by the chain.",
+    "assignment_induced_deadlock": "NONE. No two stories are mutually blocked by holding each other's assigned agent. python-backend-engineer's 7 stories are all on a consistent topological order (001, 002, 006, 008, 009, 010 sequential-compatible; 004 after 008). DASH-STORY-011's sole agent (ai-engineer) introduces no new edge into this graph.",
     "unresolvable_dependency": "NONE.",
-    "serialization_warning": "python-backend-engineer holds 7 of 10 stories (37 of 55 story points). Under strictly sequential single-agent execution the sprint's critical path is agent-bound, not dependency-bound. The dependency DAG permits DASH-STORY-003 (database-engineer) and DASH-STORY-007 (ai-engineer) to run in parallel with the python-backend-engineer chain; AR.2 must exploit that or the sprint serializes. This is a system-design bottleneck finding, not a reassignment trigger."
+    "serialization_warning": "python-backend-engineer holds 7 of 11 stories (37 of 58 story points). Under strictly sequential single-agent execution the sprint's critical path is agent-bound, not dependency-bound. The dependency DAG permits DASH-STORY-003 (database-engineer) and DASH-STORY-007/DASH-STORY-011 (ai-engineer) to run in parallel with the python-backend-engineer chain; AR.2 must exploit that or the sprint serializes. This is a system-design bottleneck finding, not a reassignment trigger."
   },
   "routing_gaps": [
     {
@@ -302,18 +324,26 @@
       "gap": "Narrowest assignment margin in the sprint (0.0735 between python-backend-engineer 0.852 and database-engineer 0.7785). Both clear threshold, so this is a preference, not a gap in coverage.",
       "why_not_force_assigned": "N/A - assigned normally.",
       "recommended_action": "If AR.2 places DASH-STORY-004 on the critical path while python-backend-engineer is saturated, reassign to database-engineer without a new AR.0 pass - the score is already recorded above threshold."
+    },
+    {
+      "id": "AR1-G5",
+      "severity": "MEDIUM",
+      "story": "DASH-STORY-011",
+      "gap": "Single valid agent. ai-engineer scores 0.765 (marginal, see ar0_routing_index.json honesty note); the next candidate (python-backend-engineer, 0.5425) falls well below the 0.75 threshold. There is no compliant fallback if ai-engineer is unavailable.",
+      "why_not_force_assigned": "python-backend-engineer at 0.5425 would be a force-assignment below threshold.",
+      "recommended_action": "Accept the single-agent risk on this 3 SP spike, or have python-backend-engineer perform the dependency/lockfile mechanics with ai-engineer as a lightweight consult on Qdrant-specific breaking changes."
     }
   ],
   "summary": {
-    "stories_total": 10,
-    "stories_assigned": 10,
+    "stories_total": 11,
+    "stories_assigned": 11,
     "stories_unassigned": 0,
     "below_threshold_assignments": 0,
     "distinct_implementing_agents": 3,
     "agent_load": {
       "python-backend-engineer": {"stories": 7, "story_points": 37, "story_ids": ["DASH-STORY-001", "DASH-STORY-002", "DASH-STORY-004", "DASH-STORY-006", "DASH-STORY-008", "DASH-STORY-009", "DASH-STORY-010"]},
       "database-engineer": {"stories": 2, "story_points": 10, "story_ids": ["DASH-STORY-003", "DASH-STORY-005"]},
-      "ai-engineer": {"stories": 1, "story_points": 8, "story_ids": ["DASH-STORY-007"]}
+      "ai-engineer": {"stories": 2, "story_points": 11, "story_ids": ["DASH-STORY-007", "DASH-STORY-011"]}
     },
     "p1_flagged_stories": ["DASH-STORY-004", "DASH-STORY-005", "DASH-STORY-006", "DASH-STORY-007"],
     "p1_reviewers": {
@@ -322,11 +352,12 @@
     },
     "blocking_math_delegations": ["DASH-STORY-007", "DASH-STORY-008", "DASH-STORY-009"],
     "advisory_math_delegations": ["DASH-STORY-010"],
-    "score_range": {"min": 0.849, "max": 0.937, "mean": 0.8866},
+    "score_range": {"min": 0.765, "max": 0.937, "mean": 0.8755},
     "open_user_decisions": [
       "Accept or reject the P1 scope extension to DASH-STORY-007 (p1_security_override.deviation_note).",
       "Accept single-agent risk on DASH-STORY-007 or authorize a two-agent split (AR1-G1).",
-      "Decide whether DPDP erasure needs its own story or stays a review-only obligation (AR1-G3)."
+      "Decide whether DPDP erasure needs its own story or stays a review-only obligation (AR1-G3).",
+      "Accept single-agent risk on DASH-STORY-011 (ai-engineer as sole valid candidate) or authorize a python-backend-engineer/ai-engineer split (AR1-G5)."
     ]
   }
 }

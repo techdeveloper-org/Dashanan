@@ -38,6 +38,10 @@
   ],
   "open_flags_remaining": 0,
   "no_flags_stories": ["DASH-STORY-002", "DASH-STORY-004", "DASH-STORY-005", "DASH-STORY-006", "DASH-STORY-009", "DASH-STORY-010"],
+  "missing_from_original_ir1_pass": {
+    "stories": ["DASH-STORY-011"],
+    "detail": "DASH-STORY-011 (Jira DSHN-53) was absent from implementation_execution_plan.json's 30-prompt set at the time ir1_agent_flags.json was produced (2026-09-17), so no reviewer evaluated it and no flags could have been raised or resolved for it. It must not be read as included in no_flags_stories above. Requires a dedicated IR.1 pass (4 reviewers) against its dev_prompt once implementation_execution_plan.json is updated, then a corresponding IR.2 entry here if any flag results. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit."
+  },
   "disclosed_non_blocking_notes": [
     "DASH-STORY-007: BA noted the P1 gate is explicitly marked 'conditional' pending user acceptance of the AC-014 scope-extension deviation -- disclosed open decision, not an unresolved flag.",
     "DASH-STORY-003: SA noted a minor, non-blocking omission of HLD Section 3.3's keyset-only/no-offset prohibition -- judged non-blocking, not patched."

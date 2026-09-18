@@ -12,10 +12,15 @@ info:
     there (FR-001..FR-008 = the eight zones, FR-009 = orchestrator, FR-010 =
     provenance obligation, FR-011 = pluggable storage adapters, FR-012 =
     scoring/rotation configurability, FR-013 = conflict-detection sweep, proposed
-    at OAQ-14, adopted here as REQUIRED scope since Zone 3/5 writes cannot satisfy
-    NFR-011 without it). NFR references trace to HLD Section 9.
+    at OAQ-14 and formally adopted into SRS.md's Functional Requirements section
+    (v1.0.6), REQUIRED scope since Zone 3/5 writes cannot satisfy NFR-011 without
+    it). NFR references trace to HLD Section 9.
   x-hld-source: docs/phase-1-architecture/HLD.md#section-7-interface-contracts-and-endpoint-inventory-input-to-phase-15
-  x-consensus-gate-status: PENDING
+  # Ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate
+  # (docs/phase-8-alignment/ir5_alignment_verdict.json, 2026-09-17); narrower-scope
+  # re-confirmation (story-patch verification), not a standalone Phase 1.5 API
+  # contract re-review.
+  x-consensus-gate-status: APPROVED
   license:
     name: Proprietary
 servers:

@@ -6,7 +6,7 @@
   "date": "2026-09-17",
   "correlation_id": "DASH-PH7-AR0-20260917",
   "source_of_truth": {
-    "backlog": "docs/phase-6-sprint-planning/backlog_draft.json v1.0.0 (10 Sprint 1 stories, SPRINT READY)",
+    "backlog": "docs/phase-6-sprint-planning/backlog_draft.json v1.0.0 (11 Sprint 1 stories, SPRINT READY)",
     "hld": "docs/phase-1-architecture/HLD.md v1.0.0 (Sections 2, 3, 5, 6, 12F)",
     "agent_registry": "claude-global-library/agents/ (529 entries enumerated by directory glob 2026-09-17)"
   },
@@ -431,18 +431,49 @@
           "evidence": "PID/control-theory scope for agent quality loops. 'Invalidation/feedback' keyword overlap is a false signal."
         }
       ]
+    },
+    {
+      "story_id": "DASH-STORY-011",
+      "title": "SPIKE: Qdrant client library version/compatibility pinning validation",
+      "hld_component": "N/A - timeboxed spike, not an HLD-owned component; de-risks DASH-STORY-007's Zone 6 Qdrant client dependency (ADR-007) ahead of that story's Dev sub-task",
+      "hld_patterns": [],
+      "hld_dsa": "N/A - research/documentation spike, no algorithmic implementation content",
+      "required_capabilities": ["vector-database-qdrant", "python-dependency-version-pinning", "compatibility-matrix-research", "breaking-change-review"],
+      "candidates": [
+        {
+          "agent": "ai-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.80, "skill_coverage": 0.65, "hld_component_ownership": 0.85, "tech_stack_fit": 0.85},
+          "score": 0.765,
+          "above_threshold": true,
+          "evidence": "vector-database-core gives direct Qdrant client/server knowledge for the compatibility matrix. hld_component_ownership is scored against the DOWNSTREAM component this spike de-risks (Zone 6, DASH-STORY-007, which this same agent owns) rather than against an HLD component the spike itself owns - spikes do not own HLD components, so this signal is interpreted by analogy rather than by the clean match every implementation story has. Flagged as marginal (barely above the 0.75 threshold) rather than asserted with the same confidence as an implementation-story score."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.45, "hld_component_ownership": 0.35, "tech_stack_fit": 1.00},
+          "score": 0.5425,
+          "above_threshold": false,
+          "evidence": "python-core covers dependency/lockfile mechanics and the Python 3.12+ runtime constraint (NFR-001), but carries no vector-database-core, so it cannot itself assess Qdrant client/server breaking changes - mirrors this agent's below-threshold showing on DASH-STORY-007 (0.680)."
+        }
+      ]
     }
   ],
   "index_level_findings": [
     {
       "id": "AR0-F1",
       "severity": "INFO",
-      "finding": "Every one of the 10 stories has at least one candidate at or above the 0.75 threshold. No story required a force-assignment or a below-threshold fallback."
+      "finding": "10 of the 11 stories have at least one candidate at or above the 0.75 threshold; no story required a force-assignment or a below-threshold fallback. DASH-STORY-011 (spike) has exactly one above-threshold candidate (ai-engineer, 0.765, marginal) - see AR0-F4."
     },
     {
       "id": "AR0-F2",
       "severity": "WARNING",
-      "finding": "python-backend-engineer is the top-scoring candidate on 7 of 10 stories (001, 002, 004, 006, 008, 009, 010). This is a single-point-of-failure and a serialization bottleneck in the Sprint 1 execution graph, not a scoring error: the HLD locks one Python 3.12 codebase, so concentration is the honest result. Mitigation belongs in AR.2 execution grouping, not in AR.1 reassignment."
+      "finding": "python-backend-engineer is the top-scoring candidate on 7 of 11 stories (001, 002, 004, 006, 008, 009, 010). This is a single-point-of-failure and a serialization bottleneck in the Sprint 1 execution graph, not a scoring error: the HLD locks one Python 3.12 codebase, so concentration is the honest result. Mitigation belongs in AR.2 execution grouping, not in AR.1 reassignment."
+    },
+    {
+      "id": "AR0-F4",
+      "severity": "WARNING",
+      "finding": "DASH-STORY-011 (spike) was absent from this index at initial authoring (2026-09-17) despite being present in backlog_draft.json's sprint_1_stories since the same date - added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit. Its sole above-threshold candidate (ai-engineer, 0.765) is a marginal score derived by analogy (see the story's own candidate evidence), not a clean HLD-component match like the other 10 stories - single-agent risk on this candidate is real and disclosed, not hidden."
     },
     {
       "id": "AR0-F3",

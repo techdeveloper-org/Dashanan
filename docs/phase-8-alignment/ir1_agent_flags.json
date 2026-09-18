@@ -14,7 +14,8 @@
         "DASH-STORY-007": "CLEAR_CONDITIONAL",
         "DASH-STORY-008": "CLEAR",
         "DASH-STORY-009": "CLEAR",
-        "DASH-STORY-010": "CLEAR"
+        "DASH-STORY-010": "CLEAR",
+        "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
       },
       "flags_raised": [
         {
@@ -34,7 +35,7 @@
         "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
         "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
         "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
-        "DASH-STORY-010": "CLEAR"
+        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
       },
       "flags_raised": [],
       "note": "No DEPENDENCY_CONFLICT found across any story; build-order groups (1->2->3->4->5) match sprint_plan.json's corrected dependency_graph; no prompt's TASK/must-not-deviate exceeds its story's AC set or locked FR; all 4 P1 gates confirmed maker_checker:true with a distinct reviewer of record."
@@ -46,7 +47,8 @@
         "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
         "DASH-STORY-007": "DESIGN_MISMATCH",
         "DASH-STORY-008": "MISSING_CONSTRAINT",
-        "DASH-STORY-009": "CLEAR", "DASH-STORY-010": "CLEAR"
+        "DASH-STORY-009": "CLEAR", "DASH-STORY-010": "CLEAR",
+        "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
       },
       "flags_raised": [
         {
@@ -72,12 +74,13 @@
         "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
         "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
         "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
-        "DASH-STORY-010": "CLEAR"
+        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
       },
       "flags_raised": [],
       "note": "All 10 stories' dev/qa/review prompt trios genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns."
     }
   },
   "total_flags_raised": 4,
-  "flags_list": ["DASH-STORY-003 (BA, ARCHITECTURE_GAP)", "DASH-STORY-007 (SA, DESIGN_MISMATCH)", "DASH-STORY-001 (SA, COVERAGE_GAP)", "DASH-STORY-008 (SA, MISSING_CONSTRAINT)"]
+  "flags_list": ["DASH-STORY-003 (BA, ARCHITECTURE_GAP)", "DASH-STORY-007 (SA, DESIGN_MISMATCH)", "DASH-STORY-001 (SA, COVERAGE_GAP)", "DASH-STORY-008 (SA, MISSING_CONSTRAINT)"],
+  "scope_gap_note": "DASH-STORY-011 (Jira DSHN-53) was absent from implementation_execution_plan.json at the time of the original IR.1 dispatch (2026-09-17) and so was never reviewed by any of the 4 agents above. Its verdict_per_story entries are placeholders recording the gap, not review findings. A genuine IR.1 pass covering DASH-STORY-011's dev_prompt is outstanding before it can be marked CLEAR. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit; total_flags_raised/flags_list intentionally unchanged -- a never-reviewed story is not the same as a reviewed story with zero flags."
 }

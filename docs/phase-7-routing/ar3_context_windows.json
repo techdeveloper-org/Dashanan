@@ -195,13 +195,28 @@
       ],
       "pii_exclusion_applied": true,
       "pii_note": "Wiring touches a mutation SIGNAL (Frequency-on-access, ProvenanceConfidence-on-conflict, Importance-on-override), not zone payload content. Context window includes only the three named hook points and the O(log N) re-insert contract; no Zone 2 content, conflict text, or override rationale text is admitted as example material."
+    },
+    {
+      "story_id": "DASH-STORY-011",
+      "title": "SPIKE: Qdrant client library version/compatibility pinning validation",
+      "assigned_agent": "ai-engineer",
+      "context_budget_tokens": 3500,
+      "sources": [
+        "backlog_draft.json_DASH-STORY-011_invest_and_spike_exit_criteria",
+        "HLD_ADR-007_QdrantVendorLock_NotReopened",
+        "SRS_FR-006",
+        "AR1-011_must_not_deviate_list",
+        "cross_reference_DASH-STORY-007_consumer_of_recommendation"
+      ],
+      "pii_exclusion_applied": false,
+      "pii_note": "Pure client-library/version research and documentation; no zone payload, no PII, no code path is touched. Nothing to redact. Budget is smaller than any other Sprint 1 entry (3500 vs. a 5000 floor) because this story's real source list is genuinely thinner - no HLD Section 3/5/6 pattern content, no AC list beyond spike exit criteria - not a measured value like the other entries, a judgment call scoped to what this spike actually needs. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit."
     }
   ],
   "summary": {
-    "stories_total": 10,
-    "total_context_budget_tokens": 55500,
+    "stories_total": 11,
+    "total_context_budget_tokens": 59000,
     "stories_with_pii_exclusion_applied": 8,
-    "stories_without_pii_exclusion_trigger": ["DASH-STORY-001", "DASH-STORY-002"],
+    "stories_without_pii_exclusion_trigger": ["DASH-STORY-001", "DASH-STORY-002", "DASH-STORY-011"],
     "zone_5_stories_in_sprint_1": 0,
     "strictest_redaction": "DASH-STORY-003 (direct Zone 2 owner) and DASH-STORY-007 (indexes Zone 2 content into embeddings) carry the strictest redaction discipline - both exclude raw/realistic PII text even from illustrative examples, substituting pseudonymized item_id placeholders.",
     "note_on_security_clearance": "No Sprint 1 story is security-cleared for raw PII. Where a P1 reviewer (security-defense-architect, api-security-auditor) needs deeper access for its own review, that access is scoped to the reviewer's separate review context, not to the implementing agent's context window documented here."

@@ -5,14 +5,14 @@
 
 **Document ID:** HLD-20260917-01
 **Version:** 1.0.0
-**Status:** DRAFT — PENDING CONSENSUS GATE
+**Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, 2026-09-17); narrower-scope re-confirmation (story-patch verification across the 10 Sprint-1 stories), not a standalone Phase 1 architecture re-review
 **Created:** 2026-09-17
 **Entry Mode:** Greenfield (Mode A) — verified: `Dashanan/` contained only `README.md` + `docs/` (no prior architecture artifacts, no source tree)
 **Source PRD:** `docs/phase-0-output/PRD.md` (PRD-20260917-01 v1.0.0)
 **Locked inputs:** `docs/orchestration/01-vision-and-prd.md` (8-zone taxonomy, Memory Score formula, rotation state machine, Zone 3/5 ownership ADR)
 **Supporting inputs:** `docs/phase-0-output/research-brief.md`, `landscape-scan.md`, `product-strategy-and-prioritization.md`
 **India Regulatory Applicable:** YES (DPDP Act 2023 — NFR-006; CERT-In log retention)
-**Consensus Gate:** PENDING
+**Consensus Gate:** APPROVED — ratified via Phase 8 IR.5 (`ir5_alignment_verdict.json`), see Status line above for the scope caveat
 
 ---
 

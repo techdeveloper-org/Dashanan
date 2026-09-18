@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashanan.internal/schemas/backlog-draft.schema.json",
+  "title": "docs/phase-6-sprint-planning/backlog_draft.json -- real on-disk artifact shape",
+  "description": "Validates the REAL backlog_draft.json artifact scrum-master-agent actually writes to disk, as distinct from srs-to-backlog.schema.json, which describes the abstract Phase 5 -> scrum-master-agent HANDOFF CONTRACT payload prose (from/to/input/output envelope) documented in docs/orchestration/02-architecture-workflow.md -- that envelope is never itself instantiated as a file; this schema is. See srs-to-backlog.schema.json's own description for the reverse cross-reference. traces_to_fr validates structural presence of an FR reference (pattern match), not that the referenced FR exists in SRS.md; full FR-coverage completeness and circular depends_on detection are checked by the companion script docs/orchestration/schemas/validate_handoff.py, not this schema.",
+  "type": "object",
+  "required": ["document_id", "version", "author", "phase", "date", "sprint_1_stories", "dependency_graph"],
+  "$defs": {
+    "story": {
+      "type": "object",
+      "required": ["story_id", "title", "traces_to_fr", "invest", "persona", "story_points", "sub_tasks", "sub_task_sp_sum", "depends_on"],
+      "properties": {
+        "story_id": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" },
+        "title": { "type": "string" },
+        "type": { "const": "spike" },
+        "traces_to_fr": { "type": "string", "pattern": "^FR-[0-9]{3}$" },
+        "invest": {
+          "type": "object",
+          "required": ["independent", "negotiable", "valuable", "estimable", "small", "testable"],
+          "properties": {
+            "independent": { "type": "string", "minLength": 10 },
+            "negotiable": { "type": "string", "minLength": 10 },
+            "valuable": { "type": "string", "minLength": 10 },
+            "estimable": { "type": "string", "minLength": 10 },
+            "small": { "type": "string", "minLength": 10 },
+            "testable": { "type": "string", "minLength": 10 }
+          }
+        },
+        "persona": { "type": "string" },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["ac_id", "text"],
+            "properties": {
+              "ac_id": { "type": "string" },
+              "text": { "type": "string", "minLength": 20 },
+              "source": { "type": "string" }
+            }
+          }
+        },
+        "spike_exit_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 20 }
+        },
+        "story_points": { "type": "integer", "minimum": 1 },
+        "sub_tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["type", "story_points", "description"],
+            "properties": {
+              "type": { "enum": ["Dev", "QA", "Review"] },
+              "story_points": { "type": "integer", "minimum": 1 },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "sub_task_sp_sum": { "type": "integer", "minimum": 1 },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" }
+        }
+      },
+      "if": { "properties": { "type": { "const": "spike" } }, "required": ["type"] },
+      "then": { "required": ["spike_exit_criteria"] },
+      "else": { "required": ["acceptance_criteria"] }
+    }
+  },
+  "properties": {
+    "document_id": { "type": "string" },
+    "version": { "type": "string" },
+    "author": { "type": "string" },
+    "phase": { "type": "string" },
+    "date": { "type": "string" },
+    "source_of_truth": { "type": "object" },
+    "estimation_method": { "type": "string" },
+    "sprint_1_stories": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/story" }
+    },
+    "future_sprints_backlog": {
+      "type": "object",
+      "description": "NOT an array of INVEST stories -- the real shape is {note, remaining_frs[]}, FR-level candidates not yet decomposed into stories.",
+      "properties": {
+        "note": { "type": "string" },
+        "remaining_frs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fr_id", "title"],
+            "properties": {
+              "fr_id": { "type": "string", "pattern": "^FR-[0-9]{3}$" },
+              "title": { "type": "string" },
+              "wsjf_rank": { "type": "integer" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "dependency_graph": {
+      "type": "object",
+      "description": "Keyed by story_id -> array of prerequisite story_ids, plus one trailing free-text key (promotion_reason) explaining the graph's root-dependency choices -- a real, deliberate mixed-purpose object, not a schema error.",
+      "patternProperties": {
+        "^DASH-STORY-[0-9]{3}$": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" }
+        }
+      },
+      "properties": {
+        "promotion_reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
