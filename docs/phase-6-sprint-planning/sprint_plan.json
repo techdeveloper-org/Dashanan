@@ -19,9 +19,10 @@
       "DASH-STORY-007",
       "DASH-STORY-008",
       "DASH-STORY-009",
-      "DASH-STORY-010"
+      "DASH-STORY-010",
+      "DASH-STORY-011"
     ],
-    "total_story_points": 55,
+    "total_story_points": 58,
     "story_point_breakdown": {
       "DASH-STORY-001": 8,
       "DASH-STORY-002": 5,
@@ -32,7 +33,8 @@
       "DASH-STORY-007": 8,
       "DASH-STORY-008": 8,
       "DASH-STORY-009": 5,
-      "DASH-STORY-010": 3
+      "DASH-STORY-010": 3,
+      "DASH-STORY-011": 3
     },
     "fr_to_story_map": {
       "FR-009": ["DASH-STORY-001"],
@@ -48,7 +50,7 @@
     "note": "See backlog_draft.json dependency_graph for the full per-story adjacency list and promotion_reason. Build order corrected per SP.0.5 SA review: DASH-STORY-007 now roots at DASH-STORY-003 (not 002); DASH-STORY-004 now also depends on DASH-STORY-008, moving it from group 4 to group 5.",
     "root_stories": ["DASH-STORY-001"],
     "build_order_groups": [
-      { "group": 1, "stories": ["DASH-STORY-001"] },
+      { "group": 1, "stories": ["DASH-STORY-001", "DASH-STORY-011"] },
       { "group": 2, "stories": ["DASH-STORY-002", "DASH-STORY-003"] },
       { "group": 3, "stories": ["DASH-STORY-005", "DASH-STORY-007"] },
       { "group": 4, "stories": ["DASH-STORY-006", "DASH-STORY-008"] },
@@ -82,6 +84,7 @@
   "promotion_reason": null,
   "notes": [
     "Corrected WSJF ranking (pm-wsjf-revalidation.md) produced an exact match to the locked Sprint 1 scope with no promotion needed - ranks 1-7 are precisely {FR-001, FR-010, FR-002, FR-009, FR-007, FR-006, FR-012}, so dependency_graph.promotion_reason in backlog_draft.json documents only the structural build-order dependency (Zone 1 as root), not a WSJF-driven scope change.",
-    "HLD Section 12F's two flagged gaps (Importance default-to-0.5, and archive-has-no-destination) are both carried into this sprint plan as explicit stories/risk flags rather than silently absorbed, per the mandate not to ignore the Zone 8/OAQ-4 dependency."
+    "HLD Section 12F's two flagged gaps (Importance default-to-0.5, and archive-has-no-destination) are both carried into this sprint plan as explicit stories/risk flags rather than silently absorbed, per the mandate not to ignore the Zone 8/OAQ-4 dependency.",
+    "DASH-STORY-011 (SPIKE: Qdrant client library version/compatibility pinning validation, 3 SP) added 2026-09-18 to sync this file with backlog_draft.json's sprint_1_stories, which already carried it from the prior gap-closure round (issue #5) but was never propagated here. It is a timeboxed spike de-risking DASH-STORY-007's dependency on the Qdrant client, not a story delivering FR-006 itself, and has no depends_on edges so it sits in build-order group 1 alongside the Orchestrator facade."
   ]
 }

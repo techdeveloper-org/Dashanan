@@ -18,11 +18,11 @@
     "state": "future",
     "board_id": 100,
     "goal": "Prove Dashanan's core memory loop end to end - orchestrated write/read through Working and Episodic Memory, hybrid retrieval, provenance-gated writes, and Memory-Score-driven Active->Compressed rotation.",
-    "story_count": 10,
-    "total_story_points": 55,
+    "story_count": 11,
+    "total_story_points": 58,
     "stories_in_sprint": [
       "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
-      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22"
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-53"
     ]
   },
   "created_issues": {
@@ -32,7 +32,7 @@
     ],
     "stories": [
       "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
-      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22"
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-53"
     ],
     "sub_tasks": [
       "DSHN-23", "DSHN-24", "DSHN-25", "DSHN-26", "DSHN-27", "DSHN-28",
@@ -41,7 +41,8 @@
       "DSHN-41", "DSHN-42", "DSHN-43", "DSHN-44", "DSHN-45", "DSHN-46",
       "DSHN-47", "DSHN-48", "DSHN-49", "DSHN-50", "DSHN-51", "DSHN-52"
     ],
-    "total_issue_count": 52
+    "total_issue_count": 53,
+    "_note_dshn_53": "DSHN-53 (DASH-STORY-011, Qdrant client compatibility spike, 3 SP) added 2026-09-18 to sync this file with backlog_draft.json's sprint_1_stories from issue #5. It is scoped as a single Dev sub-task in backlog_draft.json (no separate QA/Review split, per spike convention), so it has no entries of its own in story_to_subtask_map or the sub_tasks list above."
   },
   "story_to_subtask_map": {
     "_note": "Sub-task 'sp' values below are documentation-only (planned effort split for internal tracking). As of the 2026-09-17 Phase 6 gate fix, sub-tasks no longer carry an independent Jira story-points field value (cleared to 0/customfield_10016) so they do not double-count into the sprint's story_points_total alongside their parent story. DSHN-16 and DSHN-22 splits were also rebalanced here (dev1/qa1/review1=3) to match their 3-SP parent; live Jira descriptions/labels on DSHN-32/33/34 and DSHN-50/51/52 were already blank, so no live-issue text needed correction.",
@@ -88,7 +89,8 @@
     "FR-006": {
       "epic_key": "DSHN-6",
       "story_keys": ["DSHN-19"],
-      "sprint_1_coverage": true
+      "sprint_1_coverage": true,
+      "note": "DSHN-53 (DASH-STORY-011 spike) de-risks this FR's Qdrant client-library dependency ahead of DSHN-19's Dev sub-task; it is not listed in story_keys because it does not itself deliver FR-006."
     },
     "FR-007": {
       "epic_key": "DSHN-7",
