@@ -1,0 +1,39 @@
+{
+  "from": "solution-architect",
+  "to": "context-engineering-agent",
+  "context_budget_tokens": 10000,
+  "input": {
+    "approved_hld_ref": "docs/phase-1-architecture/HLD.md@HLD-20260917-01",
+    "component_diagram_zones": [
+      "Working Memory",
+      "Episodic Memory",
+      "Semantic Memory",
+      "Procedural Memory",
+      "Entity Memory",
+      "Retrieval-Index Memory",
+      "Provenance/Audit Memory",
+      "Consolidation Memory"
+    ],
+    "adrs": ["ADR-004", "ADR-005", "ADR-013"],
+    "capacity_estimation": {
+      "tenants": 500,
+      "items_per_tenant_p95": 250000
+    }
+  },
+  "output": {
+    "context_delivery_plan": {
+      "python-backend-engineer": {
+        "agent_name": "python-backend-engineer",
+        "context_budget_tokens": 5000,
+        "sources": ["hld-api-delta"]
+      },
+      "scrum-master-agent": {
+        "agent_name": "scrum-master-agent",
+        "context_budget_tokens": 8000,
+        "sources": ["srs-fr-delta", "uml-component-delta"]
+      }
+    }
+  },
+  "assumes": "HLD is final for this iteration (no further architecture changes mid-Phase-1.5)",
+  "must_not": "re-derive zone boundaries -- those are solution-architect's decision, not context-engineering-agent's"
+}

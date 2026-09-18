@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/srs-to-backlog.schema.json",
   "title": "Phase 5 (SRS.md + UML) -> scrum-master-agent (Phase 6) handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 3.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 3. traces_to_fr validates structural presence of an FR reference (pattern match), not that the referenced FR exists in SRS.md -- referential integrity across documents is out of scope for this schema.",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -21,17 +21,72 @@
           "type": "array",
           "minItems": 7,
           "maxItems": 7,
-          "items": { "type": "string" }
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "Context Diagram",
+              "Component Diagram",
+              "Sequence Diagram",
+              "Deployment Diagram",
+              "Data Flow Diagram",
+              "State Diagram",
+              "Class Diagram"
+            ]
+          },
+          "description": "The 7 essential diagrams per docs/orchestration/02-architecture-workflow.md's Phase 5 diagram scope note"
         }
       }
     },
     "output": {
       "type": "object",
-      "required": ["backlog_draft"],
+      "required": ["backlog_draft", "stories"],
       "properties": {
         "backlog_draft": {
           "type": "string",
           "const": "docs/phase-6-sprint-planning/backlog_draft.json"
+        },
+        "stories": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Mirrors backlog_draft.json's sprint_1_stories[] shape; named generically as 'stories' (not 'sprint_1_stories') since this schema covers every sprint, not just Sprint 1 -- the field name intentionally does not match the real file's sprint-numbered key.",
+          "items": {
+            "type": "object",
+            "required": ["story_id", "traces_to_fr", "story_points", "acceptance_criteria"],
+            "properties": {
+              "story_id": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" },
+              "traces_to_fr": { "type": "string", "pattern": "^FR-[0-9]{3}$" },
+              "story_points": { "type": "integer", "minimum": 1 },
+              "acceptance_criteria": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["ac_id", "text"],
+                  "properties": {
+                    "ac_id": { "type": "string" },
+                    "text": { "type": "string" },
+                    "source": { "type": "string" }
+                  }
+                }
+              },
+              "invest": {
+                "type": "object",
+                "properties": {
+                  "independent": { "type": "string" },
+                  "negotiable": { "type": "string" },
+                  "valuable": { "type": "string" },
+                  "estimable": { "type": "string" },
+                  "small": { "type": "string" },
+                  "testable": { "type": "string" }
+                }
+              },
+              "depends_on": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^DASH-STORY-[0-9]{3}$" }
+              }
+            }
+          }
         }
       }
     },

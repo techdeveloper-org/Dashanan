@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/hld-to-api-spec.schema.json",
   "title": "solution-architect -> python-backend-engineer / api-testing-engineer handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 2.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 2. fr_refs/FR-pattern fields validate structural presence of an FR reference, not that the referenced FR exists in SRS.md -- referential integrity across documents is out of scope for this schema.",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -18,20 +18,64 @@
       "required": ["hld_interface_contracts", "data_ownership_map"],
       "properties": {
         "hld_interface_contracts": {
-          "type": "string",
-          "description": "Per-zone read/write API definitions from the approved HLD"
+          "type": "object",
+          "description": "Per-zone read/write API definitions from the approved HLD, mirroring HLD.md Section 7's per-endpoint table (Endpoint, Method, Purpose, Auth scope).",
+          "required": ["endpoints"],
+          "properties": {
+            "endpoints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["path", "method", "purpose"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "method": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
+                  "purpose": { "type": "string" },
+                  "auth_scope": { "type": "string" }
+                }
+              }
+            },
+            "events": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
         },
         "data_ownership_map": { "type": "string" }
       }
     },
     "output": {
       "type": "object",
-      "required": ["openapi_spec", "error_catalog", "pagination_contracts"],
+      "required": ["openapi_spec", "openapi_version", "endpoints", "error_catalog", "pagination_contracts"],
       "properties": {
         "openapi_spec": {
           "type": "string",
           "const": "docs/phase-1.5-api/openapi.yaml",
           "description": "Must declare openapi: 3.1.0"
+        },
+        "openapi_version": {
+          "const": "3.1.0",
+          "description": "Structured assertion mirroring the openapi_spec file's declared version -- a JSON Schema validating this handoff payload cannot inspect the referenced YAML file's content directly, so the payload must carry this fact explicitly."
+        },
+        "endpoints": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Every operation emitted into openapi_spec, each carrying at least one FR reference -- mirrors how the real openapi.yaml tags every operation/tag with FR-NNN in its description/tags block.",
+          "items": {
+            "type": "object",
+            "required": ["operation_id", "method", "path", "fr_refs"],
+            "properties": {
+              "operation_id": { "type": "string" },
+              "method": { "enum": ["GET", "POST", "PATCH", "DELETE", "PUT"] },
+              "path": { "type": "string" },
+              "fr_refs": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "pattern": "^FR-[0-9]{3}$" }
+              }
+            }
+          }
         },
         "error_catalog": { "type": "string", "const": "error_catalog.json" },
         "pagination_contracts": { "type": "string", "const": "pagination_contracts.json" }

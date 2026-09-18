@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dashanan.internal/schemas/hld-to-context-delivery-plan.schema.json",
   "title": "solution-architect -> context-engineering-agent handoff",
-  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 1.",
+  "description": "Encodes the INPUT/OUTPUT contract in docs/orchestration/02-architecture-workflow.md, section 'INTERFACE CONTRACTS', block 1. The component_diagram_zones enum validates structural presence of a canonical zone name, not that the plan's sources are actually sufficient for that zone -- referential/semantic sufficiency across documents is out of scope for this schema.",
   "type": "object",
   "required": ["from", "to", "input", "output", "assumes", "must_not"],
   "properties": {
@@ -18,8 +18,21 @@
           "type": "array",
           "minItems": 8,
           "maxItems": 8,
-          "items": { "type": "string" },
-          "description": "The 8-zone component diagram; count is fixed per the HLD's locked shape"
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "Working Memory",
+              "Episodic Memory",
+              "Semantic Memory",
+              "Procedural Memory",
+              "Entity Memory",
+              "Retrieval-Index Memory",
+              "Provenance/Audit Memory",
+              "Consolidation Memory"
+            ]
+          },
+          "description": "The 8-zone component diagram; count and canonical zone names are fixed per the HLD's locked shape (docs/orchestration/01-vision-and-prd.md 8-zone taxonomy table)"
         },
         "adrs": { "type": "array", "items": { "type": "string" } },
         "capacity_estimation": { "type": "object" }
@@ -37,8 +50,17 @@
             "required": ["agent_name", "context_budget_tokens", "sources"],
             "properties": {
               "agent_name": { "type": "string" },
-              "context_budget_tokens": { "type": "integer", "minimum": 0 },
-              "sources": { "type": "array", "items": { "type": "string" } }
+              "context_budget_tokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64000,
+                "description": "64,000 is reused as a sanity ceiling from docs/orchestration/02-architecture-workflow.md's STEP 4.5 thinking-budget table (its highest defined tier, EXCELLENCE); the repo does not define a dedicated context-delivery-budget ceiling, so this is a deliberate cross-concept proxy, not a domain-precise bound."
+              },
+              "sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string" }
+              }
             }
           }
         }

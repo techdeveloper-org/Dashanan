@@ -1,0 +1,58 @@
+{
+  "from": "Phase 5 (SRS.md + UML)",
+  "to": "scrum-master-agent",
+  "context_budget_tokens": 8000,
+  "input": {
+    "srs_fr_list": ["FR-001", "FR-002", "FR-009"],
+    "uml_diagrams": [
+      "Context Diagram",
+      "Component Diagram",
+      "Sequence Diagram",
+      "Deployment Diagram",
+      "Data Flow Diagram",
+      "State Diagram",
+      "Class Diagram"
+    ]
+  },
+  "output": {
+    "backlog_draft": "docs/phase-6-sprint-planning/backlog_draft.json",
+    "stories": [
+      {
+        "story_id": "DASH-STORY-001",
+        "traces_to_fr": "FR-009",
+        "story_points": 8,
+        "acceptance_criteria": [
+          {
+            "ac_id": "AC-009",
+            "text": "Given a host calls the unified context-assembly API, When the request does not name any individual zone, Then the Orchestrator resolves and returns assembled context sourced from the correct zones without the host needing zone-level knowledge.",
+            "source": "SRS AC-009"
+          }
+        ],
+        "invest": {
+          "independent": "Delivers the routing facade as its own deployable surface.",
+          "negotiable": "Concrete routing algorithm is an implementation choice.",
+          "valuable": "Gives the host the single unified integration API.",
+          "estimable": "Facade pattern and API surface fully specified in HLD Section 3.1.",
+          "small": "Scoped to routing + API surface only.",
+          "testable": "AC-009 gives a concrete Given-When-Then."
+        },
+        "depends_on": []
+      },
+      {
+        "story_id": "DASH-STORY-002",
+        "traces_to_fr": "FR-001",
+        "story_points": 5,
+        "acceptance_criteria": [
+          {
+            "ac_id": "AC-001",
+            "text": "Given a host session writes to Working Memory, When the item's TTL expires without promotion, Then the item is evicted from Zone 1 without requiring an explicit delete call.",
+            "source": "SRS AC-001"
+          }
+        ],
+        "depends_on": ["DASH-STORY-001"]
+      }
+    ]
+  },
+  "assumes": "every FR in SRS.md is implementable within the approved HLD",
+  "must_not": "introduce stories with no FR traceability"
+}
