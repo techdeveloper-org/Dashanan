@@ -258,7 +258,7 @@ Worked example, the locked spec's own: `"Sachin lives in Mumbai"` -> subjects={S
 
 **Owned entities:** `Procedure(tenant_id, procedure_id, task_signature_hash, steps[], success_count, failure_count, last_used_at, state, score_terms)`.
 
-**Access pattern:** O(1) point lookup by `task_signature_hash`; secondary similarity search via Zone 6. `success_count/(success_count+failure_count)` feeds the `Importance` term for this zone (the PRD's "system-inferred from task-completion outcomes" clause made concrete — see OAQ-12).
+**Access pattern:** O(1) point lookup by `task_signature_hash`; secondary similarity search via Zone 6. `success_count/(success_count+failure_count)` feeds the `Importance` term for this zone (the PRD's "system-inferred from task-completion outcomes" clause made concrete — see §12G for the full per-term Importance normalization; this ratio is naturally bounded to `[0,1]` and needs no further clamping).
 
 ### 3.6 Zone 5 — Entity Memory (FR-005)
 
@@ -1239,7 +1239,7 @@ The write request carries the mandatory FR-010 provenance block: `{ source_type,
 |---|---|---|
 | `/v1/zones` | GET | All eight zones: health, item count, capacity utilization, adapter binding, last sweep. |
 | `/v1/zones/{zone}` | GET | Zone detail + rotation statistics. |
-| `/v1/zones/{zone}/config` | GET / PUT | `lambda_zone`, thresholds, capacity cap, max age, TTL, adapter binding (NFR-009). |
+| `/v1/zones/{zone}/config` | GET / PUT | `lambda_zone`, thresholds, capacity cap, max age, TTL, adapter binding, `frequency_cap` (NFR-009; `frequency_cap` per §12G). |
 | `/v1/zones/{zone}/sweep` | POST | Force a rotation sweep. 202 + `job_id`. |
 | `/v1/zones/{zone}/items` | GET | Cursor-paginated admin browse. |
 | `/v1/zones/{zone}/reindex` | POST | Rebuild this zone's Zone 6 projection. 202 + `job_id`. |
@@ -1403,7 +1403,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 
 ## Section 11 — Open Architectural Questions
 
-Eighteen items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract. Items marked **Proposed** without that tag are new decisions this HLD introduces in its own later sections (not Phase 0 gaps) and still need consensus-gate sign-off.
+Twenty items for the consensus gate. Items marked **[DERIVED FINDING]** are defects or gaps this HLD's own analysis surfaced in the locked Phase 0 shape — they are flagged rather than silently patched, per the Phase 1 contract. Items marked **Proposed** without that tag are new decisions this HLD introduces in its own later sections (not Phase 0 gaps) and still need consensus-gate sign-off.
 
 | # | Item | Decision taken here | Why it needs review |
 |---|---|---|---|
@@ -1425,6 +1425,8 @@ Eighteen items for the consensus gate. Items marked **[DERIVED FINDING]** are de
 | OAQ-16 | **8-zone taxonomy: NO revision proposed.** One structural observation. | Taxonomy holds | The taxonomy survives contact with the architecture. **Observation, not a revision request:** Zones 6 and 7 are categorically different from Zones 1-5 and 8 — they are *derived, cross-cutting layers* over the other six, not independent memory stores. Consequences already reflected here: they have no independent `lambda_zone`, Zone 6 needs no independent durability, and neither participates in the `Active -> Compressed -> Archived` lifecycle as a *source*. The count stays 8; the HLD models them as a distinct tier. |
 | OAQ-17 | **Proposed:** promotion-before-eviction ordering invariant (ADR-016) | Proposed, needs approval | Tightens ADR-002/ADR-005 by resolving the one race they leave open (an item's promotion and its Zone 1 eviction both pending at once). Not a Phase 0 gap — it is a gap in this HLD's own later sections, surfaced by external review of the read-your-own-writes contract (new §7.7). Needs architect sign-off that the rotation-worker ordering constraint is the right mechanism versus an alternative (e.g. a grace period on eviction). |
 | OAQ-18 | **Proposed:** regulated-identifier detection at the write gate (ADR-017) | Proposed, needs approval | Narrows ADR-014's log-tier-only PII filter to also cover a small, explicit class of regulated structured identifiers in persisted/indexed content — deliberately not general redaction (see ADR-017 Why §3 and its interaction with DPDP-1/DPDP-2). Needs: (a) legal/compliance confirmation of the exact identifier set per deployment jurisdiction, (b) a decision on the detector-unavailable fail-open vs. fail-closed posture, deferred to Phase 1.5 per ADR-017's Consequences. |
+| OAQ-19 | **Proposed:** UserAffinity session-aggregation method + cosine-mapping validity (§12G) | Proposed, needs approval | UserAffinity and TaskRelevance both had no formula anywhere in this HLD before §12G. Needs sign-off on: (a) `mean(last N=5 same-user prior sessions)` as the aggregation method versus an alternative (e.g. max, exponentially-weighted), (b) whether `N=5` is right, (c) whether `(cosine+1)/2` is the correct `[0,1]` mapping for every ADR-015 embedding adapter or needs to be adapter-specific — no guarantee of non-negative cosine exists anywhere in this HLD. |
+| OAQ-20 | **Proposed:** Frequency `f_cap` per-zone default values (§12G) | Proposed, needs approval | The Frequency log-saturation formula (`log(1+access_count)/log(1+f_cap)`) is new in §12G; the per-zone `f_cap` values themselves are a tuning question analogous to §12A's threshold-tuning exercise and are not set here. Needs a Phase 6 (Sprint Planning) or Phase 1.5 pass with representative access-count distributions per zone before defaults are locked. |
 
 ---
 
@@ -1682,6 +1684,48 @@ Sprint 1 is locked as Zones 1, 2, 6, 7 + FR-009 (orchestrator) + FR-010 + FR-012
 2. **`archive` has no destination in Sprint 1.** Zone 8 (Consolidation) is out of scope, so the `Compressed -> Archived` transition has nowhere to go. **Recommendation: Sprint 1 implements `Active -> Compressed` fully and stops there**, with archival deferred to the sprint that delivers Zone 8. Items dwell in `Compressed` indefinitely, bounded by the Zone 2 capacity cap (OAQ-4) — which means **OAQ-4 is not optional for Sprint 1; it is the only thing preventing unbounded growth in a sprint with no archival destination.** That elevates OAQ-4 from a nice-to-have to a Sprint 1 dependency.
 
 Otherwise the Sprint 1 slice is architecturally coherent: it proves orchestration, scoring, hybrid retrieval and provenance end to end — exactly the claim the product strategy says Sprint 1 must prove.
+
+### 12G — MemoryScore Term Normalization (Implementation Contract)
+
+FR-012 and §12A already require every term to be normalized to `[0,1]`. Only Recency has ever had an explicit bounding function (§12C: `exp(-lambda*dt)`). This subsection is the single place an implementer reads all six — it does not change Recency, Zone 4's existing Importance ratio, or ProvenanceConfidence's base-value table; it only supplies the formulas that were missing and clamps the one that could drift outside range.
+
+`clamp01(x) = max(0, min(1, x))` — defined once here, used by every term below that needs it.
+
+**Recency** (unchanged, restated for completeness): `Recency = exp(-lambda_zone * dt)`, `lambda_zone = ln(2)/t_half` per §12A's per-zone table. See §12C for the full derivation.
+
+**Frequency:**
+```
+Frequency = min(1, log(1 + access_count) / log(1 + f_cap))
+```
+`access_count` increments on every read-triggered access (ADR-012) and every write. It is **not** reset on promotion — it carries across zones, since Frequency is part of what makes an already-promoted item eligible to promote further (e.g. Episodic -> Semantic/Entity). `f_cap` is a new per-zone configurable saturation cap, exposed on the existing `/v1/zones/{zone}/config` surface (§7.3) alongside `lambda_zone`. Default values are a Sprint 1 tuning question — see OAQ-20.
+
+**Importance:**
+- Zone 4 (Procedural): unchanged, `success_count/(success_count+failure_count)` (§3.5) — already naturally bounded, no clamp needed.
+- All other zones (Sprint 1 ships explicit-tag-only per §12F above): a fixed tag -> value mapping,
+  ```
+  critical = 1.0, high = 0.8, medium = 0.5, low = 0.2
+  ```
+  Default tag is `medium` (0.5), matching §12F's existing "defaulting to 0.5" recommendation. An inferred-salience-model source (deferred past Sprint 1 per §12F) would replace the tag lookup with a model output already trained/calibrated to emit `[0,1]` directly — no additional normalization step needed when that lands.
+
+**UserAffinity:**
+```
+UserAffinity = clamp01( (cosine(session_embedding, mean(last N=5 same-user prior session embeddings, tenant-scoped)) + 1) / 2 )
+```
+Default `0.5` on cold start (no prior sessions for this user in this tenant). Intra-tenant only, per ADR-013 — never the isolation mechanism. **This is a new design decision, not previously specified anywhere in this HLD; flagged as OAQ-19** (session-aggregation method, `N=5`, and the `(cosine+1)/2` mapping's validity across ADR-015's pluggable embedding adapters all need consensus-gate sign-off before being locked).
+
+**TaskRelevance:**
+```
+TaskRelevance = clamp01( (cosine(item_embedding, query_embedding) + 1) / 2 )
+```
+This is the formula OAQ-5 named as "raw normalized cosine" (as distinct from the RRF fused ranking score, ADR-008) but never wrote out. **Stated as the conservative default for an embedding space with no guaranteed sign bound, not as a settled fact:** nothing in ADR-015 guarantees any given EmbeddingProvider adapter's cosine range is symmetric around 0 — some models empirically produce mostly non-negative cosine, in which case this mapping would compress the effective range. Per-adapter empirical validation is folded into OAQ-19's scope alongside UserAffinity's identical mapping, since both terms share the same open question.
+
+**ProvenanceConfidence:** unchanged base-by-`source_type` + modifier formula (§3.8), now explicitly wrapped:
+```
+ProvenanceConfidence = clamp01( base(source_type) + modifiers )
+```
+The clamp is new; the base values and modifiers are not. It exists because compounding modifiers (`-0.3` disputed, `-0.2` failed faithfulness check, `x0.9` per compression generation) can drive the unclamped sum outside `[0,1]` over multiple generations or repeated disputes, which §3.8 never explicitly guarded against.
+
+**Global invariant:** `sum(w1..w6) = 1`. Already true by construction at the Sprint 1 default (six weights of `1/6`, §12A), but not previously stated as a validated constraint. `PUT /v1/config/scoring` (§7.3) MUST reject a weight set that does not sum to 1 (within float epsilon) — this is new: prior to this subsection, nothing in the API contract enforced it.
 
 ---
 
