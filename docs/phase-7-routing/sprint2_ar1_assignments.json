@@ -333,6 +333,14 @@
       ],
       "p1_security_review": false,
       "p1_trigger_evaluation": "Considered and NOT triggered under the literal three criteria - see p1_security_override.considered_and_not_triggered above. It does not touch Zone 7, it implements adapter-internal behavior behind the existing frozen ZoneRepository port rather than modifying the port interface, and in-region bucket provisioning is data-residency rather than cross-tenant isolation. Recorded instead as a non-blocking advisory-review routing gap (AR1-S2-G1), the same posture ar1_assignments.json used for DASH-STORY-003's DPDP obligation (AR1-G3) rather than an invented P1 extension.",
+      "advisory_review": {
+        "status": "ACCEPTED by user 2026-09-19 (partial - crypto half only; the india-residency half via cloud-security-architect remains an open recommendation, not yet accepted)",
+        "agent": "crypto-security-specialist",
+        "model": "sonnet",
+        "review_scope": "Adversarially review the per-subject cryptographic key generation/storage/destruction (crypto-shredding) design and the blob-read-path key integration for DASH-STORY-020 against cryptography-core - key material handling, destruction-is-erasure mechanics, no key ever logged/persisted outside its designated store, no in-place blob rewrite substituting for real key destruction (per must_not_deviate). Non-blocking: this is an advisory review, not a P1 Maker-Checker gate (no stated P1 trigger criterion fires per p1_security_override.considered_and_not_triggered), so the story is not held closed on this review's report alone the way DASH-STORY-018 is on its P1 gate.",
+        "maker_checker": false,
+        "does_not_resolve": "OAQ-10's legal question (whether crypto-shredding satisfies DPDP Act 2023 erasure) - explicitly out of scope for an engineering advisory review, stays open regardless of this review's outcome."
+      },
       "mathematical_delegation": null,
       "logging_note": "Cite as AR1-S2-020. Depends on DASH-STORY-018 (same agent, no cross-agent handoff). Lowest implementer score of Sprint 2 - flagged as the sprint's highest single-agent-capability risk in routing_gaps."
     }
@@ -368,7 +376,8 @@
       "story": "DASH-STORY-020",
       "gap": "Single valid implementer (python-backend-engineer, 0.7645 - the most marginal above-threshold score in Sprint 2) for a story whose decisive content is per-subject cryptographic key lifecycle management and India data-residency bucket provisioning. Neither cloud-security-architect (0.4600, right skills - data-security-privacy-core, india-cyber-regulatory-core - but no Edit tool) nor crypto-security-specialist (0.4100, right skills - cryptography-core, india-cyber-regulatory-core - but no Edit tool, explicitly an audit-only agent) clears threshold as an IMPLEMENTER.",
       "why_not_force_assigned": "Neither security-specialist candidate would be a compliant force-assignment (both are below 0.75 AND structurally lack an Edit tool to implement code); assigning python-backend-engineer is not a force-assignment (it clears 0.75), but its marginal score is disclosed rather than presented with false confidence.",
-      "recommended_action": "Accept python-backend-engineer as implementer, and attach a NON-BLOCKING advisory review by crypto-security-specialist (crypto-shredding key-lifecycle correctness against cryptography-core) and cloud-security-architect (India residency/versioned/object-locked bucket provisioning against india-cyber-regulatory-core) before this story is presented as DPDP-compliant. This mirrors AR1-G3's treatment of DASH-STORY-003's DPDP obligation in Sprint 1 - advisory, not a P1 gate, because no stated trigger criterion fires. OAQ-10's legal-sufficiency question stays explicitly open regardless of engineering completion."
+      "recommended_action": "Accept python-backend-engineer as implementer, and attach a NON-BLOCKING advisory review by crypto-security-specialist (crypto-shredding key-lifecycle correctness against cryptography-core) and cloud-security-architect (India residency/versioned/object-locked bucket provisioning against india-cyber-regulatory-core) before this story is presented as DPDP-compliant. This mirrors AR1-G3's treatment of DASH-STORY-003's DPDP obligation in Sprint 1 - advisory, not a P1 gate, because no stated trigger criterion fires. OAQ-10's legal-sufficiency question stays explicitly open regardless of engineering completion.",
+      "status": "PARTIALLY RESOLVED 2026-09-19 - user accepted the crypto-security-specialist advisory review (see DASH-STORY-020.advisory_review). The cloud-security-architect india-residency advisory review remains an open recommendation, not yet accepted or dispatched."
     },
     {
       "id": "AR1-S2-G2",
@@ -423,7 +432,7 @@
     "advisory_math_delegations": ["DASH-STORY-016"],
     "score_range": {"min": 0.7645, "max": 0.8965, "mean": 0.8628},
     "open_user_decisions": [
-      "Accept single-agent implementer risk on DASH-STORY-020 (python-backend-engineer, marginal 0.7645) and authorize the two non-blocking advisory reviews recommended in AR1-S2-G1, or request a documented alternative.",
+      "RESOLVED 2026-09-19 (partial): user accepted single-agent implementer risk on DASH-STORY-020 (python-backend-engineer, marginal 0.7645) and authorized the crypto-security-specialist advisory review from AR1-S2-G1. The cloud-security-architect india-residency advisory review is still open/unconfirmed.",
       "Accept single-agent risk on DASH-STORY-013 and DASH-STORY-014 (AR1-S2-G2).",
       "Decide whether to rebalance any of DASH-STORY-015/017/018 to database-engineer now (all three pre-cleared above threshold) given the 89% python-backend-engineer concentration this sprint, or defer that decision to an AR.2-equivalent execution-grouping pass.",
       "Confirm DASH-STORY-018's P1 gate (api-security-auditor) before that story is allowed to close, consistent with the maker-checker rule applied to DASH-STORY-007 in Sprint 1."
