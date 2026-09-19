@@ -12,6 +12,7 @@ confidence value."
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from uuid import uuid4
 
@@ -35,6 +36,9 @@ ERROR_UNRESOLVABLE_SOURCE_TYPE = "unresolvable_source_type"
 ERROR_MISSING_USER_TURN_MARKER = "missing_user_turn_marker"
 ERROR_FORGED_USER_TURN_MARKER = "forged_user_turn_marker"
 ERROR_MISSING_CALLER_BINDING = "missing_caller_binding"
+ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST = (
+    "idempotency_key_reused_for_different_request"
+)
 _REJECT_HTTP_STATUS = 422
 
 
@@ -77,7 +81,29 @@ class ProvenanceWriteGate:
     looks up any prior journal entry for `(tenant_id, idempotency_key)`;
     a verbatim replay of a previously accepted request returns the
     original `WriteAccepted` result instead of journaling a duplicate
-    entry and invoking `persist_fact` a second time.
+    entry and invoking `persist_fact` a second time. A request is only
+    ever treated as a "verbatim replay" when every identifying field
+    (`item_id`, `source_zone`, the resolved `source_type`, `source_refs`,
+    `caller_identity`, `retrieval_context_hash`, `user_turn_marker`) also
+    matches the journaled entry -- reusing an already-journaled
+    `idempotency_key` for a request that differs in any of those fields
+    is rejected (`ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST`,
+    HTTP 422) rather than silently returning the earlier write's cached
+    `WriteAccepted`, which would otherwise hand the caller an
+    unambiguous success signal for a write that was never actually
+    applied.
+
+    Concurrency: the idempotency check (`find_by_idempotency_key`) and
+    the subsequent journal append + `persist_fact` invocation are one
+    atomic critical section per `(tenant_id, idempotency_key)`, guarded
+    by a per-key `threading.RLock` this instance owns (see
+    `_lock_for_idempotency_key`). Without this lock, two threads racing
+    on the same key could both observe a cache-miss on the read before
+    either had journaled, so `persist_fact` would run twice for one
+    logical idempotency key -- exactly the violation this class's own
+    "at most once" guarantee (below) promises never happens. Locks for
+    different keys are independent, so concurrent writes under different
+    idempotency keys are never serialized against each other.
     """
 
     def __init__(
@@ -108,6 +134,58 @@ class ProvenanceWriteGate:
         self._journal = journal
         self._clock = clock
         self._user_turn_signing_key = user_turn_signing_key
+        self._idempotency_locks: dict[tuple[str, str], threading.RLock] = {}
+        self._idempotency_locks_guard = threading.Lock()
+
+    def _lock_for_idempotency_key(
+        self, tenant_id: str, idempotency_key: str
+    ) -> threading.RLock:
+        """Return the one `RLock` serializing `submit_write` for this exact key.
+
+        Lazily creates and caches one `threading.RLock` per `(tenant_id,
+        idempotency_key)` pair for this gate instance's lifetime, guarded
+        by `_idempotency_locks_guard` against two threads racing to
+        create the lock itself for the same key (the classic
+        check-then-create race one level up from the one this lock
+        exists to close). `RLock` (not `Lock`) so a caller whose own
+        `persist_fact` callback re-enters `submit_write` on the same
+        thread for the same key -- an unusual but not impossible calling
+        pattern -- does not deadlock against itself.
+        """
+        key = (tenant_id, idempotency_key)
+        with self._idempotency_locks_guard:
+            lock = self._idempotency_locks.get(key)
+            if lock is None:
+                lock = threading.RLock()
+                self._idempotency_locks[key] = lock
+            return lock
+
+    def _is_verbatim_replay(
+        self, request: WriteRequest, replayed: ProvenanceJournalEntry
+    ) -> bool:
+        """True only if `request` matches every identifying field `replayed` journaled.
+
+        The sole authority on whether a `find_by_idempotency_key` hit is
+        a genuine replay of the exact same logical write (safe to answer
+        from cache) versus a caller reusing the same `idempotency_key`
+        for a materially different request (an accidental or adversarial
+        collision `submit_write` must reject rather than silently
+        answering with the first request's result -- see this module's
+        `ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST`).
+        `tenant_id` and `idempotency_key` are already equal by
+        construction (`replayed` came from looking those two up), so
+        this compares every other field `ProvenanceJournalEntry` carries
+        from the original request.
+        """
+        return (
+            replayed.item_id == request.item_id
+            and replayed.source_zone == request.source_zone
+            and replayed.source_type == resolve_source_type(request.source_type_raw)
+            and replayed.source_refs == request.source_refs
+            and replayed.caller_identity == request.caller_identity
+            and replayed.retrieval_context_hash == request.retrieval_context_hash
+            and replayed.user_turn_marker == request.user_turn_marker
+        )
 
     def submit_write(
         self,
@@ -135,12 +213,49 @@ class ProvenanceWriteGate:
             for a verbatim replay -- in either case `persist_fact` runs
             at most once for a given `(tenant_id, idempotency_key)`.
             Returns `WriteRejected` (HTTP 422) if `request` fails any
-            check below -- `persist_fact` is never called in that case.
+            check below, including a non-verbatim reuse of an
+            already-journaled `idempotency_key` -- `persist_fact` is
+            never called in that case.
+        """
+        lock = self._lock_for_idempotency_key(
+            request.tenant_id, request.idempotency_key
+        )
+        with lock:
+            return self._submit_write_within_lock(request, persist_fact)
+
+    def _submit_write_within_lock(
+        self,
+        request: WriteRequest,
+        persist_fact: Callable[[], None],
+    ) -> WriteGateResult:
+        """The idempotency-check-through-persist critical section `submit_write` locks.
+
+        Never called directly -- only `submit_write`, which first
+        acquires this exact `(tenant_id, idempotency_key)`'s lock, calls
+        this. Holding the lock across the whole method (the
+        `find_by_idempotency_key` read, every validation check, the
+        journal append, and the `persist_fact` call) is what makes the
+        class docstring's "Concurrency" guarantee hold: two threads
+        racing on the same key can never both observe a cache-miss and
+        both proceed to journal and persist.
         """
         replayed = self._journal.find_by_idempotency_key(
             request.tenant_id, request.idempotency_key
         )
         if replayed is not None:
+            if not self._is_verbatim_replay(request, replayed):
+                return self._reject(
+                    request,
+                    ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST,
+                    f"idempotency_key {request.idempotency_key!r} was already "
+                    "journaled for a different write request (item_id, "
+                    "source_zone, source_type, source_refs, caller_identity, "
+                    "retrieval_context_hash, or user_turn_marker does not match "
+                    "the original request this key was first accepted for); "
+                    "reusing an idempotency_key for a materially different "
+                    "request is rejected rather than silently returning the "
+                    "earlier write's cached result",
+                )
             logger.info(
                 "provenance write-path gate returned cached result for a "
                 "replayed write (idempotency_key already journaled)",

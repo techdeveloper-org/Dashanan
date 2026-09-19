@@ -66,6 +66,7 @@ import pytest
 
 from dashanan.application.provenance_write_gate import (
     ERROR_FORGED_USER_TURN_MARKER,
+    ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST,
     ERROR_MISSING_CALLER_BINDING,
     ERROR_MISSING_USER_TURN_MARKER,
     ERROR_UNRESOLVABLE_SOURCE_TYPE,
@@ -701,29 +702,35 @@ class TestReplayIdempotencyProtection:
         assert persist.calls == 1
         assert len(journal.entries) == 1
 
-    def test_replay_with_mutated_payload_still_returns_cached_result(
+    def test_replay_with_mutated_item_id_is_rejected_not_silently_cached(
         self, gate: ProvenanceWriteGate, journal: RecordingJournal
     ) -> None:
-        """Standard idempotency-key semantics: the key alone identifies
-        the logical operation, so a second submission under the same key
-        is treated as the same request even if a field differs -- it is
-        never re-validated or re-persisted a second time."""
+        """MEDIUM finding (DSHN-59): reusing an idempotency_key for a
+        DIFFERENT item_id must never silently return the first write's
+        cached WriteAccepted -- that would hand the caller an
+        unambiguous success signal for a write that was never applied
+        for `item-mutated`. The key alone does not identify the logical
+        operation; every identifying field must also match
+        (`_is_verbatim_replay`), or the mismatched second request is
+        rejected (422) and persist_fact is never invoked for it."""
         persist = PersistTracker()
         first_request = make_request(
             idempotency_key="replay-nonce-2", item_id="item-original"
         )
-        replayed_with_different_item = make_request(
+        mismatched_request = make_request(
             idempotency_key="replay-nonce-2", item_id="item-mutated"
         )
 
         first = gate.submit_write(first_request, persist.persist)
-        second = gate.submit_write(replayed_with_different_item, persist.persist)
+        second = gate.submit_write(mismatched_request, persist.persist)
 
         assert isinstance(first, WriteAccepted)
-        assert isinstance(second, WriteAccepted)
-        assert first.write_id == second.write_id
+        assert isinstance(second, WriteRejected)
+        assert second.http_status == 422
+        assert second.error_code == ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST
         assert persist.calls == 1
         assert len(journal.entries) == 1
+        assert journal.entries[0].item_id == "item-original"
 
     def test_different_idempotency_keys_are_independent_writes(
         self, gate: ProvenanceWriteGate, journal: RecordingJournal

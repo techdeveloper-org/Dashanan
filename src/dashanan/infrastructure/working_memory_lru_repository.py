@@ -10,6 +10,7 @@ judgment-call notes for why it is not attempted here.
 
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from dataclasses import replace
 from datetime import timedelta
@@ -52,13 +53,31 @@ class WorkingMemoryLRURepository(ZoneRepository):
     -- the sweep only ever touches items it actually evicts, plus one
     extra peek.
 
-    Known scope gap (flagged, not silently absorbed): ADR-018 (Zone 1
-    concurrency control -- WATCH/MULTI-EXEC or a Lua script for Shape
-    B, a per-session `asyncio.Lock` for Shape A) is not implemented
-    here. It was adopted 2026-09-18, after this story's routing prompt
-    (ar1_assignments.json, dated 2026-09-17) fixed this story's context
-    sources and must-not-deviate list, and ADR-018 does not appear in
-    either. See the DASH-STORY-002 implementation report.
+    Concurrency (ADR-018, closed by this class): this adapter is called
+    from arbitrary caller threads -- `ProvenanceWriteGate.submit_write`
+    invokes a `persist_fact` callback that may land here from any thread
+    racing on a distinct idempotency key, so ADR-018's Shape A guidance
+    of "a per-session lock" is implemented here as one
+    `threading.Lock` per `(tenant_id, session_id)`, lazily created and
+    cached in `_session_locks` under the short-held `_sessions_guard`
+    (the same lazily-created-per-key-lock pattern
+    `ProvenanceWriteGate._lock_for_idempotency_key` uses for its own
+    concurrency guarantee). `threading.Lock`, not `asyncio.Lock`, because
+    every call into this repository observed under real concurrent load
+    (the DSHN-59 adversarial re-audit) arrives on a plain OS thread, not
+    inside an event loop -- an `asyncio.Lock` provides no mutual
+    exclusion across threads with no running loop. `put`, `get`,
+    `evict_expired`, and `session_item_count` each hold one session's
+    lock for their whole read-modify-write sequence against that
+    session's `OrderedDict`; `fetch` acquires each matching session's
+    lock in turn while reading it. Locks for different sessions are
+    independent, so concurrent writes to different sessions are never
+    serialized against each other. `_sessions_guard` is a second, always
+    short-held lock that protects only structural changes to the outer
+    `_sessions` dict itself (a new session being registered, or `fetch`
+    safely snapshotting which sessions exist) -- it is never held while
+    waiting on a session lock, so the two locks cannot deadlock against
+    each other.
     """
 
     def __init__(
@@ -95,6 +114,46 @@ class WorkingMemoryLRURepository(ZoneRepository):
         self._capacity_per_session = capacity_per_session
         self._idle_ttl = timedelta(seconds=idle_ttl_seconds)
         self._sessions: dict[tuple[str, str], OrderedDict[str, WorkingItem]] = {}
+        self._sessions_guard = threading.Lock()
+        self._session_locks: dict[tuple[str, str], threading.Lock] = {}
+
+    def _lock_for_session(self, tenant_id: str, session_id: str) -> threading.Lock:
+        """Return the one `Lock` serializing all access to one session's items.
+
+        Lazily creates and caches one `threading.Lock` per `(tenant_id,
+        session_id)` pair for this repository instance's lifetime,
+        guarded by `_sessions_guard` against two threads racing to
+        create the lock itself for the same key -- the same
+        check-then-create race `ProvenanceWriteGate._lock_for_idempotency_key`
+        closes for its own per-key locks (ADR-018).
+        """
+        key = (tenant_id, session_id)
+        with self._sessions_guard:
+            lock = self._session_locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                self._session_locks[key] = lock
+            return lock
+
+    def _session_items_for(
+        self, tenant_id: str, session_id: str
+    ) -> OrderedDict[str, WorkingItem]:
+        """Return this session's `OrderedDict`, creating it under `_sessions_guard`.
+
+        Callers must already hold this session's lock (from
+        `_lock_for_session`) before calling this -- creation of the
+        `OrderedDict` and every subsequent mutation of it happen only
+        while that lock is held, which is what makes the per-session
+        lock a genuine mutual-exclusion guarantee over the structure
+        `put`/`get`/`evict_expired` each read-modify-write.
+        """
+        key = (tenant_id, session_id)
+        with self._sessions_guard:
+            session_items = self._sessions.get(key)
+            if session_items is None:
+                session_items = OrderedDict()
+                self._sessions[key] = session_items
+            return session_items
 
     def put(
         self,
@@ -129,27 +188,28 @@ class WorkingMemoryLRURepository(ZoneRepository):
         self._require_non_blank("tenant_id", tenant_id)
         self._require_non_blank("session_id", session_id)
 
-        session_items = self._sessions.setdefault((tenant_id, session_id), OrderedDict())
-        self._evict_expired_locked(session_items)
+        with self._lock_for_session(tenant_id, session_id):
+            session_items = self._session_items_for(tenant_id, session_id)
+            self._evict_expired_locked(session_items)
 
-        now = self._clock.now()
-        item = WorkingItem(
-            tenant_id=tenant_id,
-            session_id=session_id,
-            item_id=item_id,
-            payload=payload,
-            token_count=token_count,
-            written_at=now,
-            last_access_at=now,
-            score_terms=dict(score_terms) if score_terms else {},
-        )
-        session_items[item_id] = item
-        session_items.move_to_end(item_id)
+            now = self._clock.now()
+            item = WorkingItem(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                item_id=item_id,
+                payload=payload,
+                token_count=token_count,
+                written_at=now,
+                last_access_at=now,
+                score_terms=dict(score_terms) if score_terms else {},
+            )
+            session_items[item_id] = item
+            session_items.move_to_end(item_id)
 
-        while len(session_items) > self._capacity_per_session:
-            session_items.popitem(last=False)
+            while len(session_items) > self._capacity_per_session:
+                session_items.popitem(last=False)
 
-        return item
+            return item
 
     def get(self, tenant_id: str, session_id: str, item_id: str) -> WorkingItem | None:
         """Read one item, refreshing its idle-TTL window (HLD 12A: "idle").
@@ -169,19 +229,21 @@ class WorkingMemoryLRURepository(ZoneRepository):
         self._require_non_blank("tenant_id", tenant_id)
         self._require_non_blank("session_id", session_id)
 
-        session_items = self._sessions.get((tenant_id, session_id))
-        if session_items is None:
-            return None
-        self._evict_expired_locked(session_items)
+        with self._lock_for_session(tenant_id, session_id):
+            with self._sessions_guard:
+                session_items = self._sessions.get((tenant_id, session_id))
+            if session_items is None:
+                return None
+            self._evict_expired_locked(session_items)
 
-        item = session_items.get(item_id)
-        if item is None:
-            return None
+            item = session_items.get(item_id)
+            if item is None:
+                return None
 
-        refreshed = replace(item, last_access_at=self._clock.now())
-        session_items[item_id] = refreshed
-        session_items.move_to_end(item_id)
-        return refreshed
+            refreshed = replace(item, last_access_at=self._clock.now())
+            session_items[item_id] = refreshed
+            session_items.move_to_end(item_id)
+            return refreshed
 
     def evict_expired(self, tenant_id: str, session_id: str) -> list[str]:
         """Force an eviction sweep for one session (AC-001's own mechanism).
@@ -202,18 +264,22 @@ class WorkingMemoryLRURepository(ZoneRepository):
         self._require_non_blank("tenant_id", tenant_id)
         self._require_non_blank("session_id", session_id)
 
-        session_items = self._sessions.get((tenant_id, session_id))
-        if session_items is None:
-            return []
-        return self._evict_expired_locked(session_items)
+        with self._lock_for_session(tenant_id, session_id):
+            with self._sessions_guard:
+                session_items = self._sessions.get((tenant_id, session_id))
+            if session_items is None:
+                return []
+            return self._evict_expired_locked(session_items)
 
     def session_item_count(self, tenant_id: str, session_id: str) -> int:
         """Return the live item count for one session, after a lazy sweep."""
-        session_items = self._sessions.get((tenant_id, session_id))
-        if session_items is None:
-            return 0
-        self._evict_expired_locked(session_items)
-        return len(session_items)
+        with self._lock_for_session(tenant_id, session_id):
+            with self._sessions_guard:
+                session_items = self._sessions.get((tenant_id, session_id))
+            if session_items is None:
+                return 0
+            self._evict_expired_locked(session_items)
+            return len(session_items)
 
     def fetch(self, query: ZoneQuery) -> list[MemoryItem]:
         """Serve the `ZoneRepository` read contract for Zone 1 (HLD Section 7.1).
@@ -233,12 +299,20 @@ class WorkingMemoryLRURepository(ZoneRepository):
             most-recently-accessed first, after a lazy expiry sweep of
             every touched session.
         """
+        with self._sessions_guard:
+            matching_keys = [
+                key for key in self._sessions if key[0] == query.tenant_id
+            ]
+
         candidates: list[WorkingItem] = []
-        for (tenant_id, _session_id), session_items in self._sessions.items():
-            if tenant_id != query.tenant_id:
-                continue
-            self._evict_expired_locked(session_items)
-            candidates.extend(session_items.values())
+        for tenant_id, session_id in matching_keys:
+            with self._lock_for_session(tenant_id, session_id):
+                with self._sessions_guard:
+                    session_items = self._sessions.get((tenant_id, session_id))
+                if session_items is None:
+                    continue
+                self._evict_expired_locked(session_items)
+                candidates.extend(session_items.values())
 
         candidates.sort(key=lambda wi: (wi.last_access_at, wi.item_id), reverse=True)
         return [

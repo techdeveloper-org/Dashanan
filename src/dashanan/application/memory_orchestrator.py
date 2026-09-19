@@ -68,7 +68,12 @@ class MemoryOrchestrator:
         adapter raises `ZoneRepositoryError`, is recorded in
         `zones_unavailable` and never surfaces as an unhandled exception.
         Implements AC-009-R1-1: every returned `AssemblyResult`, success
-        or degraded, carries a fresh `assembly_id` and `trace_id`.
+        or degraded, carries a fresh `assembly_id` and `trace_id`. A
+        duplicate `ZoneId` in `request.zones` -- `ContextAssemblyRequest`
+        does not itself reject or dedupe the list -- is collapsed to a
+        single fetch here, order preserved, so a repeated zone entry can
+        never double-fetch and double-add the same items into the
+        assembled result.
 
         Args:
             request: The host's context-assembly call.
@@ -81,7 +86,9 @@ class MemoryOrchestrator:
         assembly_id = str(uuid4())
         trace_id = str(uuid4())
         target_zones = (
-            list(request.zones) if request.zones is not None else list(ZoneId)
+            list(dict.fromkeys(request.zones))
+            if request.zones is not None
+            else list(ZoneId)
         )
 
         builder = (
