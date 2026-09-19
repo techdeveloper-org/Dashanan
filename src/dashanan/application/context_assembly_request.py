@@ -47,11 +47,12 @@ class ContextAssemblyRequest:
     as_of: datetime | None = None
 
     def __post_init__(self) -> None:
-        """Validate the two AC-009 preconditions this DTO must uphold.
+        """Validate the preconditions this DTO must uphold before any zone adapter runs.
 
         Raises:
             ValueError: If neither `task` nor `query_embedding` is given,
-                or if `token_budget` is not positive.
+                if `token_budget` is not positive, or if `max_items` is not
+                positive.
         """
         if self.task is None and self.query_embedding is None:
             raise ValueError(
@@ -60,4 +61,8 @@ class ContextAssemblyRequest:
         if self.token_budget <= 0:
             raise ValueError(
                 f"token_budget must be positive, got {self.token_budget}"
+            )
+        if self.max_items <= 0:
+            raise ValueError(
+                f"max_items must be positive, got {self.max_items}"
             )

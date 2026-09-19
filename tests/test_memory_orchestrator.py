@@ -317,6 +317,25 @@ class TestBoundaryAndNegativeCases:
         with pytest.raises(ValueError, match="token_budget must be positive"):
             _request(token_budget=-5)
 
+    def test_zero_max_items_rejected_at_request_construction(self) -> None:
+        with pytest.raises(ValueError, match="max_items must be positive"):
+            _request(max_items=0)
+
+    def test_negative_max_items_rejected_at_request_construction(self) -> None:
+        """DSHN-59 adversarial finding: negative max_items must fail fast at
+
+        request construction, before any zone adapter (WorkingMemoryLRURepository,
+        HybridRetrievalIndexRepository, SqlEpisodicRepository) ever sees the
+        request. Live-verified prior behavior: max_items=-1 silently returned 4
+        of 5 seeded items via `candidates[:query.max_items]` end-slicing.
+        """
+        with pytest.raises(ValueError, match="max_items must be positive"):
+            _request(max_items=-1)
+
+    def test_more_negative_max_items_rejected_at_request_construction(self) -> None:
+        with pytest.raises(ValueError, match="max_items must be positive"):
+            _request(max_items=-2)
+
     def test_request_requires_task_or_query_embedding(self) -> None:
         with pytest.raises(ValueError, match="requires 'task' or 'query_embedding'"):
             _request(task=None, query_embedding=None)
