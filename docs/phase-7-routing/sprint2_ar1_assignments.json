@@ -1,9 +1,17 @@
 {
   "document_id": "AR1-ASSIGNMENTS-SPRINT2-20260919-01",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "orchestrator-agent",
   "phase": "Phase 7 - Agent-Task Routing (AR.1 story-to-agent assignment, Sprint 2)",
   "date": "2026-09-19",
+  "last_amended": "2026-09-19",
+  "amendment_log": [
+    {
+      "version": "1.1.0",
+      "date": "2026-09-19",
+      "change": "User accepted DASH-STORY-020's single-agent implementer risk and authorized the crypto-security-specialist advisory review (partial resolution of AR1-S2-G1). Added DASH-STORY-020.advisory_review block. Restructured summary.open_user_decisions from plain strings into tracked decision objects with decision_id/owner/due_date/status/acceptance_criteria, per external review feedback that decisions lacked explicit ownership and closure tracking."
+    }
+  ],
   "correlation_id": "DASH-PH7-AR1-SPRINT2-20260919",
   "depends_on": [
     "docs/phase-7-routing/ar0_routing_index.json v1.0.0 (scoring model, threshold, agent-existence method reused verbatim - no new methodology invented)",
@@ -432,10 +440,51 @@
     "advisory_math_delegations": ["DASH-STORY-016"],
     "score_range": {"min": 0.7645, "max": 0.8965, "mean": 0.8628},
     "open_user_decisions": [
-      "RESOLVED 2026-09-19 (partial): user accepted single-agent implementer risk on DASH-STORY-020 (python-backend-engineer, marginal 0.7645) and authorized the crypto-security-specialist advisory review from AR1-S2-G1. The cloud-security-architect india-residency advisory review is still open/unconfirmed.",
-      "Accept single-agent risk on DASH-STORY-013 and DASH-STORY-014 (AR1-S2-G2).",
-      "Decide whether to rebalance any of DASH-STORY-015/017/018 to database-engineer now (all three pre-cleared above threshold) given the 89% python-backend-engineer concentration this sprint, or defer that decision to an AR.2-equivalent execution-grouping pass.",
-      "Confirm DASH-STORY-018's P1 gate (api-security-auditor) before that story is allowed to close, consistent with the maker-checker rule applied to DASH-STORY-007 in Sprint 1."
+      {
+        "decision_id": "SP2-DEC-001",
+        "story": "DASH-STORY-020 / DSHN-69",
+        "decision": "Accept single-agent implementer risk (python-backend-engineer, marginal 0.7645) and authorize advisory reviews per AR1-S2-G1.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-020's Fix stage is dispatched in a future Phase B round",
+        "status": "PARTIALLY RESOLVED 2026-09-19 — crypto-security-specialist advisory review accepted (see DASH-STORY-020.advisory_review). Implementer risk itself accepted.",
+        "acceptance_criteria": "Crypto-security-specialist advisory review must actually run and report before DSHN-69 is presented as security-reviewed; story must not be marked 'security cleared' or 'DPDP-compliant' until BOTH the crypto AND india-residency advisory reviews (SP2-DEC-002) have run, and regardless of either, OAQ-10's legal question stays open."
+      },
+      {
+        "decision_id": "SP2-DEC-002",
+        "story": "DASH-STORY-020 / DSHN-69",
+        "decision": "Authorize the india-residency advisory review (cloud-security-architect) recommended alongside the crypto review in AR1-S2-G1.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-020's Fix stage is dispatched in a future Phase B round",
+        "status": "OPEN — not yet accepted or dispatched.",
+        "acceptance_criteria": "User explicitly confirms (or declines) this review, same as SP2-DEC-001 was confirmed."
+      },
+      {
+        "decision_id": "SP2-DEC-003",
+        "story": "DASH-STORY-013, DASH-STORY-014 / DSHN-62, DSHN-63",
+        "decision": "Accept single-agent risk (no above-threshold fallback candidate exists for either story) per AR1-S2-G2.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before these stories' Dev stage is dispatched in a future Phase B round",
+        "status": "OPEN",
+        "acceptance_criteria": "User explicitly accepts the risk, or requests a documented alternative (e.g. a fresh AR.0-equivalent scoring pass against a wider candidate set)."
+      },
+      {
+        "decision_id": "SP2-DEC-004",
+        "story": "DASH-STORY-015 / DSHN-64, DASH-STORY-017 / DSHN-66, DASH-STORY-018 / DSHN-67",
+        "decision": "Decide whether to rebalance any of these 3 stories from python-backend-engineer (89% Sprint 2 concentration) to database-engineer (pre-cleared above threshold on all three), or defer to an AR.2-equivalent execution-grouping pass.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before Phase B execution grouping for Sprint 2 begins",
+        "status": "OPEN",
+        "acceptance_criteria": "User picks one: rebalance now (name which stories move), or explicitly defer to a future AR.2-equivalent pass — either is a valid close, silence is not."
+      },
+      {
+        "decision_id": "SP2-DEC-005",
+        "story": "DASH-STORY-018 / DSHN-67",
+        "decision": "Confirm the P1 security gate (api-security-auditor, cross-tenant merge adversarial review) before this story is allowed to close, per the Maker-Checker rule already applied to DASH-STORY-007 in Sprint 1.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DSHN-67 is marked Done in Jira",
+        "status": "OPEN — this is a structural confirmation (the P1 gate itself is already correctly triggered and recorded in this file's p1_security_override block), not a request to waive it.",
+        "acceptance_criteria": "api-security-auditor's real adversarial review runs and reports APPROVED before DSHN-67 transitions to Done; the implementer's own report alone is insufficient, per maker_checker."
+      }
     ]
   }
 }

@@ -10,7 +10,11 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 >
 > Full rationale: [`docs/orchestration/01-vision-and-prd.md`](docs/orchestration/01-vision-and-prd.md).
 
-> ⚠️ **Status (updated 2026-09-19):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** — all 11 Sprint 1 stories are now implemented: DASH-STORY-001 landed first (`cba559f`); DASH-STORY-002 through 010 landed via a dependency-gated `Workflow`-tool run (`d888536`), including a full adversarial P1 security remediation round for DASH-STORY-004/005/006/007 (see Local development below). Future-sprint FR-003/004/005/008/011/013 (Zones 3/4/5/8) are not yet started. The **Harness Gate (Phase A.6/A.6.1)** was activated 2026-09-19, retroactively — see `docs/phase-A6-harness/`; Phase H (eval/regression gate) remains deferred. The **Phase F.1-F.6 Security Audit** ran 2026-09-19: F.1-F.5 findings resolved across 3 bounded remediation rounds (a real signing-key forgery collision closed, a write-rate-limiter added, key-rotation support, an SBOM, a `pip-audit` CI gate), but **F.6's binary gate is still REJECTED** after exhausting the 3-attempt cap — accepted as a disclosed architectural gap (see the security-wiring gap bullet above), tracked open at `DSHN-60`/[GitHub #20](https://github.com/techdeveloper-org/Dashanan/issues/20), not silently closed.
+> ⚠️ **Status (updated 2026-09-19):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project; Sprint 1 implemented and merged, Sprint 2 planned — see below), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** — all 11 Sprint 1 stories are now implemented: DASH-STORY-001 landed first (`cba559f`); DASH-STORY-002 through 010 landed via a dependency-gated `Workflow`-tool run (`d888536`), including a full adversarial P1 security remediation round for DASH-STORY-004/005/006/007 (see Local development below). Future-sprint FR-003/004/005/008 (Zones 3/4/5/8): **Sprint 2 planning complete** (2026-09-19) —
+9 real INVEST stories (`DSHN-61`..`DSHN-69`, Jira Sprint 2 `sprint_id 201`) went through real
+Phase 6 (Sprint Planning) → Phase 7 (Agent-Task Routing) → Phase 8 (Alignment); **no Sprint 2 code
+has been written yet** — see `docs/phase-7-routing/sprint2_ar1_assignments.json` for the routing
+detail and open decisions (`open_user_decisions`), several still unresolved. The **Harness Gate (Phase A.6/A.6.1)** was activated 2026-09-19, retroactively — see `docs/phase-A6-harness/`; Phase H (eval/regression gate) remains deferred. The **Phase F.1-F.6 Security Audit** ran 2026-09-19: F.1-F.5 findings resolved across 3 bounded remediation rounds (a real signing-key forgery collision closed, a write-rate-limiter added, key-rotation support, an SBOM, a `pip-audit` CI gate), but **F.6's binary gate is still REJECTED** after exhausting the 3-attempt cap — accepted as a disclosed architectural gap (see the security-wiring gap bullet above), tracked open at `DSHN-60`/[GitHub #20](https://github.com/techdeveloper-org/Dashanan/issues/20), not silently closed.
 
 > **Implementation Ready — with these documented pre-implementation decisions pending** (added 2026-09-18, per a repo-wide consistency audit). "Implementation Ready" above means the planning pipeline's own gates all passed; it does not mean every underlying architecture question is closed. The following items in [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md)'s Open Architecture Questions table are genuinely still open and should be resolved (or explicitly accepted as-is) before or early in Phase B:
 > - **OAQ-10** — DPDP erasure via crypto-shredding of an append-only audit store. Status: Proposed. Whether key destruction constitutes erasure under DPDP Act 2023 requires legal confirmation, not an architect's judgment.
@@ -50,7 +54,9 @@ A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency +
 
 ## Getting started
 
-This repository is currently **pre-implementation** — Phases 0 through 8 (architecture and planning) are complete, but Phase B (actual code) has not started yet (see the Status callout above). There is no package to install or server to run yet; getting started today means getting oriented in the design, not running code.
+Sprint 1's Phase B implementation is complete (see the Status callout above and Local development
+below) — this is now a real, installable, tested Python library, not a pre-implementation
+planning repo. Sprint 2 (Zones 3/4/5/8) is planned but not yet implemented.
 
 Recommended reading order for someone new to the project:
 1. **This README** — problem statement, the 8-zone model, goals.
@@ -85,9 +91,12 @@ pip install -e ".[dev]"
 python -m pytest -v
 ```
 
-878 tests pass as of this round, including an AST-based architecture-fitness test enforcing HLD
-3.0 invariant 1 (no `dashanan/domain/**` module may import `dashanan/infrastructure/**`) and a
-real Docker Postgres 16 regression test for DASH-STORY-005's append-only privilege fix.
+1004 tests pass as of the Phase F.1-F.6 security audit round (2026-09-19), including an AST-based
+architecture-fitness test enforcing HLD 3.0 invariant 1 (no `dashanan/domain/**` module may import
+`dashanan/infrastructure/**`) and a real Docker Postgres 16 regression test for DASH-STORY-005's
+append-only privilege fix. Run `python -m pytest -v` yourself to reconfirm the current count —
+this number is updated manually and can drift; do not treat it as more authoritative than a fresh
+test run.
 
 ## Repository layout
 
@@ -106,7 +115,9 @@ Dashanan/
 │   └── phase-8-alignment/       <- pre-implementation self-review + consensus gate records
 ├── uml/                          <- 7 Mermaid diagrams (context, component, deployment, class, state, data-flow, sequence)
 ├── drawio/                       <- same 7 diagrams as editable .drawio XML
-└── (source code)                 <- NOT YET CREATED — Phase B implementation awaits explicit user go-ahead
+├── src/dashanan/                 <- Sprint 1 implementation (Shape A, embedded library): domain/, application/, infrastructure/
+├── tests/                        <- 1004 tests, including tests/integration/ (real cross-zone composition + adversarial suite)
+└── pyproject.toml                <- pip install -e ".[dev]" — see Local development below
 ```
 
 ## License

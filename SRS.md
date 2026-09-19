@@ -1,7 +1,7 @@
 # Software Requirements Specification
 
 **Document ID:** SRS-20260917-01
-**Version:** 1.0.7
+**Version:** 1.0.8
 **Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, `final_verdict: APPROVED`, 2026-09-17); intermediate Phase 1/1.5/2 consensus-gate artifacts were not separately closed, but this document's approval status was re-confirmed as part of Phase 8's pre-implementation story-patch verification, not a standalone re-review of this document's own content
 **Created:** 2026-09-17
 **Author:** business-analyst-agent
