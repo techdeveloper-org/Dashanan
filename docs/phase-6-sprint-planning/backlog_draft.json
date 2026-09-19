@@ -248,7 +248,8 @@
         { "type": "Review", "story_points": 1, "description": "Security review of tenant isolation controls (HLD I-1/I-2/I-3, ADR-007/ADR-013)." }
       ],
       "sub_task_sp_sum": 8,
-      "depends_on": ["DASH-STORY-003"]
+      "depends_on": ["DASH-STORY-003", "DASH-STORY-011"],
+      "depends_on_note": "DASH-STORY-011 added 2026-09-18, closing an IR.1-equivalent review flag (raised independently by product-manager-agent/solution-architect/scrum-master-agent): the spike's pinned Qdrant client-version recommendation must land before this story's Dev sub-task writes adapter code, per DASH-STORY-011's own spike_exit_criteria #3 -- previously asserted only in ar1_assignments.json prose, not enforceable by AR.2's mechanical DAG scheduling."
     },
     {
       "story_id": "DASH-STORY-008",
@@ -358,12 +359,12 @@
         "negotiable": "This spike does NOT reopen the vendor decision (Qdrant is locked by ADR-007) - scope is strictly compatibility/version validation of the client library, not vendor selection.",
         "valuable": "Closes a residual doc-gap: no story previously validated that the pinned Qdrant client library version is compatible with the target Qdrant server version and the project's Python 3.12+ runtime (NFR-001) before DASH-STORY-007's Dev sub-task starts building against it.",
         "estimable": "Timeboxed at 3 story points (spike convention: capped effort, not a full estimate of unknown work).",
-        "small": "Scoped to the client library only - compatibility matrix (client version x server version x Python 3.12+), breaking-change review since the version ADR-007 originally evaluated, and a pinned-version recommendation.",
+        "small": "Scoped to the client library only - compatibility matrix (client version x server version x Python 3.12+), breaking-change review since Qdrant's earliest version compatible with ADR-007's approved architecture, and a pinned-version recommendation.",
         "testable": "Spike exit criterion below is concrete and checkable, per spike convention (a spike's 'AC' is its exit criterion, not a product behavior)."
       },
       "persona": "DASH-STORY-007 implementer (needs a validated, pinned client library version before writing adapter code)",
       "spike_exit_criteria": [
-        "A documented client-library-version x Qdrant-server-version x Python-3.12+ compatibility matrix exists, covering at minimum the version ADR-007 originally evaluated and the current latest stable release.",
+        "A documented client-library-version x Qdrant-server-version x Python-3.12+ compatibility matrix exists, covering at minimum the earliest Qdrant version compatible with ADR-007's approved architecture (ADR-007 itself names no specific version number -- this is a fresh research finding, not a citable ADR-007 fact) and the current latest stable release.",
         "Any breaking changes between those versions are identified and a specific version is recommended and pinned (e.g. in a requirements/lockfile reference), with rationale.",
         "The recommendation is handed to DASH-STORY-007's Dev sub-task as an input, not left as an open question during that story's implementation.",
         "Explicitly out of scope: re-evaluating Qdrant against pgvector/Milvus/other vector stores - that decision is closed per ADR-007 and is not reopened by this spike."
@@ -383,7 +384,15 @@
       { "fr_id": "FR-004", "title": "Procedural Memory zone (Zone 4)", "wsjf_rank": 12, "note": "Also the eventual source of inferred Importance salience, currently defaulted to 0.5 in DASH-STORY-008." },
       { "fr_id": "FR-005", "title": "Entity Memory zone (Zone 5)", "wsjf_rank": 9 },
       { "fr_id": "FR-008", "title": "Consolidation Memory zone (Zone 8)", "wsjf_rank": 11, "note": "Unblocks the Compressed -> Archived transition deferred in DASH-STORY-009." },
-      { "fr_id": "FR-011", "title": "Pluggable storage-adapter interface (remaining zone coverage beyond Sprint 1 adapters)", "wsjf_rank": 8 }
+      { "fr_id": "FR-011", "title": "Pluggable storage-adapter interface (remaining zone coverage beyond Sprint 1 adapters)", "wsjf_rank": 8 },
+      {
+        "fr_id": "FR-013",
+        "title": "Zone 3/5 write-conflict-detection sweep",
+        "wsjf_rank": 7,
+        "wsjf_score": 4.25,
+        "note": "FR-013 postdates pm-wsjf-revalidation.md's 12-FR table (added to SRS.md 2026-09-18, table dated 2026-09-17), so it was never scored there. Scored here using that document's own method (CoD = UBV+TC+RRO, WSJF = CoD/Job Size): UBV=7 (HLD Section 3.8, verbatim: 'it is the single highest-leverage anti-hallucination control in the design' -- high value, but derived/instrumental rather than an independent user-facing capability, so below the 9s); TC=3 (explicitly gated -- cannot build or matter before Zone 3/FR-003 and Zone 5/FR-005 exist, both already deferred at ranks 9-10); RRO=7 (HLD's OAQ-14 row, verbatim: 'it is the strongest memory-poisoning control (T-1)' -- comparable to FR-007's RRO=9 but narrower, a mechanism not a full zone); Job Size=4 (a targeted write-path check + conflict-marking scheme layered onto existing Zone 3/5 write paths, not a new zone -- comparable to or smaller than FR-011's Job Size=5). CoD=7+3+7=17, WSJF=17/4=4.25, which lands at rank 7 on the 12-FR table's rank scale (1,2,3,4,5,6,6,8,9,10,11,12 -- rank 7 is the unoccupied slot from the 6/6 tie; no existing entry needs renumbering).",
+        "sequencing_note": "Despite ranking above FR-011 (rank 8) on pure WSJF, FR-013's own text ('on every write targeting Zone 3 or Zone 5') hard-dependency-gates it behind FR-003 and FR-005 -- it cannot be built or deployed before those zones exist. This is a novel judgment call for this round, not an existing documented precedent: pm-wsjf-revalidation.md Section 6 was checked and does not contain an equivalent dependency-gating case (its FR-010-vs-FR-001 discussion concludes 'no contradiction', i.e. no gate was needed there)."
+      }
     ]
   },
   "dependency_graph": {
@@ -393,7 +402,7 @@
     "DASH-STORY-004": ["DASH-STORY-003", "DASH-STORY-008"],
     "DASH-STORY-005": ["DASH-STORY-002"],
     "DASH-STORY-006": ["DASH-STORY-001", "DASH-STORY-005"],
-    "DASH-STORY-007": ["DASH-STORY-003"],
+    "DASH-STORY-007": ["DASH-STORY-003", "DASH-STORY-011"],
     "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
     "DASH-STORY-009": ["DASH-STORY-008"],
     "DASH-STORY-010": ["DASH-STORY-008"],

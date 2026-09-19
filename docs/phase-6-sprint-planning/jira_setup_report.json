@@ -131,6 +131,6 @@
     "frs_with_sprint_1_stories": 7,
     "frs_epic_only": 5,
     "verified_complete": false,
-    "unmapped_fr_note": "FR-013 (Zone 3/5 write-conflict-detection sweep, formally adopted into SRS.md v1.0.6, 2026-09-18) is intentionally not yet mapped to any Jira epic or story, and has no Sprint-1/future-sprint backlog entry -- deferred to a future sprint-planning pass. verified_complete is false until FR-013 is mapped or explicitly excluded by that pass."
+    "unmapped_fr_note": "FR-013 (Zone 3/5 write-conflict-detection sweep, formally adopted into SRS.md v1.0.6, 2026-09-18) now has a real forward-tracking hook: backlog_draft.json's future_sprints_backlog.remaining_frs (wsjf_rank 7, wsjf_score 4.25, full derivation and a sequencing_note gating it behind FR-003/FR-005). It is still intentionally not mapped to any Jira epic or story -- creating that epic is a distinct, separate action for a future sprint-planning pass, not something a docs-consistency fix should do on its own. verified_complete stays false until that Jira epic exists or FR-013 is formally excluded."
   }
 }

@@ -1,7 +1,7 @@
 {
   "phase": 8,
   "step": "IR.1",
-  "description": "Self-review flags raised by each of the 4 Phase 8 review agents (BA/PM/SA/scrum-master) against the 30 CoT prompts in implementation_execution_plan.json, dispatched 2026-09-17. DASH-STORY-011 was added later (2026-09-18) and is not covered by this dispatch -- see scope_gap_note.",
+  "description": "Self-review flags raised by each of the 4 Phase 8 review agents (BA/PM/SA/scrum-master) against the 30 CoT prompts in implementation_execution_plan.json, dispatched 2026-09-17 (DASH-STORY-001..010), plus a genuine supplemental IR.1-equivalent pass for DASH-STORY-011 dispatched 2026-09-19 (see story_011_supplemental_review) after that story was found missing from the original dispatch.",
   "reviewers": {
     "business-analyst-agent": {
       "verdict_per_story": {
@@ -15,7 +15,7 @@
         "DASH-STORY-008": "CLEAR",
         "DASH-STORY-009": "CLEAR",
         "DASH-STORY-010": "CLEAR",
-        "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
+        "DASH-STORY-011": "COVERAGE_GAP"
       },
       "flags_raised": [
         {
@@ -27,6 +27,11 @@
           "story": "DASH-STORY-007",
           "type": "DISCLOSED_OPEN_DECISION",
           "detail": "P1 gate explicitly marked 'conditional' pending user acceptance of the AC-014 scope-extension deviation. Not an ambiguity, a disclosed decision point."
+        },
+        {
+          "story": "DASH-STORY-011",
+          "type": "UNVERIFIABLE_TRACEABILITY_CLAIM",
+          "detail": "Spike exit criterion #1 (backlog_draft.json, repeated in implementation_execution_plan.json's dev_prompt) required the compatibility matrix to cover 'the version ADR-007 originally evaluated', with a CRITICAL clause instructing the implementer to cite ADR-007 verbatim for it. HLD.md's ADR-007 (read in full) is a vendor-selection decision (HNSW/Qdrant vs. pgvector vs. FAISS-IVFPQ) and names no specific Qdrant client or server version anywhere -- a self-contradicting instruction (cite verbatim + never fabricate) that risked the implementing agent inventing a version. Found 2026-09-19 in DASH-STORY-011's supplemental IR.1-equivalent review."
         }
       ]
     },
@@ -35,10 +40,16 @@
         "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
         "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
         "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
-        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
+        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "CLEAR_MINOR"
       },
-      "flags_raised": [],
-      "note": "No DEPENDENCY_CONFLICT found across any story; build-order groups (1->2->3->4->5) match sprint_plan.json's corrected dependency_graph; no prompt's TASK/must-not-deviate exceeds its story's AC set or locked FR; all 4 P1 gates confirmed maker_checker:true with a distinct reviewer of record."
+      "flags_raised": [
+        {
+          "story": "DASH-STORY-011",
+          "type": "DEPENDENCY_CONFLICT",
+          "detail": "Spike exit criterion #3 requires the pinned-version recommendation be handed to DASH-STORY-007's Dev sub-task as an input, but DASH-STORY-007's dev_prompt (authored pre-011) had no context source citing DASH-STORY-011's output, and dependency_graph showed DASH-STORY-007 depending only on DASH-STORY-003, not DASH-STORY-011. Non-blocking because build order already sequenced 011 before 007, but the hand-off was unenforced at the routing-artifact level. Found 2026-09-19 in DASH-STORY-011's supplemental IR.1-equivalent review."
+        }
+      ],
+      "note": "No DEPENDENCY_CONFLICT found across DASH-STORY-001..010; build-order groups (1->2->3->4->5) match sprint_plan.json's corrected dependency_graph; no prompt's TASK/must-not-deviate exceeds its story's AC set or locked FR; all 4 P1 gates confirmed maker_checker:true with a distinct reviewer of record. DASH-STORY-011's own DEPENDENCY_CONFLICT flag is listed above (resolved)."
     },
     "solution-architect": {
       "verdict_per_story": {
@@ -48,7 +59,7 @@
         "DASH-STORY-007": "DESIGN_MISMATCH",
         "DASH-STORY-008": "MISSING_CONSTRAINT",
         "DASH-STORY-009": "CLEAR", "DASH-STORY-010": "CLEAR",
-        "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
+        "DASH-STORY-011": "CLEAR_MINOR"
       },
       "flags_raised": [
         {
@@ -65,6 +76,11 @@
           "story": "DASH-STORY-008",
           "type": "MISSING_CONSTRAINT",
           "detail": "Memory Score engine implements UserAffinity but carried no ADR-013/I-2 (cross-tenant isolation) must-not-deviate line."
+        },
+        {
+          "story": "DASH-STORY-011",
+          "type": "MISSING_CONSTRAINT",
+          "detail": "DASH-STORY-011's precedence over DASH-STORY-007's Dev sub-task (client version must land before adapter code is written) was asserted only in ar1_assignments.json prose (logging_note), not encoded in backlog_draft.json's dependency_graph -- AR.2 execution grouping consuming the DAG mechanically could have legally scheduled both in parallel, defeating the spike's stated purpose. Non-blocking since ADR-007 scope itself was correctly bounded and the gap was already partially disclosed. Found 2026-09-19 in DASH-STORY-011's supplemental IR.1-equivalent review."
         }
       ],
       "note_minor": "DASH-STORY-003 non-blocking: omits HLD Section 3.3's keyset-only/no-offset prohibition (not patched, judged non-blocking by SA)."
@@ -74,13 +90,19 @@
         "DASH-STORY-001": "CLEAR", "DASH-STORY-002": "CLEAR", "DASH-STORY-003": "CLEAR",
         "DASH-STORY-004": "CLEAR", "DASH-STORY-005": "CLEAR", "DASH-STORY-006": "CLEAR",
         "DASH-STORY-007": "CLEAR", "DASH-STORY-008": "CLEAR", "DASH-STORY-009": "CLEAR",
-        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
+        "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "CLEAR_MINOR"
       },
-      "flags_raised": [],
-      "note": "All 10 stories reviewed here (DASH-STORY-001..010) have dev/qa/review prompt trios that genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns. DASH-STORY-011 postdates this review -- see scope_gap_note."
+      "flags_raised": [
+        {
+          "story": "DASH-STORY-011",
+          "type": "MISSING_CONSTRAINT",
+          "detail": "DASH-STORY-011's own spike exit criteria (#3) and dev_prompt established that DASH-STORY-007's Dev sub-task consumes the pinned Qdrant client-version recommendation as a required input, but backlog_draft.json's dependency_graph and DASH-STORY-007's depends_on list did not include DASH-STORY-011. The DAG under-represented a real sequencing coupling introduced when the spike was added post-hoc on 2026-09-18. Found 2026-09-19 in DASH-STORY-011's supplemental IR.1-equivalent review."
+        }
+      ],
+      "note": "All 10 stories reviewed in the original dispatch (DASH-STORY-001..010) have dev/qa/review prompt trios that genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns. DASH-STORY-011's own supplemental review found the sub-task structure (single Dev-only, spike convention) correctly and consistently applied across backlog_draft.json, implementation_execution_plan.json, and jira_setup_report.json, with the one dependency-DAG gap listed above (resolved)."
     }
   },
-  "total_flags_raised": 4,
-  "flags_list": ["DASH-STORY-003 (BA, ARCHITECTURE_GAP)", "DASH-STORY-007 (SA, DESIGN_MISMATCH)", "DASH-STORY-001 (SA, COVERAGE_GAP)", "DASH-STORY-008 (SA, MISSING_CONSTRAINT)"],
-  "scope_gap_note": "DASH-STORY-011 (Jira DSHN-53) was absent from implementation_execution_plan.json at the time of the original IR.1 dispatch (2026-09-17) and so was never reviewed by any of the 4 agents above. Its verdict_per_story entries are placeholders recording the gap, not review findings. A genuine IR.1 pass covering DASH-STORY-011's dev_prompt is outstanding before it can be marked CLEAR. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit; total_flags_raised/flags_list intentionally unchanged -- a never-reviewed story is not the same as a reviewed story with zero flags."
+  "total_flags_raised": 6,
+  "flags_list": ["DASH-STORY-003 (BA, ARCHITECTURE_GAP)", "DASH-STORY-007 (SA, DESIGN_MISMATCH)", "DASH-STORY-001 (SA, COVERAGE_GAP)", "DASH-STORY-008 (SA, MISSING_CONSTRAINT)", "DASH-STORY-011 (BA, UNVERIFIABLE_TRACEABILITY_CLAIM)", "DASH-STORY-011 (PM/SA/scrum-master, DEPENDENCY_CONFLICT/MISSING_CONSTRAINT -- same underlying DAG gap, independently raised by 3 reviewers, resolved as one fix)"],
+  "scope_gap_note": "DASH-STORY-011 (Jira DSHN-53) was absent from implementation_execution_plan.json at the time of the original IR.1 dispatch (2026-09-17) and so was not reviewed by any of the 4 agents' original pass. A genuine supplemental IR.1-equivalent review was dispatched 2026-09-19 (all 4 personas, each loading its real agent.md and mandatory skills) -- its real findings are recorded above, replacing the earlier NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS placeholder. See ir2_resolution_log.json for how the 2 distinct flags (1 BA, 3-reviewer-concurring DAG gap) were resolved, and ir5_alignment_verdict.json's story_011_supplemental_verdict for the resulting gate outcome."
 }

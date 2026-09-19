@@ -269,7 +269,7 @@
       "p1_security_review": false,
       "p1_trigger_evaluation": "No Zone 7 surface, no storage-adapter port implementation, no tenant-isolation logic. This is a documentation/research deliverable (a compatibility matrix and a version recommendation) with no write path and no code shipped to any zone.",
       "mathematical_delegation": null,
-      "logging_note": "Cite as AR1-011. Single-subtask spike (Dev only, no QA/Review split per spike convention - see jira_setup_report.json _note_dshn_53). Feeds DASH-STORY-007 as an input, not a blocking dependency in the DAG (depends_on: [] per backlog_draft.json), but DASH-STORY-007's Dev sub-task should not start writing Qdrant client adapter code before this spike's recommendation lands. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit - DASH-STORY-011 existed in backlog_draft.json since 2026-09-17 but was absent from this file at initial authoring."
+      "logging_note": "Cite as AR1-011. Single-subtask spike (Dev only, no QA/Review split per spike convention - see jira_setup_report.json _note_dshn_53). Feeds DASH-STORY-007 as a required input; DASH-STORY-007's Dev sub-task should not start writing Qdrant client adapter code before this spike's recommendation lands. Added 2026-09-18 closing a docs-drift gap found in a 57-artifact repo-wide audit - DASH-STORY-011 existed in backlog_draft.json since 2026-09-17 but was absent from this file at initial authoring. 2026-09-19 update: this precedence is now a real DAG edge (DASH-STORY-007 depends_on DASH-STORY-011, per backlog_draft.json), not just prose -- closing a MISSING_CONSTRAINT/DEPENDENCY_CONFLICT flag independently raised by 3 of 4 reviewers (PM, SA, scrum-master) in DASH-STORY-011's IR.1-equivalent review."
     }
   ],
   "dependency_integrity_check": {
@@ -281,7 +281,7 @@
       "DASH-STORY-004": ["DASH-STORY-003", "DASH-STORY-008"],
       "DASH-STORY-005": ["DASH-STORY-002"],
       "DASH-STORY-006": ["DASH-STORY-001", "DASH-STORY-005"],
-      "DASH-STORY-007": ["DASH-STORY-003"],
+      "DASH-STORY-007": ["DASH-STORY-003", "DASH-STORY-011"],
       "DASH-STORY-008": ["DASH-STORY-005", "DASH-STORY-007"],
       "DASH-STORY-009": ["DASH-STORY-008"],
       "DASH-STORY-010": ["DASH-STORY-008"],
