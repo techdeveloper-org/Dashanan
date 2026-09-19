@@ -22,17 +22,17 @@
     "total_story_points": 58,
     "stories_in_sprint": [
       "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
-      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-53"
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-54"
     ]
   },
   "created_issues": {
     "epics": [
       "DSHN-1", "DSHN-2", "DSHN-3", "DSHN-4", "DSHN-5", "DSHN-6",
-      "DSHN-7", "DSHN-8", "DSHN-9", "DSHN-10", "DSHN-11", "DSHN-12"
+      "DSHN-7", "DSHN-8", "DSHN-9", "DSHN-10", "DSHN-11", "DSHN-12", "DSHN-53"
     ],
     "stories": [
       "DSHN-13", "DSHN-14", "DSHN-15", "DSHN-16", "DSHN-17",
-      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-53"
+      "DSHN-18", "DSHN-19", "DSHN-20", "DSHN-21", "DSHN-22", "DSHN-54"
     ],
     "sub_tasks": [
       "DSHN-23", "DSHN-24", "DSHN-25", "DSHN-26", "DSHN-27", "DSHN-28",
@@ -41,8 +41,8 @@
       "DSHN-41", "DSHN-42", "DSHN-43", "DSHN-44", "DSHN-45", "DSHN-46",
       "DSHN-47", "DSHN-48", "DSHN-49", "DSHN-50", "DSHN-51", "DSHN-52"
     ],
-    "total_issue_count": 53,
-    "_note_dshn_53": "DSHN-53 (DASH-STORY-011, Qdrant client compatibility spike, 3 SP) added 2026-09-18 to sync this file with backlog_draft.json's sprint_1_stories from issue #5. It is scoped as a single Dev sub-task in backlog_draft.json (no separate QA/Review split, per spike convention), so it has no entries of its own in story_to_subtask_map or the sub_tasks list above."
+    "total_issue_count": 54,
+    "_note_dshn_53_54_correction": "2026-09-19 CORRECTION: this file previously claimed DSHN-53 was DASH-STORY-011's story issue (added 2026-09-18, issue #5) -- that was never actually true. A live query of the DSHN board (jira_search_issues, all issues sorted by creation date) on 2026-09-19 confirmed the real board only ever had DSHN-1..52 (12 epics + the original 10 Sprint-1 stories + 30 sub-tasks); DASH-STORY-011's story was never created via the Jira API despite this file claiming otherwise. This was discovered when creating FR-013's real epic (round-7 docs-consistency fix): the live API returned DSHN-53 for that new epic (proof no issue previously existed at that key), colliding with this file's stale claim. Resolution: DASH-STORY-011's real story issue was created immediately after and correctly landed at DSHN-54 (moved into Sprint 1, sprint_id 168). DSHN-53 is genuinely FR-013's epic; DSHN-54 is genuinely DASH-STORY-011's story. All fields below updated to match the live board."
   },
   "story_to_subtask_map": {
     "_note": "Sub-task 'sp' values below are documentation-only (planned effort split for internal tracking). As of the 2026-09-17 Phase 6 gate fix, sub-tasks no longer carry an independent Jira story-points field value (cleared to 0/customfield_10016) so they do not double-count into the sprint's story_points_total alongside their parent story. DSHN-16 and DSHN-22 splits were also rebalanced here (dev1/qa1/review1=3) to match their 3-SP parent; live Jira descriptions/labels on DSHN-32/33/34 and DSHN-50/51/52 were already blank, so no live-issue text needed correction.",
@@ -90,7 +90,7 @@
       "epic_key": "DSHN-6",
       "story_keys": ["DSHN-19"],
       "sprint_1_coverage": true,
-      "note": "DSHN-53 (DASH-STORY-011 spike) de-risks this FR's Qdrant client-library dependency ahead of DSHN-19's Dev sub-task; it is not listed in story_keys because it does not itself deliver FR-006."
+      "note": "DSHN-54 (DASH-STORY-011 spike) de-risks this FR's Qdrant client-library dependency ahead of DSHN-19's Dev sub-task; it is not listed in story_keys because it does not itself deliver FR-006."
     },
     "FR-007": {
       "epic_key": "DSHN-7",
@@ -123,14 +123,20 @@
       "epic_key": "DSHN-12",
       "story_keys": ["DSHN-20", "DSHN-21", "DSHN-22"],
       "sprint_1_coverage": true
+    },
+    "FR-013": {
+      "epic_key": "DSHN-53",
+      "story_keys": [],
+      "sprint_1_coverage": false,
+      "note": "Backlog for a future sprint per backlog_draft.json future_sprints_backlog.remaining_frs (wsjf_rank 7, wsjf_score 4.25), hard-dependency-gated behind FR-003/FR-005. Epic created 2026-09-19 (round-7 docs-consistency fix); same treatment as FR-003/004/005/008/011's epic-only placeholders."
     }
   },
   "fr_to_jira_map_completeness": {
     "total_frs": 13,
-    "frs_mapped": 12,
+    "frs_mapped": 13,
     "frs_with_sprint_1_stories": 7,
-    "frs_epic_only": 5,
-    "verified_complete": false,
-    "unmapped_fr_note": "FR-013 (Zone 3/5 write-conflict-detection sweep, formally adopted into SRS.md v1.0.6, 2026-09-18) now has a real forward-tracking hook: backlog_draft.json's future_sprints_backlog.remaining_frs (wsjf_rank 7, wsjf_score 4.25, full derivation and a sequencing_note gating it behind FR-003/FR-005). It is still intentionally not mapped to any Jira epic or story -- creating that epic is a distinct, separate action for a future sprint-planning pass, not something a docs-consistency fix should do on its own. verified_complete stays false until that Jira epic exists or FR-013 is formally excluded."
+    "frs_epic_only": 6,
+    "verified_complete": true,
+    "unmapped_fr_note": "Resolved 2026-09-19: FR-013 now has a real Jira epic (DSHN-53), same as every other FR. verified_complete is true because every FR has at least an epic -- matching what this field already meant for the other 5 epic-only future-sprint FRs (FR-003/004/005/008/011), none of which have a Sprint-1 story either."
   }
 }

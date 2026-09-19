@@ -2,12 +2,35 @@
 
 **2026-09-18 addendum:** All sampling/verification figures below (n=21/30, 27/27, 30/30, etc.)
 were computed against the 30-prompt set that existed in `implementation_execution_plan.json`
-when this gate ran (DASH-STORY-001..010). DASH-STORY-011 (Jira DSHN-53) was added to that file
-afterward and its `dev_prompt` has **not** been verified by this Phase C hallucination/
-faithfulness gate — an outstanding item, not silently counted as covered by the "30/30 prompts
-effectively verified" figure below. Consistent with the same gap already disclosed in
-`docs/phase-8-alignment/ir1_agent_flags.json`'s `scope_gap_note` and
-`ir2_resolution_log.json`'s `missing_from_original_ir1_pass` field.
+when this gate ran (DASH-STORY-001..010). DASH-STORY-011 (Jira DSHN-54) was added to that file
+afterward and its `dev_prompt` was **not yet** verified by this Phase C hallucination/
+faithfulness gate at that time — see the 2026-09-19 addendum below for the real, completed check.
+
+**2026-09-19 addendum — DASH-STORY-011 real Phase C-equivalent check (full, non-sampled — one
+prompt, not thirty):** Dispatched `hallucination-detector` and `context-faithfulness-engineer`
+personas (each loading its real `agent.md` and mandatory skills) against DASH-STORY-011's
+`dev_prompt` in full.
+
+- **C-2 (context-faithfulness-engineer): CLEAN.** Context-source citations exact match to
+  `ar3_context_windows.json`'s real `sources` array (no extraneous, none missing). Faithfulness
+  check confirmed the round-6/7 ADR-007-version-citation fix holds up under independent re-check.
+  PII hard-fail check PASS (no zone payload/PII/code path touched, consistent with
+  `ar3_context_windows.json`'s own `pii_note`).
+- **C-1 (hallucination-detector): 1 real finding, MEDIUM severity, RESOLVED.** The `dev_prompt`'s
+  `MUST-NOT-DEVIATE (binding, ar1_assignments.json)` block was labeled as sourced from
+  `ar1_assignments.json` but didn't match it: it dropped the real second constraint ("Scope is
+  client-library compatibility/version validation only, not vendor selection") and fabricated a
+  replacement ("Timeboxed to 3 story points") that does not appear in
+  `ar1_assignments.json`'s real `must_not_deviate` array (3 SP is the separate `story_points`
+  field, not a listed constraint) — an extrinsic hallucination attributed to a source that
+  doesn't contain it. **Fixed**: `implementation_execution_plan.json`'s dev_prompt now lists the
+  real 3-item `must_not_deviate` array verbatim. Also fixed 2 LOW-severity wording drifts in the
+  SPIKE EXIT CRITERIA text (criteria #3/#4) to match `backlog_draft.json`'s exact wording — no
+  meaning change, citation-accuracy only.
+- Context-source citation accuracy: exact match (both reviewers independently confirmed).
+
+**Verdict: PASS after resolution.** Same discipline as round 6's IR.1 flags — a real finding
+found by genuine review, fixed and verified, not silently disclosed-and-deferred a third time.
 
 ## C-1: hallucination-detector
 - **NLI faithfulness (proxy): 0.99** (sample n=21/30 prompts, 7/10 stories)
@@ -27,4 +50,6 @@ effectively verified" figure below. Consistent with the same gap already disclos
 DASH-STORY-005's dev_prompt CONTEXT SOURCES line and PII note were extracted directly from `implementation_execution_plan.json` and diffed against `ar3_context_windows.json`'s `sources`/`pii_note` fields for that story — **exact match**, same pattern as all 9 other stories. No anomaly. Coverage gap closed: **30/30 prompts effectively verified** (27 automated + 3 manually spot-checked via DASH-STORY-005).
 
 ## Overall verdict
-Both Phase C gates **PASS**. NLI 0.99, FactScore 0.99, RAGAS F/CP/CR all 1.00 (sampled), AR ~0.95 — all comfortably above the RS >= 0.95 component thresholds. PII hard-fail check clean. No blocking findings carried forward to reliability-auditor's RS computation.
+Both Phase C gates **PASS** for DASH-STORY-001..010 (2026-09-17 run). NLI 0.99, FactScore 0.99, RAGAS F/CP/CR all 1.00 (sampled), AR ~0.95 — all comfortably above the RS >= 0.95 component thresholds. PII hard-fail check clean. No blocking findings carried forward to reliability-auditor's RS computation.
+
+DASH-STORY-011 (2026-09-19 supplemental run, see addendum above): **PASS after resolution** — 1 real MEDIUM finding (a MUST-NOT-DEVIATE block misattributed to ar1_assignments.json) found and fixed, C-2 clean throughout. All 11 Sprint-1 stories now have a completed Phase C pass.

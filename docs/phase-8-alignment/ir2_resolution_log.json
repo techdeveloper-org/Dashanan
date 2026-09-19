@@ -56,7 +56,7 @@
   "no_flags_stories": ["DASH-STORY-002", "DASH-STORY-004", "DASH-STORY-005", "DASH-STORY-006", "DASH-STORY-009", "DASH-STORY-010"],
   "story_011_supplemental_pass": {
     "stories": ["DASH-STORY-011"],
-    "detail": "DASH-STORY-011 (Jira DSHN-53) was absent from implementation_execution_plan.json's 30-prompt set at the time ir1_agent_flags.json was originally produced (2026-09-17). A genuine supplemental IR.1-equivalent review (all 4 personas, real agent.md + mandatory skills loaded) was dispatched 2026-09-19, found 2 real, distinct flags (both above, both RESOLVED), and is reflected in ir1_agent_flags.json's verdict_per_story entries for DASH-STORY-011 (replacing the earlier NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS placeholder). See ir5_alignment_verdict.json's story_011_supplemental_verdict for the resulting gate outcome."
+    "detail": "DASH-STORY-011 (Jira DSHN-54) was absent from implementation_execution_plan.json's 30-prompt set at the time ir1_agent_flags.json was originally produced (2026-09-17). A genuine supplemental IR.1-equivalent review (all 4 personas, real agent.md + mandatory skills loaded) was dispatched 2026-09-19, found 2 real, distinct flags (both above, both RESOLVED), and is reflected in ir1_agent_flags.json's verdict_per_story entries for DASH-STORY-011 (replacing the earlier NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS placeholder). See ir5_alignment_verdict.json's story_011_supplemental_verdict for the resulting gate outcome."
   },
   "disclosed_non_blocking_notes": [
     "DASH-STORY-007: BA noted the P1 gate is explicitly marked 'conditional' pending user acceptance of the AC-014 scope-extension deviation -- disclosed open decision, not an unresolved flag.",
