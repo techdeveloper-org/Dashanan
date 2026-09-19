@@ -7,6 +7,8 @@
 **Author:** business-analyst-agent (Phase 0 co-lead)
 **Source of truth:** `docs/orchestration/01-vision-and-prd.md` (locked, post architecture-review), `README.md`
 
+**Historical note:** this is the Phase 0 snapshot; superseded by the living `SRS.md` (currently v1.0.6, APPROVED) and `HLD.md` for all current requirements/architecture content.
+
 ---
 
 ## 1. Purpose

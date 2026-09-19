@@ -17,5 +17,6 @@
   ],
   "final_verdict": "APPROVED",
   "bounded_retry_note": "2 of 3 max iterations used (ADR-9) -- did not need to escalate to human.",
-  "downstream_status": "IMPLEMENTATION READY -- STOP 8 reached. Phase B (code implementation) is explicitly out of scope for this bundle per repeated user instruction and requires the user's own explicit go-ahead before any implementation begins."
+  "downstream_status": "IMPLEMENTATION READY -- STOP 8 reached. Phase B (code implementation) is explicitly out of scope for this bundle per repeated user instruction and requires the user's own explicit go-ahead before any implementation begins.",
+  "scope_note": "This verdict's final_verdict: APPROVED covers exactly the 10 stories reviewed by ir1_agent_flags.json/ir2_resolution_log.json (DASH-STORY-001..010). DASH-STORY-011 was added to the Sprint 1 backlog afterward (2026-09-18 docs-drift fix) and is explicitly not covered by this verdict -- see ir2_resolution_log.json's missing_from_original_ir1_pass field. A follow-up IR.1/IR.2/IR.5-equivalent pass for DASH-STORY-011 is required before it is considered implementation-ready under this gate."
 }

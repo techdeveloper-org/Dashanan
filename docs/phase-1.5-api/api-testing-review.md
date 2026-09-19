@@ -2,7 +2,7 @@
 
 Reviewer: api-testing-engineer (Domain 42, skills: api-testing-core, contract-testing-core,
 security-testing-ci-core, integration-testing-core)
-Artifact reviewed: `docs/phase-1.5-api/openapi.yaml` (openapi 3.1.0, 31 operations, JWT bearer + mTLS)
+Artifact reviewed: `docs/phase-1.5-api/openapi.yaml` (openapi 3.1.0, 32 operations, JWT bearer + mTLS)
 Basis for security test plan: `docs/phase-1-architecture/HLD.md` Section 10, threats I-1/I-2/I-3
 
 **2026-09-18 addendum:** This review's operation count (31) and every derived coverage number
@@ -11,7 +11,11 @@ below (|T(S)| = 112 triples, the 4-gaps/27-clean breakdown) were computed before
 endpoint"). The spec now has 32 operations. `/items:batchGet`'s own design-time testability has
 not yet been assessed by this review — an open item, not silently folded into the 27-clean
 figure below. The original 31-operation analysis and its triple count remain a real, dated
-result and are left as authored rather than rewritten to an unverified "32".
+result and are left as authored rather than rewritten to an unverified "32". The heading above
+has been corrected to the current operation count (32); every other "31 operations" mention
+remaining in this document (the |T(S)|=112 triple-count line in §1 and the 4-of-31/27-clean
+gap summary near the end) is an intentional reference to this same original analysis baseline,
+not an unfixed instance of this staleness.
 
 ---
 
@@ -96,7 +100,7 @@ triple, regardless of shared `$ref` response bodies).
 Recomputing cleanly, one row at a time, running total:
 7, 10, 13, 16, 21, 24, 27, 30, 37, 42, 45, 48, 52, 55, 59, 62, 65, 68, 71, 75, 79, 83, 86, 90, 95, 99, 103, 108, 109, 111, **112**
 
-**|T(S)| = 112 triples across 31 operations.**
+**|T(S)| = 112 triples across 31 operations** (the original 31-operation analysis baseline; see the 2026-09-18 addendum — not re-run against the current 32).
 
 ### 1.3 Reported coverage
 
@@ -210,5 +214,7 @@ of admin reads). All other 27 operations are testable as documented — no block
 - **BOLA/IDOR plan**: 14 test cases across every tenant-scoped endpoint (§3), directly tied to
   HLD threats I-1/I-2/I-3, including one end-to-end retrieval-level test (BOLA-13) and one
   timing-oracle test (BOLA-12) that unit-level per-endpoint tests alone would miss.
-- **4 High/Medium-severity gaps** block full design-time testability on 4 of 31 operations; the
-  remaining 27 are fully testable as specified.
+- **4 High/Medium-severity gaps** block full design-time testability on 4 of the **original 31
+  analyzed** operations; the remaining 27 of those 31 are fully testable as specified.
+  `/items:batchGet`, the 32nd operation, has not yet been analyzed by this review — see the
+  2026-09-18 addendum.

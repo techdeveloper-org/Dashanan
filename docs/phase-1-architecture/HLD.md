@@ -5,7 +5,7 @@
 
 **Document ID:** HLD-20260917-01
 **Version:** 1.0.0
-**Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, 2026-09-17); narrower-scope re-confirmation (story-patch verification across the 10 Sprint-1 stories), not a standalone Phase 1 architecture re-review
+**Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, 2026-09-17); narrower-scope re-confirmation (story-patch verification across the 10 Sprint-1 stories), not a standalone Phase 1 architecture re-review. DASH-STORY-011, added to the Sprint 1 backlog after this verification ran, is explicitly OUT of this governed-approval scope -- see `ir2_resolution_log.json`'s `missing_from_original_ir1_pass` field; it requires its own IR.1/IR.2 pass before its Dev sub-task begins, not implied coverage by this document's APPROVED status.
 **Created:** 2026-09-17
 **Entry Mode:** Greenfield (Mode A) — verified: `Dashanan/` contained only `README.md` + `docs/` (no prior architecture artifacts, no source tree)
 **Source PRD:** `docs/phase-0-output/PRD.md` (PRD-20260917-01 v1.0.0)

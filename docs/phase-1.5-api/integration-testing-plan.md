@@ -1,6 +1,6 @@
 # Dashanan Phase 1.5 — Integration & Contract Testing Plan
 
-Source of truth: `docs/phase-1.5-api/openapi.yaml` (31 operations, JWT `bearerAuth` with scopes
+Source of truth: `docs/phase-1.5-api/openapi.yaml` (32 operations, JWT `bearerAuth` with scopes
 `context:read` / `memory:write` / `admin:zones` / `admin:tenants`) and
 `docs/phase-1-architecture/HLD.md` §3.10 (Data Ownership Map) + §7.6 (Internal event contracts).
 Everything below is derived from those two documents — no field, endpoint, or event shape is
@@ -8,10 +8,10 @@ invented independently of `openapi.yaml`. Where the spec is ambiguous, that is f
 in §6 rather than guessed at, per this task's constraint (this document is one of two inputs to
 `api-testing-engineer`'s parallel coverage review).
 
-**2026-09-18 addendum:** The "31 operations" count above predates `/items:batchGet`, added to
-`openapi.yaml` after this plan was authored (SRS Change Log 1.0.5). The spec now has 32
-operations; `/items:batchGet`'s test plan has not yet been derived and is an open item, not
-folded into any count below.
+**2026-09-18 addendum:** The operation count above has been corrected to 32 (was 31 when this
+plan was originally authored, before `/items:batchGet` was added to `openapi.yaml` per SRS
+Change Log 1.0.5). `/items:batchGet`'s test plan has not yet been derived and is an open item,
+not folded into any count below.
 
 ---
 
