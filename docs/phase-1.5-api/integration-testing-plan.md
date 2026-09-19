@@ -8,6 +8,11 @@ invented independently of `openapi.yaml`. Where the spec is ambiguous, that is f
 in §6 rather than guessed at, per this task's constraint (this document is one of two inputs to
 `api-testing-engineer`'s parallel coverage review).
 
+**2026-09-18 addendum:** The "31 operations" count above predates `/items:batchGet`, added to
+`openapi.yaml` after this plan was authored (SRS Change Log 1.0.5). The spec now has 32
+operations; `/items:batchGet`'s test plan has not yet been derived and is an open item, not
+folded into any count below.
+
 ---
 
 ## 1. Storage adapter → zone mapping (drives the Testcontainers strategy, §2)

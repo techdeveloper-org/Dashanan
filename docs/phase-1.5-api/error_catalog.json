@@ -1,0 +1,86 @@
+{
+  "document_id": "ERROR-CATALOG-20260918-01",
+  "version": "1.0.0",
+  "date": "2026-09-18",
+  "derived_from": "docs/phase-1.5-api/openapi.yaml",
+  "regenerate_when": "openapi.yaml's components.responses or components.schemas.ErrorResponse change -- this file is an extract, not an independent source of truth.",
+  "envelope_schema": {
+    "ref": "openapi.yaml#/components/schemas/ErrorResponse",
+    "required": ["success", "error", "timestamp"],
+    "properties": {
+      "success": "boolean, const false",
+      "data": "null",
+      "error": {
+        "required": ["code", "message"],
+        "code": "string, e.g. INVALID_SOURCE_TYPE, TENANT_SCOPE_MISMATCH, IDEMPOTENCY_KEY_REUSED, STALE_CURSOR, MALFORMED_CURSOR",
+        "message": "string, user-facing; never echoes payload content or internal storage detail (HLD control I-6)",
+        "trace_id": "string, optional"
+      },
+      "timestamp": "string, date-time"
+    }
+  },
+  "errors": [
+    {
+      "name": "BadRequest",
+      "http_status": 400,
+      "description": "Malformed request -- includes a syntactically invalid opaque cursor value (corrupted, truncated, or tampered; distinct from 410 StaleCursor, which is a well-formed cursor that no longer resolves).",
+      "example_codes": ["MALFORMED_CURSOR"]
+    },
+    {
+      "name": "Unauthorized",
+      "http_status": 401,
+      "description": "Missing or invalid credential.",
+      "example_codes": []
+    },
+    {
+      "name": "Forbidden",
+      "http_status": 403,
+      "description": "Credential valid but scope insufficient (e.g. data-plane token at an admin endpoint -- HLD threat E-1). Also used for TENANT_SCOPE_MISMATCH, never 404.",
+      "example_codes": ["TENANT_SCOPE_MISMATCH"]
+    },
+    {
+      "name": "NotFound",
+      "http_status": 404,
+      "description": "Resource does not exist (or is outside the caller's tenant partition -- never distinguished from true absence, to avoid a tenant-existence oracle).",
+      "example_codes": []
+    },
+    {
+      "name": "IdempotencyConflict",
+      "http_status": 409,
+      "description": "Idempotency-Key reused with a different request body.",
+      "example_codes": ["IDEMPOTENCY_KEY_REUSED"]
+    },
+    {
+      "name": "UnprocessableEntity",
+      "http_status": 422,
+      "description": "Semantically invalid -- e.g. a write with no resolvable source_type (FR-010 boundary enforcement).",
+      "example_codes": ["INVALID_SOURCE_TYPE"]
+    },
+    {
+      "name": "RateLimited",
+      "http_status": 429,
+      "description": "Per-tenant token-bucket exhausted (HLD threat D-1).",
+      "headers": ["Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+      "example_codes": []
+    },
+    {
+      "name": "ServiceDegraded",
+      "http_status": 503,
+      "description": "Read path degraded to working_only or unavailable (HLD Section 8.4); response body still returned with degraded:true where possible.",
+      "example_codes": []
+    },
+    {
+      "name": "WriteRejectedNotDurable",
+      "http_status": 503,
+      "description": "Structured store unreachable; the write is rejected rather than falsely acknowledged (HLD Section 8.4 -- the one accepted single point of failure on the write path, by design, not by omission).",
+      "headers": ["Retry-After"],
+      "example_codes": []
+    },
+    {
+      "name": "StaleCursor",
+      "http_status": 410,
+      "description": "The supplied cursor no longer resolves against the current assembly_id/query basis -- either it referenced a different session/assembly than the one it is now being replayed against, or the underlying result set it was issued for has expired/rotated server-side. The caller must discard the cursor and re-issue the original request without cursor to obtain a fresh first page.",
+      "example_codes": ["STALE_CURSOR"]
+    }
+  ]
+}

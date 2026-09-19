@@ -1,7 +1,7 @@
 {
   "phase": 8,
   "step": "IR.1",
-  "description": "Self-review flags raised by each of the 4 Phase 8 review agents (BA/PM/SA/scrum-master) against the 30 CoT prompts in implementation_execution_plan.json, dispatched 2026-09-17.",
+  "description": "Self-review flags raised by each of the 4 Phase 8 review agents (BA/PM/SA/scrum-master) against the 30 CoT prompts in implementation_execution_plan.json, dispatched 2026-09-17. DASH-STORY-011 was added later (2026-09-18) and is not covered by this dispatch -- see scope_gap_note.",
   "reviewers": {
     "business-analyst-agent": {
       "verdict_per_story": {
@@ -77,7 +77,7 @@
         "DASH-STORY-010": "CLEAR", "DASH-STORY-011": "NOT_REVIEWED_MISSING_FROM_ORIGINAL_IR1_PASS"
       },
       "flags_raised": [],
-      "note": "All 10 stories' dev/qa/review prompt trios genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns."
+      "note": "All 10 stories reviewed here (DASH-STORY-001..010) have dev/qa/review prompt trios that genuinely cover the 70/20/10 sub-task split against the INVEST/AC decomposition in backlog_draft.json; P1 escalations (004/005/006/007) trace correctly to backlog-flagged security/PII concerns. DASH-STORY-011 postdates this review -- see scope_gap_note."
     }
   },
   "total_flags_raised": 4,

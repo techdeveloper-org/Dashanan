@@ -1,5 +1,14 @@
 # Phase 7 Phase C (Hallucination/Faithfulness Gate) Results — 2026-09-17
 
+**2026-09-18 addendum:** All sampling/verification figures below (n=21/30, 27/27, 30/30, etc.)
+were computed against the 30-prompt set that existed in `implementation_execution_plan.json`
+when this gate ran (DASH-STORY-001..010). DASH-STORY-011 (Jira DSHN-53) was added to that file
+afterward and its `dev_prompt` has **not** been verified by this Phase C hallucination/
+faithfulness gate — an outstanding item, not silently counted as covered by the "30/30 prompts
+effectively verified" figure below. Consistent with the same gap already disclosed in
+`docs/phase-8-alignment/ir1_agent_flags.json`'s `scope_gap_note` and
+`ir2_resolution_log.json`'s `missing_from_original_ir1_pass` field.
+
 ## C-1: hallucination-detector
 - **NLI faithfulness (proxy): 0.99** (sample n=21/30 prompts, 7/10 stories)
 - **FactScore: 0.99** (25/25 sampled atomic facts supported)

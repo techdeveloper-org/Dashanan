@@ -1,0 +1,42 @@
+{
+  "document_id": "PAGINATION-CONTRACTS-20260918-01",
+  "version": "1.0.0",
+  "date": "2026-09-18",
+  "derived_from": "docs/phase-1.5-api/openapi.yaml",
+  "regenerate_when": "openapi.yaml's cursor/page_size parameters, AssembleContextRequest.cursor, SearchMemoryResponse.next_cursor, ZoneItemsPage, or the StaleCursor/BadRequest error responses change -- this file is an extract, not an independent source of truth.",
+  "design_note": "api-design-core M1: offset pagination is forbidden at the item counts in HLD Section 12D. Every pattern below is cursor-based; none accepts an offset/page-number parameter.",
+  "patterns": [
+    {
+      "endpoint": "POST /context/assemble",
+      "kind": "budget-fit continuation cursor",
+      "description": "NOT classic pagination. HLD Section 7.1 models assemble as a single budget-fitted snapshot bounded by max_items<=500, not a paginated list. cursor lets a caller retrieve additional ranked candidates beyond the first page's budget fit without re-running retrieval, while keeping the snapshot's assembly_id and score basis stable.",
+      "request_field": "cursor (string, nullable) -- absent on the first call",
+      "response_field": "next_cursor (string, nullable) -- present when items_considered > items_returned",
+      "cap": "max_items: integer, minimum 1, maximum 500, default 50 (hard server-side cap per HLD threat D-3)",
+      "same_scope_constraint": "cursor is only valid within the SAME assembly_id it was issued for",
+      "error_on_invalid_cursor": {
+        "malformed": "400 BadRequest / MALFORMED_CURSOR",
+        "no_longer_resolves": "410 StaleCursor / STALE_CURSOR"
+      }
+    },
+    {
+      "endpoint": "POST /memory/search",
+      "kind": "classic cursor + page_size",
+      "description": "Raw retrieval without assembly/budget-fitting; standard cursor-paginated results.",
+      "request_fields": ["cursor (string, nullable)", "page_size (integer, minimum 1, maximum 500, default 50)"],
+      "response_field": "next_cursor (string, nullable), required field on SearchMemoryResponse",
+      "error_on_invalid_cursor": {
+        "malformed": "400 BadRequest / MALFORMED_CURSOR",
+        "no_longer_resolves": "410 StaleCursor / STALE_CURSOR"
+      }
+    },
+    {
+      "endpoint": "GET /zones/{zone}/items",
+      "kind": "admin cursor + page_size browse",
+      "description": "Cursor-paginated admin browse of a zone's items (FR-009, FR-002 -- Episodic zone's own cursor-pagination rule generalized to every zone's admin browse per api-design-core M1).",
+      "request_fields": ["cursor (string, query param)", "page_size (integer, minimum 1, maximum 500, default 50, query param)"],
+      "response_schema": "ZoneItemsPage",
+      "auth_scope": "admin:zones"
+    }
+  ]
+}

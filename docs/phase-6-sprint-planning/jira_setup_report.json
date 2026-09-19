@@ -126,10 +126,11 @@
     }
   },
   "fr_to_jira_map_completeness": {
-    "total_frs": 12,
+    "total_frs": 13,
     "frs_mapped": 12,
     "frs_with_sprint_1_stories": 7,
     "frs_epic_only": 5,
-    "verified_complete": true
+    "verified_complete": false,
+    "unmapped_fr_note": "FR-013 (Zone 3/5 write-conflict-detection sweep, formally adopted into SRS.md v1.0.6, 2026-09-18) is intentionally not yet mapped to any Jira epic or story, and has no Sprint-1/future-sprint backlog entry -- deferred to a future sprint-planning pass. verified_complete is false until FR-013 is mapped or explicitly excluded by that pass."
   }
 }

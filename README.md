@@ -10,7 +10,14 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 >
 > Full rationale: [`docs/orchestration/01-vision-and-prd.md`](docs/orchestration/01-vision-and-prd.md).
 
-> ⚠️ **Status (updated 2026-09-17):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (15 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed (see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** Phase B — actual code implementation — has **not** started and is intentionally out of scope until the user reviews everything above and gives explicit go-ahead.
+> ⚠️ **Status (updated 2026-09-17):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed (see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** Phase B — actual code implementation — has **not** started and is intentionally out of scope until the user reviews everything above and gives explicit go-ahead.
+
+> **Implementation Ready — with these documented pre-implementation decisions pending** (added 2026-09-18, per a repo-wide consistency audit). "Implementation Ready" above means the planning pipeline's own gates all passed; it does not mean every underlying architecture question is closed. The following items in [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md)'s Open Architecture Questions table are genuinely still open and should be resolved (or explicitly accepted as-is) before or early in Phase B:
+> - **OAQ-10** — DPDP erasure via crypto-shredding of an append-only audit store. Status: Proposed. Whether key destruction constitutes erasure under DPDP Act 2023 requires legal confirmation, not an architect's judgment.
+> - **OAQ-13** — All NFR-004 capacity/latency numbers (2,000 read QPS / 5,000 write QPS / 99.9% availability, Profile C) are `[ASSUMED]`, not measured. Must be confirmed before further scaling decisions build on them.
+> - **OAQ-18** — Regulated-identifier detection at the write gate (ADR-017). Status: Partially resolved — the identifier set (Aadhaar/PAN/payment card) has a citation-backed recommendation, but counsel ratification and the formal fail-open/fail-closed choice remain open.
+> - **OAQ-20** — Per-zone Frequency `f_cap` defaults (§12G). Status: Partially resolved — `[ASSUMED]` starting defaults only (Zone 1: 20, Zone 2: 100), not validated against real access-count telemetry.
+> - **OAQ-22** — `context.assemble` RPC transport shape at large token budgets (ADR-019). Status: Partially resolved — unary transport is adopted, but the specific streaming-mandatory token-count threshold stays open pending a benchmarking pass.
 
 ## What problem does this solve?
 
@@ -46,8 +53,8 @@ This repository is currently **pre-implementation** — Phases 0 through 8 (arch
 
 Recommended reading order for someone new to the project:
 1. **This README** — problem statement, the 8-zone model, goals.
-2. [`SRS.md`](SRS.md) — the canonical requirements specification (13 FRs, 11 NFRs, 17+ ACs): what the system is required to do.
-3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 15+ ADRs covering every major technology and mechanism choice.
+2. [`SRS.md`](SRS.md) — the canonical requirements specification (13 FRs, 15 NFRs, 23 ACs): what the system is required to do.
+3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 19 ADRs covering every major technology and mechanism choice.
 4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
 5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
 
@@ -58,7 +65,7 @@ Local development / build / run instructions will be added here once Phase B imp
 ```
 Dashanan/
 ├── README.md                    <- this file
-├── SRS.md                       <- Software Requirements Specification (13 FRs, 11 NFRs, 17 ACs)
+├── SRS.md                       <- Software Requirements Specification (13 FRs, 15 NFRs, 23 ACs)
 ├── docs/
 │   ├── orchestration_prompt.md  <- index into the 3-file orchestration bundle
 │   ├── orchestration/           <- 01-vision-and-prd.md, 02-architecture-workflow.md, 03-agent-registry.md

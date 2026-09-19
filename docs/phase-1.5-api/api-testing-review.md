@@ -5,6 +5,14 @@ security-testing-ci-core, integration-testing-core)
 Artifact reviewed: `docs/phase-1.5-api/openapi.yaml` (openapi 3.1.0, 31 operations, JWT bearer + mTLS)
 Basis for security test plan: `docs/phase-1-architecture/HLD.md` Section 10, threats I-1/I-2/I-3
 
+**2026-09-18 addendum:** This review's operation count (31) and every derived coverage number
+below (|T(S)| = 112 triples, the 4-gaps/27-clean breakdown) were computed before
+`/items:batchGet` was added to `openapi.yaml` (SRS Change Log 1.0.5, "OpenAPI batch-retrieve
+endpoint"). The spec now has 32 operations. `/items:batchGet`'s own design-time testability has
+not yet been assessed by this review — an open item, not silently folded into the 27-clean
+figure below. The original 31-operation analysis and its triple count remain a real, dated
+result and are left as authored rather than rewritten to an unverified "32".
+
 ---
 
 ## 1. C_api Triple Coverage — Derivation

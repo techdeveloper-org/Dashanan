@@ -13,10 +13,12 @@ as event-level test coverage.
 ## FR traceability note
 
 `integration-testing-plan.md` §4 cites "FR-013, FR-012, FR-009" as the FRs governing this whole event
-section collectively. **FR-013 does not exist anywhere in `docs/phase-0-output/PRD.md`'s FR list
-(FR-001 through FR-012 only)** — this is a docs-drift defect in the source file, not something this RTM
-can resolve by inventing a meaning for FR-013. It is recorded as `[NEEDS INPUT]` below rather than
-silently dropped or guessed at.
+section collectively. **2026-09-18 update:** FR-013 was formally adopted into `SRS.md` v1.0.6
+(Zone 3/5 write-conflict-detection sweep, HLD OAQ-14 -> Resolved: Adopted) — it does not appear
+in the frozen `docs/phase-0-output/PRD.md`'s FR list (FR-001 through FR-012 only) because it was
+added post-PRD, directly to the living SRS, per this repo's append-only SRS lifecycle
+convention. This closes the docs-drift defect previously recorded here; FR-013 is no longer an
+undefined reference.
 
 ## Event → Consumer → FR → Test Matrix
 

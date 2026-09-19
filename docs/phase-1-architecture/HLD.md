@@ -374,7 +374,7 @@ Rotation Engine       OWNS: RotationDeadline (the timer-wheel entries, Section 1
 
 ## Section 4 — Architecture Decision Records
 
-Fifteen ADRs. Every technology selection in Sections 2, 3, 5 traces to exactly one.
+Nineteen ADRs. Every technology selection in Sections 2, 3, 5 traces to exactly one.
 
 ### ADR-001: Deployment shape — dual (embeddable library + optional sidecar)
 
@@ -1647,7 +1647,7 @@ Twenty-two items for the consensus gate. Items marked **[DERIVED FINDING]** are 
 | OAQ-11 | **Provenance travels with every retrieval hit** (research brief §4) | Adopted | Increases response payload ~30%. Phase 1.5 must decide whether `include_provenance` defaults true (recommended — it is the product's differentiator) or false. |
 | OAQ-12 | Fast-track `Compressed`+`Archived` in one sweep | Adopted, gated by **content size**: eligible when `payload_tokens < 64` | Implements the brief's recommendation to gate by content type/size rather than score-collapse velocity. A 40-token scratch note has negligible fidelity to preserve at the intermediate step. Threshold value needs review. |
 | OAQ-13 | **All NFR-004 numbers are `[ASSUMED]`** | Stated in Section 9 | Profile C's 2,000 read QPS / 5,000 write QPS / 99.9% availability are this HLD's assumptions, not user-stated targets. Everything in Section 12D scales from them. **Must be confirmed before Phase 1.5.** |
-| OAQ-14 | **NEW SCOPE:** conflict-detection sweep on Zone 3/5 writes | Proposed | From research brief §4. Not in the PRD's FRs. It is what makes `ProvenanceConfidence` a live computation instead of a write-once constant, and it is the strongest memory-poisoning control (T-1). Recommend adopting as **FR-013**. |
+| OAQ-14 | **NEW SCOPE:** conflict-detection sweep on Zone 3/5 writes | **Resolved: Adopted** (SRS.md v1.0.6, 2026-09-18) | From research brief §4. Not in the PRD's FRs. It is what makes `ProvenanceConfidence` a live computation instead of a write-once constant, and it is the strongest memory-poisoning control (T-1). Formally adopted as **FR-013** in SRS.md's Functional Requirements section, closing the docs-drift gap where openapi.yaml/integration-testing-plan.md already treated it as adopted while SRS's own FR table stopped at FR-012. |
 | OAQ-15 | **Embedding provider is a hard dependency Phase 0 never named** | Addressed by ADR-015 | Zone 6 cannot exist without it. It is also the read path's dominant latency cost and a DPDP cross-border transfer surface. Should appear explicitly in the PRD's dependency list. |
 | OAQ-16 | **8-zone taxonomy: NO revision proposed.** One structural observation. | Taxonomy holds | The taxonomy survives contact with the architecture. **Observation, not a revision request:** Zones 6 and 7 are categorically different from Zones 1-5 and 8 — they are *derived, cross-cutting layers* over the other six, not independent memory stores. Consequences already reflected here: they have no independent `lambda_zone`, Zone 6 needs no independent durability, and neither participates in the `Active -> Compressed -> Archived` lifecycle as a *source*. The count stays 8; the HLD models them as a distinct tier. |
 | OAQ-17 | **Proposed:** promotion-before-eviction ordering invariant (ADR-016) | **Resolved: Adopted** (consensus-gate sign-off, 2026-09-18) | Tightens ADR-002/ADR-005 by resolving the one race they leave open (an item's promotion and its Zone 1 eviction both pending at once). Not a Phase 0 gap — it is a gap in this HLD's own later sections, surfaced by external review of the read-your-own-writes contract (new §7.7). Sign-off compared the ordering constraint fresh against a grace-period-on-eviction alternative (ADR-016's own Sign-off note) and confirmed the ordering constraint as correct; no change to the mechanism. |
@@ -1963,6 +1963,9 @@ The clamp is new; the base values and modifiers are not. It exists because compo
 ---
 
 ## Revision History
+
+Each row below records that revision's state *at the time it was authored* -- see the document
+header above for the current, live Version/Status/Consensus Gate.
 
 | Version | Date | Author | Change |
 |---|---|---|---|
