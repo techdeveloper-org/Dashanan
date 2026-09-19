@@ -1,0 +1,81 @@
+{
+  "phase": 8,
+  "step": "IR.1 (Sprint 2 pre-implementation alignment)",
+  "description": "Citation cross-check of docs/phase-7-routing/sprint2_ar1_assignments.json (Phase 7 AR.1 story-to-agent routing for DASH-STORY-012..020 / DSHN-61..69) against the two real source files it cites: docs/phase-1-architecture/HLD.md v1.0.0/1.2.0 and docs/phase-6-sprint-planning/backlog_draft.json v1.1.0 (sprint_2_stories + sprint_2_dependency_graph + future_sprints_backlog). Same discipline as ir1_agent_flags.json's DASH-STORY-011 supplemental review: every HLD section number, ADR reference, quoted acceptance-criterion text, must_not_deviate claim, and dependency-graph edge in the routing artifact was checked against the source file's actual text, not accepted on the routing artifact's own say-so.",
+  "reviewer_note": "Runtime persona for this pass was computed by the Phase 8 harness as reliability-auditor (claude-global-library/agents/reliability-auditor/agent.md v1.0.0), loaded in full together with its 3 mandatory skills (agent-reliability-core, output-contract-core, uncertainty-quantification-core). That persona and skill set are built for multi-agent LLM pipeline reliability auditing (RS composite scores, POMDP hallucination monitoring, cascading-failure DAGs, DPDP/MeitY AI-governance mapping) and do not name HLD/backlog citation-checking, JSON routing-artifact review, or software sprint-planning verification anywhere in their scope. This is disclosed as a routing/persona mismatch for the Phase 8 dispatch step itself (worth carrying back to whoever owns Phase 8's agent-selection rule), not silently worked around. The actual verification work below was still performed to the letter of the task instructions, using output-contract-core's own 'post-generation validation pipeline' discipline (parse the claim, check it against the schema/source of truth, grade the violation) as the applicable general method, since none of the three skills' domain-specific formulas (RS, POMDP, ECE/conformal) apply to a documentation cross-check.",
+  "method": "For each of the 9 Sprint 2 stories (DASH-STORY-012..020): (1) read the routing artifact's hld_ownership_crosscheck, must_not_deviate, and p1_trigger_evaluation fields; (2) read the corresponding HLD.md section(s) cited (3.4-3.11, 7.4, 8.4, Section 10 STRIDE/DPDP, Section 12/12A/12B/12C/12F/12G, ADR-006/007/009/012) in full; (3) read the corresponding backlog_draft.json sprint_2_stories entry (hld_citation, acceptance_criteria, must_not_deviate) in full; (4) diff the routing artifact's paraphrase against both source texts for invented constraints, wrong section numbers, or dropped caveats; (5) independently re-traverse the combined 20-story dependency graph (backlog_draft.json's dependency_graph + sprint_2_dependency_graph) against the routing artifact's dependency_integrity_check.combined_edges for a missing or extra edge; (6) recompute every candidate_scores entry's weighted formula (0.30*domain_match + 0.35*skill_coverage + 0.20*hld_component_ownership + 0.15*tech_stack_fit) and every reported margin, and recompute summary.score_range from the 9 assigned scores.",
+  "per_story_citation_check": [
+    {
+      "story": "DASH-STORY-012 / DSHN-61",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.4 SemanticEdge/GeneralFact schema and the object_ref CHECK constraint text, HLD 3.10 Hard Rule 1 ('No two zones share a table'), and HLD 3.11 ('Zone N | nothing | zones are leaves by design') all verified verbatim. must_not_deviate items match backlog_draft.json's must_not_deviate array for this story near-verbatim."
+    },
+    {
+      "story": "DASH-STORY-013 / DSHN-62",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.4 lines 235-249 (EntityOwnershipSpecification pseudocode) confirmed at that exact line range; Sachin/Mumbai worked example text confirmed. 'index_reverse MUST default to false' and 'per HLD Section 3.10 Hard Rule 2' both verified against HLD 3.10's Hard Rule (2) text."
+    },
+    {
+      "story": "DASH-STORY-014 / DSHN-63",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.10 (Zone 3 PROJECTS INTO Zone 6), HLD 3.7 line 279 (Zone 6 outage = recall degradation, OAQ-16) and HLD 3.11 all confirmed verbatim at the cited locations."
+    },
+    {
+      "story": "DASH-STORY-015 / DSHN-64",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.5 Importance ratio formula (success_count/(success_count+failure_count), no clamp needed) and HLD 12G's identical statement both confirmed. HLD 3.10's Data Ownership Map genuinely omits a READS line for Zone 4 (unlike Zones 1/2/3/5/6/7, which each have an explicit READS: line) -- the routing artifact's 'treat as reads-nothing until the HLD is amended' is a disclosed inference from that omission, not a fabricated rule."
+    },
+    {
+      "story": "DASH-STORY-016 / DSHN-65",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 12A per-zone table Zone 4 row confirmed exactly: t_half 120 days, capacity cap 50,000 procedures, MaxAge 730 days, compression method 'step-sequence generalization' (undefined, correctly flagged as an open question rather than implemented). Decay constant lambda=6.68e-8 independently recomputed as ln(2)/(120*86400)=6.685e-08, matching the published HLD value and the routing artifact's mathematical_delegation trigger text."
+    },
+    {
+      "story": "DASH-STORY-016 secondary note",
+      "hld_citation_verdict": "MINOR / NOT BLOCKING",
+      "detail": "The '(HLD 12F)' citation for 'Zone 4 stops at Compressed while Zone 8 is absent' is an analogical extension: HLD 12F ('Sprint 1 Architectural Coherence Check') discusses this gap for Zone 2/Sprint 1 specifically, not Zone 4/Sprint 2. The routing artifact did not introduce this extension -- it is already present verbatim in backlog_draft.json's own hld_citation and must_not_deviate for DASH-STORY-016 (line ~495, ~513), so Phase 7 faithfully carried forward a citation choice made at Phase 6. The underlying claim is independently true for Sprint 2's own story set (no Sprint-2 story gives Zone 4 an archival path), so this is a citation-precision note, not a citation error, and needs no fix."
+    },
+    {
+      "story": "DASH-STORY-017 / DSHN-66",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.6 (Zone 5 Entity Memory, sub-record provenance, alias Trie, deliberately-not-vector-primary rationale) confirmed. Hard Rule 2 citation ('cross-zone references use entity_id only') confirmed against HLD 3.10. 'reuse DASH-STORY-006/AC-010's HTTP 422 contract' matches backlog_draft.json's AC-005-5 text exactly."
+    },
+    {
+      "story": "DASH-STORY-018 / DSHN-67",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 3.9 (Zone 8, ConsolidatedBlob), ADR-009 (object store + hot manifest, India Layer), HLD 3.10 RECEIVES rule and Hard Rule 1 all confirmed. The P1 trigger quote -- 'a consolidation merge batch spanning more than one tenant_id fails that batch rather than completing a cross-tenant merge, per threat I-5' -- is an exact match to backlog_draft.json's AC-008-3 text, and HLD Section 10's threat table row I-5 ('The consolidation job is tenant-scoped by construction and asserts tenant uniformity before any merge, failing the batch rather than merging on violation') independently confirms the same control. This is a real, direct P1 trigger, not an invented one."
+    },
+    {
+      "story": "DASH-STORY-019 / DSHN-68",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 12A Zone 8 row (t_half=270 days, weekly-batch sweep), HLD 12B.2-12B.3 (ArchiveThreshold=0.25 derivation, superseding the research brief's provisional 0.15), and OAQ-12 (payload_tokens<64 fast-track) all confirmed verbatim against HLD.md and against backlog_draft.json's AC-008-ROT-1/2."
+    },
+    {
+      "story": "DASH-STORY-020 / DSHN-69",
+      "hld_citation_verdict": "MATCH",
+      "detail": "HLD 7.4 (DELETE /v1/tenants/{id}/subjects/{subject_id} erasure cascade), Section 10 DPDP-2/DPDP-3/DPDP-4 (crypto-shredding, subject_id secondary index mandatory per ADR-006, per-tenant embedding_residency), and ADR-009's India Layer paragraph ('Bucket must be in-region..., versioned, object-locked..., per-subject encryption keys must be individually destroyable') all confirmed verbatim. The non-trigger reasoning for the P1 override (touches Zone 8 adapter internals, not the ZoneRepository port; residency is not cross-tenant isolation) is a correct, literal application of the same three criteria used to trigger DASH-STORY-018 -- not a differently-applied standard."
+    }
+  ],
+  "dependency_graph_check": {
+    "verdict": "MATCH - no missing or extra edge",
+    "detail": "Independently re-traversed backlog_draft.json's dependency_graph (Sprint 1, DASH-STORY-001..011) plus sprint_2_dependency_graph (Sprint 2, DASH-STORY-012..020) and diffed every edge against the routing artifact's dependency_integrity_check.combined_edges block. All 20 nodes and every edge match exactly, with no back-edge from any Sprint 1 story into a Sprint 2 story ID. The importance_feed_check's quoted phrase 'the eventual source of inferred Importance salience' was verified as an exact verbatim quote from backlog_draft.json's future_sprints_backlog FR-004 entry note -- not a paraphrase presented as a quote."
+  },
+  "flags_raised": [
+    {
+      "id": "IR1-S2-F1",
+      "story": "N/A - artifact-level (summary block)",
+      "type": "ARITHMETIC_ERROR",
+      "severity": "MEDIUM",
+      "detail": "summary.score_range.mean was recorded as 0.8420. Recomputing the mean of the 9 assigned scores actually present in the assignments array (0.8815, 0.8855, 0.8850, 0.8795, 0.8520, 0.8725, 0.8480, 0.8965, 0.7645) gives sum=7.7650, mean=0.862777... (0.8628 to 4 dp) -- a ~0.021 discrepancy from the recorded value. min (0.7645) and max (0.8965) were both correct. All 9 individual candidate_scores entries were independently recomputed against the stated formula (score = 0.30*domain_match + 0.35*skill_coverage + 0.20*hld_component_ownership + 0.15*tech_stack_fit) and all margins were independently recomputed (score - runner_up.score); no other arithmetic error was found anywhere else in the artifact.",
+      "resolution": "FIXED directly in docs/phase-7-routing/sprint2_ar1_assignments.json: summary.score_range.mean changed from 0.8420 to 0.8628."
+    }
+  ],
+  "total_flags_raised": 1,
+  "flags_list": ["Artifact-level (summary.score_range.mean), ARITHMETIC_ERROR, MEDIUM, FIXED"],
+  "not_flagged_but_disclosed": [
+    "Phase 8 harness dispatched this review under the reliability-auditor persona/skill set, which is scoped to multi-agent LLM reliability auditing and has no stated coverage of HLD/backlog citation review or sprint-routing artifact review; see reviewer_note above. This is a process-fit observation for whoever owns the Phase 8 agent-selection step, not a defect in the routing artifact under review.",
+    "cross_sprint_agent_load_note's '75% / 15 of 20 stories' and 'database-engineer holds 3 of 20' figures are internally self-consistent (Sprint 2's 8-of-9 python-backend-engineer count plus a disclosed Sprint-1 7-of-11 count sums to 15 of 20 = 75% exactly) but could not be independently verified against docs/phase-7-routing/ar1_assignments.json (Sprint 1's own assignment artifact), which was outside this pass's directed source-file scope (HLD.md and backlog_draft.json only)."
+  ],
+  "verdict": "ALIGNED",
+  "verdict_rationale": "Every HLD.md section/ADR/line-number citation and every backlog_draft.json acceptance-criterion/must_not_deviate citation across all 9 Sprint 2 stories checked out against the real source text -- no invented constraint, no wrong section number, no dropped caveat, no missing or extra dependency edge, and the sole P1 trigger (DASH-STORY-018) and sole non-trigger reasoning (DASH-STORY-020) both apply the stated three-criteria test literally and correctly. The one defect found (summary.score_range.mean arithmetic error) has been fixed directly in the routing artifact and is not an open item for the user."
+}

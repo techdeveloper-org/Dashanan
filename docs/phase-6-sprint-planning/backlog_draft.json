@@ -1,9 +1,11 @@
 {
   "document_id": "SP0-BACKLOG-20260917-01",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "scrum-master-agent",
-  "phase": "Phase 6 - Sprint Planning (SP.0 draft)",
+  "phase": "Phase 6 - Sprint Planning (SP.0 draft; Sprint 2 finalized 2026-09-19)",
   "date": "2026-09-17",
+  "last_updated": "2026-09-19",
+  "sprint_2_note": "Sprint 2 (Jira sprint_id 201, board 100) created 2026-09-19 from the BA+PM-refined INVEST drafts for FR-003, FR-004, FR-005 and FR-008. This scrum-master-agent finalization pass reconciled a DASH-STORY-012/013/014 story-ID collision across the four independently-authored drafts (each draft's author assumed it would receive the next available ID starting at 012): FR-003 keeps DASH-STORY-012..014 as drafted; FR-004's two stories were renumbered DASH-STORY-015..016; FR-005's one story was renumbered DASH-STORY-017; FR-008's three stories (originally also drafted as DASH-STORY-012..014) were renumbered DASH-STORY-018..020. All depends_on references below are corrected to the renumbered IDs. Real Jira Story issues DSHN-61..DSHN-69 were created under epics DSHN-3/DSHN-4/DSHN-5/DSHN-8 and moved into sprint_id 201.",
   "source_of_truth": {
     "srs": "SRS.md v1.0.0 (12 FRs, 17 ACs)",
     "wsjf": "docs/phase-2-validation/pm-wsjf-revalidation.md v1.0.0",
@@ -377,13 +379,261 @@
       "depends_on": []
     }
   ],
+  "sprint_2_stories": [
+    {
+      "story_id": "DASH-STORY-012",
+      "jira_key": "DSHN-61",
+      "title": "Zone 3 Semantic Memory store - SemanticEdge and GeneralFact schema with non-duplication CHECK constraint",
+      "traces_to_fr": "FR-003",
+      "hld_citation": "HLD Section 3.4 (owned entities SemanticEdge, GeneralFact; partial unique/CHECK constraint on SemanticEdge.object_ref closing PRD risk R-005); Section 3.10 (Zone 3 OWNS: SemanticEdge, GeneralFact; Hard Rule 1: no two zones share a table).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-003", "text": "Given a candidate fact that spans two or more entities, When it is classified per the Zone 3/Zone 5 ownership ADR (HLD Section 3.4, ADR-006), Then it is stored in Semantic Memory, not duplicated into any single Entity record.", "source": "SRS AC-003" },
+        { "ac_id": "AC-003-SCHEMA-1", "text": "Given a write attempts to persist a SemanticEdge with object_ref IS NULL, When submitted to Zone 3's store, Then the database-level CHECK constraint rejects it, making the R-005 non-duplication regression structurally impossible.", "source": "[DERIVED FROM HLD Section 3.4]" },
+        { "ac_id": "AC-003-GF-1", "text": "Given a candidate fact with zero subject entity references (|subjects|==0), When classified, Then it is stored as a Zone 3 GeneralFact(tenant_id, fact_id, statement, subject_scope, state, score_terms).", "source": "[DERIVED FROM HLD Section 3.4]" },
+        { "ac_id": "AC-003-OWN-1", "text": "Given a SemanticEdge or GeneralFact record exists in Zone 3, When any other zone's table is inspected, Then no other zone holds a table for these record types, per HLD Section 3.10 Hard Rule 1.", "source": "[DERIVED FROM HLD Section 3.10]" }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement SemanticEdge/GeneralFact schema, DB CHECK/partial-unique constraint on object_ref, Zone 3 storage adapter." },
+        { "type": "QA", "story_points": 1, "description": "Test constraint rejection, GeneralFact routing for |subjects|==0, and cross-zone table-ownership assertion." },
+        { "type": "Review", "story_points": 1, "description": "Review that the non-duplication guarantee is DB-level, not application-review-level, per HLD's explicit intent." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-001"],
+      "must_not_deviate": [
+        "SemanticEdge and GeneralFact are the only two owned entity types for Zone 3 per HLD Section 3.4/3.10 - no additional owned entity types.",
+        "object_ref NOT NULL must be enforced as a DB CHECK/partial-unique constraint, not an application-level convention.",
+        "Depends only on DASH-STORY-001 - no zone-to-zone dependency introduced, per HLD Section 3.11 (zones are leaves by design)."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-013",
+      "jira_key": "DSHN-62",
+      "title": "EntityOwnershipSpecification classification gate - |subjects|==0 and |subjects|>1 branches, plus the conditional Zone 3 edge within the |subjects|==1 reverse-traversal sub-case (Zone 5 attribute write itself out of scope, FR-005 unscheduled at draft time)",
+      "traces_to_fr": "FR-003",
+      "hld_citation": "HLD Section 3.4 (EntityOwnershipSpecification pseudocode, lines 235-249, including the |subjects|==1,|objects|>=1 branch's conditional Zone 3 SemanticEdge IFF index_reverse=true, default false); worked example (Sachin/Mumbai).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-003-CLASS-1", "text": "Facts with |subjects|>1 route to Zone 3 as one SemanticEdge per (subject,object) pair; facts with |subjects|==0 route to Zone 3 as a GeneralFact, per HLD Section 3.4's routing table.", "source": "[DERIVED FROM HLD Section 3.4]" },
+        { "ac_id": "AC-003-CLASS-2", "text": "Given |subjects|==1 and |objects|==0 (HLD line 239-240, 'ONLY Zone 5'), no SemanticEdge or GeneralFact write to Zone 3 occurs for any index_reverse value; the paired Zone 5 write stays out of this story's build scope pending FR-005.", "source": "[DERIVED FROM HLD Section 3.4]" },
+        { "ac_id": "AC-003-CLASS-3", "text": "Given the Sachin/Mumbai worked example (|subjects|=1,|objects|=1) with index_reverse not set to true, no Zone 3 SemanticEdge is created, confirming default index_reverse=false.", "source": "[DERIVED FROM HLD Section 3.4]" },
+        { "ac_id": "AC-003-CLASS-4", "text": "Given the same worked example with index_reverse=true, Zone 3 creates exactly one SemanticEdge(located_in, Sachin, Mumbai); the paired Zone 5 attribute write remains out of this story's scope.", "source": "[DERIVED FROM HLD Section 3.4]" }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement EntityOwnershipSpecification classification gate for the |subjects|==0, |subjects|>1, and conditional |subjects|==1 index_reverse=true sub-branch." },
+        { "type": "QA", "story_points": 1, "description": "Test AC-003-CLASS-1..4 including the index_reverse default-false and true cases." },
+        { "type": "Review", "story_points": 1, "description": "Review that no Zone 5 attribute write is stubbed or faked, and index_reverse defaults to false." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-012"],
+      "must_not_deviate": [
+        "Does NOT implement the Zone 5 attribute write required by the |subjects|==1 branch in either sub-case - that targets FR-005, unscheduled at draft time. Do not stub, fake, or silently implement a Zone 5 write path.",
+        "index_reverse MUST default to false per HLD Section 3.4.",
+        "Zone 3 must never copy an entity attribute value when creating the conditional SemanticEdge - only entity_id references, per HLD Section 3.10 Hard Rule 2.",
+        "Cross-FR sequencing risk: partial coverage until FR-005 is scheduled; carry this flag forward, as DASH-STORY-004/009 carried Sprint 1 scope-stop flags."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-014",
+      "jira_key": "DSHN-63",
+      "title": "Zone 3 to Zone 6 retrieval-index projection (async event emission only)",
+      "traces_to_fr": "FR-003",
+      "hld_citation": "HLD Section 3.10 (Zone 3 PROJECTS INTO Zone 6); Section 3.7 line 279 (Zone 6 outage is a recall degradation, not a data-loss event, OAQ-16); Section 3.11 (zones are leaves by design).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-003-PROJ-1", "text": "Given a SemanticEdge or GeneralFact is durably written to Zone 3, a projection event is published to the EventBus for Zone 6's index worker to consume.", "source": "[DERIVED FROM HLD Section 3.10]" },
+        { "ac_id": "AC-003-PROJ-2", "text": "Zone 3 makes no synchronous call into Zone 6 and carries no recorded dependency on it, per HLD Section 3.11.", "source": "[DERIVED FROM HLD Section 3.11]" },
+        { "ac_id": "AC-003-PROJ-3", "text": "When Zone 3 cannot publish a projection event (EventBus unavailable), the underlying durable write is NOT rolled back or rejected, per HLD Section 3.7's 'recall degradation, not a data-loss event' framing (OAQ-16).", "source": "[DERIVED FROM HLD Section 3.7]" }
+      ],
+      "story_points": 3,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 2, "description": "Wire Zone 3 write-commit to EventBus projection-event publish for Zone 6 consumption." },
+        { "type": "QA", "story_points": 1, "description": "Test async, non-blocking publish and write-durability independence from EventBus availability." },
+        { "type": "Review", "story_points": 1, "description": "Review no synchronous Zone 6 dependency was introduced." }
+      ],
+      "sub_task_sp_sum": 4,
+      "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
+      "depends_on": ["DASH-STORY-012", "DASH-STORY-007"],
+      "must_not_deviate": [
+        "Projection is push/async only; must not gain a synchronous read/write dependency on Zone 6.",
+        "Must not modify Zone 6's consumer/indexing logic (DASH-STORY-007's scope, Hard Rule 1: no two zones share a table).",
+        "Zone 3's own write-path durability must remain independent of EventBus/Zone 6 availability."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-015",
+      "jira_key": "DSHN-64",
+      "title": "Procedural Memory zone (Zone 4) core store, point lookup, and Importance ratio",
+      "traces_to_fr": "FR-004",
+      "hld_citation": "HLD Section 3.5 (Zone 4 Procedural Memory); Section 3.10 (Zone 4 OWNS Procedure, PROJECTS INTO Zone 6); Section 3.11 (zones are leaves by design); Section 12 access-pattern table row; Section 12G (Importance = success_count/(success_count+failure_count), no clamp needed).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-004-1", "text": "Zone 4 returns a Procedure by exact task_signature_hash via O(1) point lookup (HashMap keyed by task_signature_hash).", "source": "[DERIVED FROM HLD Section 3.5]" },
+        { "ac_id": "AC-004-2", "text": "Zone 4's adapter port exposes only point-lookup, no similarity-search method; any similarity need routes exclusively through Zone 6. Enforced by a contract test asserting the Zone 4 adapter interface contains no similarity-search operation.", "source": "[DERIVED FROM HLD Section 3.5; tightened for testability by PM pass]" },
+        { "ac_id": "AC-004-3", "text": "Importance = success_count/(success_count+failure_count), naturally bounded [0,1], no clamp function required.", "source": "[DERIVED FROM HLD Section 3.5/12G]" },
+        { "ac_id": "AC-004-4", "text": "On write commit, Zone 4 publishes a projection event so the item becomes discoverable via Zone 6.", "source": "[DERIVED FROM HLD Section 3.10/3.11]" },
+        { "ac_id": "AC-004-5", "text": "A static dependency/import-graph audit against the Zone 4 module finds no import or call to any other zone's adapter interface, enforced as an automated architecture-conformance CI check (import-linter / dependency-cruiser).", "source": "[DERIVED FROM HLD Section 3.11; tightened for testability by PM pass]" }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement Zone 4 point-lookup store, Importance ratio computation, projection-event publish." },
+        { "type": "QA", "story_points": 1, "description": "Test AC-004-1..5 including the automated architecture-conformance leaf-status check." },
+        { "type": "Review", "story_points": 1, "description": "Review no similarity-search or cross-zone read was introduced." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-001"],
+      "must_not_deviate": [
+        "Do not implement a Zone-4-owned vector/similarity search path - HLD Section 3.5 routes similarity through Zone 6.",
+        "Do not add a READS relationship from Zone 4 to any other zone - Section 3.10's Data Ownership Map omits a READS line for Zone 4; treat as reads-nothing until the HLD is amended.",
+        "Do not invent a conflict-detection or provenance-linkage mechanism analogous to Zone 3/5 or Zone 7 - HLD Section 3.5 describes none for Zone 4.",
+        "PM note: FR-004 is WSJF rank 12 of 12 (score 2.00) on the current un-revised table. Do not present its Sprint 2 inclusion as WSJF-validated without the formal re-score recommended in this pass's wsjf_notes, or an explicit documented override."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-016",
+      "jira_key": "DSHN-65",
+      "title": "Zone 4 (Procedural) capacity cap and MaxAge rotation backstop wiring",
+      "traces_to_fr": "FR-004",
+      "hld_citation": "HLD Section 12 rotation-parameters table (Zone 4 row: half-life 120 days, decay constant ~6.68e-8, capacity cap 50,000, MaxAge 730 days, weekly-batch sweep); Section 12C; Section 12F (stops at Compressed while Zone 8 absent).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-004-CAP-1", "text": "When Zone 4 reaches its capacity cap (50,000) or an item exceeds MaxAge (730 days) in Compressed, the backstop sweep forcibly evicts the lowest-ranked-by-MemoryScore Procedure(s), mirroring the Zone 2 backstop pattern.", "source": "[DERIVED FROM HLD Section 12 rotation-parameters table]" },
+        { "ac_id": "AC-004-CAP-2", "text": "A Procedure crossing CompressThreshold (not ArchiveThreshold) transitions to Compressed using a Recency half-life of 120 days.", "source": "[DERIVED FROM HLD Section 12/12C]" },
+        { "ac_id": "AC-004-CAP-3", "text": "While Zone 8 is absent, an item that would otherwise cross ArchiveThreshold remains in Compressed indefinitely, bounded only by this story's capacity/MaxAge backstop, per HLD Section 12F.", "source": "[DERIVED FROM HLD Section 12F]" },
+        { "ac_id": "AC-004-CAP-4", "text": "Capacity cap and MaxAge are deployment configuration; changing either takes effect on the next sweep without a code change.", "source": "[AUTO-AC: configuration_pattern]" }
+      ],
+      "story_points": 3,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 2, "description": "Wire Zone 4's capacity/MaxAge parameters and eviction predicate into the existing deadline-scheduled sweep engine (DASH-STORY-009)." },
+        { "type": "QA", "story_points": 1, "description": "Test capacity-cap trigger, MaxAge trigger, and Compressed-indefinite-dwell behavior." },
+        { "type": "Review", "story_points": 1, "description": "Review that no code path attempts an Archived transition for Zone 4 in this story." }
+      ],
+      "sub_task_sp_sum": 4,
+      "sub_task_sp_note": "Sum 4 vs parent 3 - within +/-1 Fibonacci-rounding tolerance per scrum-framework-core Operating Rule 14.",
+      "depends_on": ["DASH-STORY-015", "DASH-STORY-008", "DASH-STORY-009"],
+      "must_not_deviate": [
+        "Do not specify or implement 'step-sequence generalization' (Section 12 rotation table, named once, undefined) as the Compressed-state transform - raise as an open question for the Solution Architect instead.",
+        "Do not assume Zone 4 reaches Archived in this story - design stops at Compressed while Zone 8 is absent (Section 12F).",
+        "Do not duplicate the generic deadline-scheduled sweep engine (Section 12C) built in DASH-STORY-009 - wire into it, do not reimplement it."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-017",
+      "jira_key": "DSHN-66",
+      "title": "Entity Memory zone (Zone 5) - canonical per-entity attribute store with sub-record provenance and alias Trie resolution",
+      "traces_to_fr": "FR-005",
+      "hld_citation": "HLD Section 3.6 (Zone 5 Entity Memory), cross-referenced with Section 3.10 (Data Ownership Map), Section 3.11 (Dependency Matrix), and DASH-STORY-006/AC-010 (FR-010 write-path rejection contract).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-005-1", "text": "Zone 5 returns an EntityRecord by exact (tenant_id, entity_id) via O(1) point lookup.", "source": "[DERIVED FROM HLD 3.6]" },
+        { "ac_id": "AC-005-2", "text": "A single attribute update writes exactly one new provenance record for that attribute only; no sibling attribute's value/provenance_id/updated_at changes; no whole-record rewrite occurs.", "source": "[DERIVED FROM HLD 3.6]" },
+        { "ac_id": "AC-005-3", "text": "Alias prefix resolution returns matching entity_id(s) via Trie prefix match, empty set (not error) when no match.", "source": "[DERIVED FROM HLD 3.6]" },
+        { "ac_id": "AC-005-4", "text": "Exact entity-name/exact-term queries are answered directly by Zone 5's own mechanism even with Zone 6 unavailable, demonstrating the deliberately-not-vector-primary design as observable behavior.", "source": "[DERIVED FROM HLD 3.6]" },
+        { "ac_id": "AC-005-5", "text": "A write attempting to persist an EntityRecord attribute without its own provenance_id is rejected using the same rejection contract DASH-STORY-006/AC-010 established (HTTP 422).", "source": "[DERIVED FROM HLD 3.10]" },
+        { "ac_id": "AC-005-6", "text": "On write commit, a projection event is published to the EventBus for future Zone 6 indexing, asynchronously and non-blocking.", "source": "[DERIVED FROM HLD 3.10/3.11]" }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Implement Zone 5 EntityRecord store, point lookup, alias Trie, sub-record provenance write path, ownership-violation rejection gate, projection-event publish." },
+        { "type": "QA", "story_points": 2, "description": "Test AC-005-1..6, including Zone-6-unavailable exact-query resolution and sibling-attribute-timestamp invariance." },
+        { "type": "Review", "story_points": 1, "description": "Review reuse of DASH-STORY-006/AC-010's 422 rejection contract and add a QA follow-up item confirming that contract extends correctly to Zone 5." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": ["DASH-STORY-001"],
+      "must_not_deviate": [
+        "Do NOT implement the Zone 3/Zone 5 write-conflict-detection sweep (HLD Section 3.8) - tracked separately as FR-013, hard-gated behind FR-003 and FR-005 both existing.",
+        "Do NOT make Zone 5 vector-primary or route its dominant exact-term query through Zone 6 - must be demonstrated with Zone 6 unavailable.",
+        "Do NOT allow any other zone to copy an entity attribute value directly - cross-zone references to Zone 5 use entity_id only.",
+        "Do NOT perform a whole-record rewrite on a single-attribute update.",
+        "Do NOT build any Zone 6 indexing/consumption logic in this story - only emit the projection event.",
+        "Do NOT invent a Zone-5-specific rejection error code - reuse DASH-STORY-006/AC-010's HTTP 422 contract."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-018",
+      "jira_key": "DSHN-67",
+      "title": "Zone 8 Consolidation store - object-store blobs with hot manifest index (ADR-009)",
+      "traces_to_fr": "FR-008",
+      "hld_citation": "HLD Section 3.9 (Zone 8 responsibility, ConsolidatedBlob); ADR-009 Section 4 (storage adapter decision); Section 3.10 (RECEIVES rule, Hard Rule 1); Section 3.11 (zones are leaves); Section 10 threat I-5; Section 8.4 failure-mode table.",
+      "acceptance_criteria": [
+        { "ac_id": "AC-008-1", "text": "Manifest resolves item_id -> (blob_id, byte_range, compression_generation) via a single indexed manifest-table lookup plus at most one ranged GET, no full-bucket or full-manifest scan.", "source": "[DERIVED FROM ADR-009]" },
+        { "ac_id": "AC-008-2", "text": "Zone 8 accepts writes only as archived items originating from Zone 2, 3, 4 or 5; rejects writes originating directly from Zone 1 or from Zone 6/7, per Section 3.10's RECEIVES rule.", "source": "[DERIVED FROM HLD 3.10]" },
+        { "ac_id": "AC-008-3", "text": "A consolidation merge batch spanning more than one tenant_id fails that batch rather than completing a cross-tenant merge, per threat I-5.", "source": "[DERIVED FROM HLD Section 10]" },
+        { "ac_id": "AC-008-4", "text": "When the object store is unavailable, an archive transition defers (item stays Compressed, no loss/partial write); reads of already-archived items fail 503 scoped only to affected items.", "source": "[DERIVED FROM HLD Section 8.4]" }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Implement object-store adapter (ADR-009), hot PostgreSQL manifest index, tenant-uniformity merge assertion, degraded-mode handling." },
+        { "type": "QA", "story_points": 2, "description": "Test manifest resolution, RECEIVES-rule enforcement (against Zone 2, the only available source at ship time), tenant-uniformity failure, and degraded-mode behavior." },
+        { "type": "Review", "story_points": 1, "description": "Security review of tenant isolation on the consolidation merge path." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": ["DASH-STORY-001", "DASH-STORY-003"],
+      "must_not_deviate": [
+        "Zone 8 is reachable only via the Archived state and is never a competing zone to Zones 2-5.",
+        "The object-store + hot-manifest shape is locked by ADR-009 (APPROVED) - do not re-open it as a design choice.",
+        "Blobs are immutable and content-addressed - never overwritten.",
+        "Zone 8 owns ConsolidatedBlob and no other table may duplicate it, per Hard Rule 1.",
+        "PM note: only Zone 2 exists as a rotation source at ship time; re-test AC-008-2 against Zones 3/4/5 as each ships."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-019",
+      "jira_key": "DSHN-68",
+      "title": "Compressed to Archived rotation transition completion (closes the gap DASH-STORY-009 deliberately deferred)",
+      "traces_to_fr": "FR-008",
+      "hld_citation": "HLD Section 12A per-zone policy table (Zone 8 row: t_half=270 days, weekly-batch sweep); Section 12B.2-12B.3 (ArchiveThreshold=0.25 derivation); OAQ-1/OAQ-12; Section 12C/ADR-012.",
+      "acceptance_criteria": [
+        { "ac_id": "AC-008-ROT-1", "text": "A Compressed item crossing ArchiveThreshold (0.25) transitions to Archived and is persisted into Zone 8 as a ConsolidatedBlob with a resolvable manifest entry, completing DASH-STORY-009's AC-012-ROT-1-deferred transition.", "source": "[DERIVED FROM HLD Section 12B.2 / DASH-STORY-009]" },
+        { "ac_id": "AC-008-ROT-2", "text": "An item with payload_tokens < 64 is fast-tracked through Compressed and Archived within the same sweep, per OAQ-12.", "source": "[DERIVED FROM HLD OAQ-12]" },
+        { "ac_id": "AC-008-ROT-3", "text": "All eligible Compressed items are consolidated in a single weekly batch window, no individual per-item archive call outside the batch (other than the OAQ-12 fast-track).", "source": "[DERIVED FROM HLD Section 12A]" },
+        { "ac_id": "AC-008-ROT-4", "text": "The Archived-transition decision uses the post-mutation, non-stale rotation deadline from DASH-STORY-010's deadline-invalidation wiring, not a cached pre-mutation value.", "source": "[DERIVED FROM HLD Section 12C/ADR-012]" }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement the Compressed->Archived transition on the existing rotation sweep, OAQ-12 fast-track, and weekly batch cadence." },
+        { "type": "QA", "story_points": 1, "description": "Test AC-008-ROT-1..4 including the post-mutation deadline read." },
+        { "type": "Review", "story_points": 1, "description": "Review ArchiveThreshold stays fixed at 0.25 and the PromoteThreshold>CompressThreshold>ArchiveThreshold gating is not reopened." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-009", "DASH-STORY-010", "DASH-STORY-018"],
+      "must_not_deviate": [
+        "ArchiveThreshold is fixed at 0.25, not the research brief's provisional 0.15 (structurally unreachable per Section 12B.2).",
+        "An item SHALL NOT reach Archived without having passed through Compressed.",
+        "The OAQ-12 fast-track is gated strictly by payload_tokens < 64, not by score-collapse velocity.",
+        "DASH-STORY-004's Zone-2-only capacity/MaxAge backstop must not be left as the sole bound on Compressed growth once this story ships - Zone 8 becomes the real destination."
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-020",
+      "jira_key": "DSHN-69",
+      "title": "DPDP erasure-cascade reach into Zone 8 archives + India residency and crypto-shredding (ADR-009 India Layer, Section 10 DPDP-2/DPDP-3/DPDP-4)",
+      "traces_to_fr": "FR-008",
+      "hld_citation": "HLD Section 7.4 (DELETE /v1/tenants/{id}/subjects/{subject_id}); Section 10 DPDP-2/DPDP-3/DPDP-4; ADR-009 India Layer; Section 3.10 (subject_id secondary index, ADR-006); OAQ-10.",
+      "acceptance_criteria": [
+        { "ac_id": "AC-008-DPDP-1", "text": "A DPDP subject-erasure request's cascade reaches Zone 8 archives via the subject_id secondary index (ADR-006), returning 202 with a job_id per the async admin-job pattern.", "source": "[DERIVED FROM HLD Section 7.4]" },
+        { "ac_id": "AC-008-DPDP-2", "text": "Each tenant's Zone 8 bucket is provisioned in-region per that tenant's embedding_residency policy, versioned, and object-locked for an operator-configurable audit-retention window.", "source": "[DERIVED FROM ADR-009 India Layer / Section 10 DPDP-4]" },
+        { "ac_id": "AC-008-DPDP-3", "text": "A Zone 8 blob subject to DPDP erasure has its per-subject encryption key individually destroyable (crypto-shredding) so the blob becomes permanently unreadable, without an in-place rewrite of the immutable blob.", "source": "[DERIVED FROM HLD Section 10 DPDP-2 / ADR-009]" }
+      ],
+      "story_points": 5,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 3, "description": "Implement per-subject key generation/storage/destruction, blob-read-path key integration, in-region versioned/object-locked bucket provisioning, cascade endpoint hook." },
+        { "type": "QA", "story_points": 1, "description": "Test cascade reach, residency/versioning/object-lock configuration, and post-key-destruction read failure with no blob rewrite issued." },
+        { "type": "Review", "story_points": 1, "description": "Review that OAQ-10's legal-sufficiency question on crypto-shredding-as-erasure is preserved as open, not asserted as settled." }
+      ],
+      "sub_task_sp_sum": 5,
+      "depends_on": ["DASH-STORY-018"],
+      "must_not_deviate": [
+        "Do not implement erasure as an in-place blob rewrite - erasure works through key destruction, not mutation.",
+        "OAQ-10's legal question (does crypto-shredding satisfy DPDP Act 2023 erasure) is not settled by this story and must not be asserted as such.",
+        "The cascade's reach into Zone 8 depends on the subject_id secondary index (ADR-006) being present on the Zone 8 manifest table - do not ship against a schema lacking it.",
+        "PM revision note: story points raised from the BA draft's 3 to 5 - crypto-shredding requires net-new per-subject key-management infrastructure plus in-region bucket provisioning, materially more than a wiring-only extension. Confirmed as a risk flag, not a final estimate, pending engineering re-estimation."
+      ]
+    }
+  ],
   "future_sprints_backlog": {
     "note": "Not detailed into INVEST stories yet - candidates for a subsequent Phase 6 sprint planning pass.",
     "remaining_frs": [
-      { "fr_id": "FR-003", "title": "Semantic Memory zone (Zone 3)", "wsjf_rank": 10 },
-      { "fr_id": "FR-004", "title": "Procedural Memory zone (Zone 4)", "wsjf_rank": 12, "note": "Also the eventual source of inferred Importance salience, currently defaulted to 0.5 in DASH-STORY-008." },
-      { "fr_id": "FR-005", "title": "Entity Memory zone (Zone 5)", "wsjf_rank": 9 },
-      { "fr_id": "FR-008", "title": "Consolidation Memory zone (Zone 8)", "wsjf_rank": 11, "note": "Unblocks the Compressed -> Archived transition deferred in DASH-STORY-009." },
+      { "fr_id": "FR-003", "title": "Semantic Memory zone (Zone 3)", "wsjf_rank": 10, "wsjf_score": 2.50, "promoted_to_sprint": 2, "sprint_id": 201, "sprint_2_story_ids": ["DASH-STORY-012", "DASH-STORY-013", "DASH-STORY-014"], "sprint_2_jira_keys": ["DSHN-61", "DSHN-62", "DSHN-63"], "note": "Detailed into INVEST stories in sprint_2_stories above; see that section for full acceptance criteria, dependencies, and must_not_deviate constraints." },
+      { "fr_id": "FR-004", "title": "Procedural Memory zone (Zone 4)", "wsjf_rank": 12, "wsjf_score": 2.00, "promoted_to_sprint": 2, "sprint_id": 201, "sprint_2_story_ids": ["DASH-STORY-015", "DASH-STORY-016"], "sprint_2_jira_keys": ["DSHN-64", "DSHN-65"], "note": "Also the eventual source of inferred Importance salience, currently defaulted to 0.5 in DASH-STORY-008. WSJF rank 12 of 12 (lowest score on the current table) - Sprint 2 inclusion flagged by this pass as requiring a formal re-score (DASH-STORY-008's now-shipped Importance-default gap may raise RRO) or an explicit documented WSJF-exception before being presented as WSJF-consistent. Detailed into INVEST stories in sprint_2_stories above." },
+      { "fr_id": "FR-005", "title": "Entity Memory zone (Zone 5)", "wsjf_rank": 9, "wsjf_score": 3.00, "promoted_to_sprint": 2, "sprint_id": 201, "sprint_2_story_ids": ["DASH-STORY-017"], "sprint_2_jira_keys": ["DSHN-66"], "note": "Detailed into INVEST stories in sprint_2_stories above." },
+      { "fr_id": "FR-008", "title": "Consolidation Memory zone (Zone 8)", "wsjf_rank": 11, "wsjf_score": 2.14, "promoted_to_sprint": 2, "sprint_id": 201, "sprint_2_story_ids": ["DASH-STORY-018", "DASH-STORY-019", "DASH-STORY-020"], "sprint_2_jira_keys": ["DSHN-67", "DSHN-68", "DSHN-69"], "note": "Unblocks the Compressed -> Archived transition deferred in DASH-STORY-009. Sequencing flag: FR-008 (WSJF 2.14) ranks below FR-005 (3.00) and FR-003 (2.50); building it ahead of them in the same sprint is architecturally valid (only Zone 2 exists as a RECEIVES source at ship time) but should be recorded as an explicit WSJF-rank override with rationale, the way FR-013 already models in this document, rather than stand as an unstated exception. Detailed into INVEST stories in sprint_2_stories above." },
       { "fr_id": "FR-011", "title": "Pluggable storage-adapter interface (remaining zone coverage beyond Sprint 1 adapters)", "wsjf_rank": 8 },
       {
         "fr_id": "FR-013",
@@ -408,5 +658,18 @@
     "DASH-STORY-010": ["DASH-STORY-008"],
     "DASH-STORY-011": [],
     "promotion_reason": "DASH-STORY-002 (Working Memory, Zone 1) is the sole root dependency for DASH-STORY-005 (Zone 7) per the mandated dependency graph. DASH-STORY-007 (Zone 6) depends on DASH-STORY-003 (Zone 2), corrected per SP.0.5 SA review C-3: Zone 6 indexes Zones 2-5, 7, 8 and explicitly not Zone 1 (HLD Section 3.7), so Zone 6's real content dependency is Zone 2, not Zone 1. DASH-STORY-004 depends additionally on DASH-STORY-008 per SP.0.5 SA review C-2, since its eviction ranks by MemoryScore. DASH-STORY-001 (Orchestrator) is the sole root dependency for all zone stories since every write/read routes through its facade."
+  },
+  "sprint_2_dependency_graph": {
+    "DASH-STORY-012": ["DASH-STORY-001"],
+    "DASH-STORY-013": ["DASH-STORY-012"],
+    "DASH-STORY-014": ["DASH-STORY-012", "DASH-STORY-007"],
+    "DASH-STORY-015": ["DASH-STORY-001"],
+    "DASH-STORY-016": ["DASH-STORY-015", "DASH-STORY-008", "DASH-STORY-009"],
+    "DASH-STORY-017": ["DASH-STORY-001"],
+    "DASH-STORY-018": ["DASH-STORY-001", "DASH-STORY-003"],
+    "DASH-STORY-019": ["DASH-STORY-009", "DASH-STORY-010", "DASH-STORY-018"],
+    "DASH-STORY-020": ["DASH-STORY-018"],
+    "renumbering_note": "FR-003 (DASH-STORY-012..014), FR-004 (DASH-STORY-015..016), FR-005 (DASH-STORY-017), and FR-008 (DASH-STORY-018..020) were drafted independently by BA+PM passes; FR-003 and FR-008 each independently used DASH-STORY-012..014 for their own first stories, causing an ID collision. This scrum-master-agent finalization pass kept FR-003's numbering as-drafted (it was first in FR order) and renumbered FR-004, FR-005 and FR-008's stories sequentially from DASH-STORY-015, correcting every internal depends_on reference accordingly (e.g. FR-008's Story 2's depends_on Zone-8-store reference, originally written as 'DASH-STORY-012' inside the FR-008 draft, now correctly points to DASH-STORY-018).",
+    "promotion_reason": "All Sprint 2 zone-store stories (DASH-STORY-012, -015, -017, -018) depend only on DASH-STORY-001 (Orchestrator facade), consistent with Sprint 1's promotion_reason that every write/read routes through the facade and zones are leaves by design (HLD Section 3.11). DASH-STORY-013 and DASH-STORY-014 depend on their own zone's store (DASH-STORY-012) landing first, plus DASH-STORY-007 (Zone 6) for the projection story. DASH-STORY-016 (Zone 4 backstop) depends on DASH-STORY-008 (MemoryScore engine) and DASH-STORY-009 (rotation state machine) exactly as DASH-STORY-004 (the Zone 2 analogue) did in Sprint 1. DASH-STORY-019 and DASH-STORY-020 depend on DASH-STORY-018 (Zone 8 store) landing first, since both extend the store's write path (rotation completion and DPDP cascade respectively)."
   }
 }
