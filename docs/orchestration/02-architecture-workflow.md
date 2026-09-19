@@ -80,9 +80,10 @@ D20 →[D20::B1 assemble terminal]→ phase:execution-plan     emits: phase:0, p
 
 EXECUTION PLAN
   Active phases : phase:0, phase:1(A), phase:1.5, phase:2, phase:5, phase:6, phase:7, phase:8
-  Pruned phases : phase:3, phase:4 (no UI surface), phase:A.6/H (deferred to Phase B, not this bundle)
+  Pruned phases : phase:3, phase:4 (no UI surface); phase:A.6/A.6.1 was deferred to Phase B (not this bundle) — see below, ACTIVATED 2026-09-19; phase:H remains deferred
   Active pattern: composed (AI/LLM Product × BA/PM R&D chain)
-  Harness active: DEFERRED — will activate at Phase B (Enterprise + AI/LLM stack confirms D21::B1), not part of this Phase 0-8 bundle
+  Harness (A.6/A.6.1): ACTIVATED 2026-09-19, retroactively — Phase B (Waves 2-5 + P1 remediation, commits cba559f/d888536) already ran before this policy existed; see docs/phase-A6-harness/. Enforcement going forward is self-applied per Workflow/Agent dispatch, not a mechanical orchestrator-agent injection.
+  Harness Phase H (eval/regression gate, harness-evaluation-engineer): still DEFERRED — activates before Phase F, not yet dispatched
 ```
 
 ---
@@ -405,8 +406,19 @@ per-story CoT generation) are the highest-volume phases.
 output in every phase listed above — mandatory, no exceptions, this project is not LLM-output-only so
 the rule still applies in full per the template's zero-skip-clause.
 
-**Harness Gate:** DEFERRED — Phase A.6/H activate only once Phase B (implementation) begins, which is
-explicitly out of scope for this bundle (STOP 8 is the terminal gate here).
+**Harness Gate — Phase A.6/A.6.1:** ACTIVATED 2026-09-19, retroactively — Phase B implementation
+(Waves 2-5 and the P1 security remediation round, commits `cba559f`/`d888536`) already ran before
+this policy was produced, an honest disclosed gap rather than a silent backdate. Real policy
+artifacts (`harness_control_policy.json`, `resource_elastic_policy.json`) are at
+`docs/phase-A6-harness/`, produced by genuine `harness-mathematics-expert` +
+`harness-engineering-architect` persona dispatch grounded in this project's real observed Phase B
+token/agent/retry data. Enforcement going forward is self-applied per `Workflow`/`Agent` dispatch
+in this project (no literal orchestrator-agent prompt-injection runtime exists here), not a
+mechanical gate.
+
+**Harness Gate — Phase H (eval/regression, `harness-evaluation-engineer`):** still DEFERRED —
+this is a separate, later-stage gate (McNemar/Krippendorff-based, blocks Phase F) and was NOT
+activated by the 2026-09-19 round above. Activates once dispatched before Phase F.
 
 **Security Audit:** DEFERRED to Phase B for the full F.1-F.6 pipeline; Phase 7 includes a scoped
 `security-testing-engineer` OWASP Top 10 P1 + WCAG 2.2 AA review of the routed implementation prompts

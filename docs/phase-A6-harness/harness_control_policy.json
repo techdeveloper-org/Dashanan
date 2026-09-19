@@ -1,0 +1,208 @@
+{
+  "phase": "A.6",
+  "step": "Harness Control Setup",
+  "artifact": "harness_control_policy.json",
+  "owner_agent": "harness-engineering-architect",
+  "date": "2026-09-19",
+  "gate": "Phase A.6 Harness Gate -- BLOCKING, equal weight to the Context Delivery Plan gate (ORCHESTRATION_TEMPLATE.md STEP 10 / phase-A.6.md)",
+  "consulted": {
+    "harness_mathematics_expert": "Little's Law throughput bounds, Wilson-CI/E[attempts] story-level circuit-breaker derivation, Clopper-Pearson transient-retry derivation, capped-exponential-with-full-jitter backoff derivation -- all consumed verbatim below, not re-derived here"
+  },
+
+  "retroactive_gap_disclosure": {
+    "status": "ACTIVATED RETROACTIVELY -- disclosed gap, not backdated",
+    "what_happened": "Phase A.6/A.6.1 harness gate is being produced and committed now (2026-09-19), after Phase B (Waves 2-5 implementation, 38 agents / 12,479,018 tokens / 0 errors) and the P1 remediation workflow (26 agents / 6,990,891 tokens / 0 errors, 2 of 4 stories needed a 2nd attempt) had already run to completion without this policy existing as a committed artifact.",
+    "why_disclosed_here": "ORCHESTRATION_TEMPLATE.md STEP 10 states harness_control_policy.json must be committed BEFORE any Phase B agent receives its prompt (BLOCKING gate). That did not happen for Waves 2-5 or the P1 remediation run. This field records that fact plainly instead of silently backdating the artifact's effective date to precede the work it did not actually govern.",
+    "scope_of_applicability": "This policy governs Phase B / P1-remediation-class work FROM THIS COMMIT FORWARD. It does not retroactively validate or invalidate the already-completed Waves 2-5 or P1 remediation runs -- those are grounded empirically (see empirical_grounding below) as the DATA this policy's thresholds were derived FROM, not as runs that were compliant WITH a policy that did not yet exist.",
+    "dispatch_mechanism_caveat": "This project's actual dispatch mechanism is the Claude Code Workflow/Agent tools (Task-style subagent spawns), not a literal prompt-injection orchestrator-agent runtime that mechanically prepends this JSON as a header block to every subagent prompt. Consequently, enforcement of this policy going forward is SELF-APPLIED by whichever agent (orchestrator persona or the coordinating session) dispatches each future Task/Agent call -- the coordinating agent is responsible for reading this policy and honoring its stop conditions, budgets, retry/backoff, and circuit-breaker rules at each dispatch, rather than the harness mechanically injecting and enforcing it outside the dispatching agent's control."
+  },
+
+  "empirical_grounding": {
+    "sprint_1_composition": {
+      "stories": 11,
+      "story_points": 58,
+      "implementer_roles": ["python-backend-engineer", "database-engineer", "ai-engineer"],
+      "p1_reviewer_roles": ["security-defense-architect", "api-security-auditor"],
+      "math_delegation_role": "mathematics-engineer (opus)"
+    },
+    "waves_2_5_workflow": {
+      "agents": 38,
+      "errors": 0,
+      "total_tokens": 12479018,
+      "tool_uses": 1217,
+      "wall_clock_ms_approx": 12819865,
+      "tokens_per_story_approx": 1134456,
+      "note": "tokens_per_story_approx = total_tokens / stories-covered in this wave set; cited as one of the two cross-phase inputs to the per-story-group ceiling derivation"
+    },
+    "p1_remediation_workflow": {
+      "agents": 26,
+      "errors": 0,
+      "total_tokens": 6990891,
+      "tool_uses": 759,
+      "wall_clock_ms_approx": 4759647,
+      "stories_needing_2nd_attempt": ["DASH-STORY-005", "DASH-STORY-006"],
+      "stories_needing_2nd_attempt_count": 2,
+      "stories_p1_remediated_total": 4,
+      "stories_needing_3rd_attempt_count": 0,
+      "tokens_per_story_attempt_approx": 1165149,
+      "note": "tokens_per_story_attempt_approx is the higher of the two cross-phase per-story token figures and is the binding input to the per-story-group ceiling derivation"
+    },
+    "transient_call_reliability_sample": {
+      "observed_failures": 0,
+      "observed_calls": 64,
+      "note": "0/64 observed transient tool-dispatch failures across the two workflows above; feeds the Clopper-Pearson upper-bound derivation for the transient-retry layer, NOT the story-level circuit breaker"
+    }
+  },
+
+  "stop_conditions": {
+    "description": "The disjunctive stop predicate governing any single agent-loop run dispatched under this policy (per agent-loop-lifecycle-core / stop-condition-budget-control-core). All four disjuncts are mandatory; a run halts the instant any one fires.",
+    "disjuncts": [
+      {
+        "name": "natural_final",
+        "trigger": "agent emits a final answer with no further tool calls",
+        "finishReason": "stop",
+        "owner": "model-driven, harness-observed"
+      },
+      {
+        "name": "max_turn_cap",
+        "trigger": "turn >= T_max for the dispatched agent",
+        "finishReason": "aborted",
+        "owner": "harness-driven, unconditional",
+        "note": "T_max is set per-agent-role in the Context Delivery Plan; this policy does not override per-role T_max values, it enforces that one is always set (no unbounded loop is permitted, per agent-loop-lifecycle-core Operating Rule)"
+      },
+      {
+        "name": "budget_guard",
+        "trigger": "cumulative tokens for the run >= per-agent ceiling (see token_budget_ceilings below)",
+        "finishReason": "length / aborted",
+        "owner": "harness-driven, unconditional"
+      },
+      {
+        "name": "output_contract_check",
+        "trigger": "agent's final output fails the phase's required artifact schema/contract (e.g. does not match the expected JSON schema for its phase deliverable)",
+        "finishReason": "aborted (custom stopWhen)",
+        "owner": "harness-driven, policy predicate"
+      }
+    ],
+    "convergence_signal": "for Fix->QA->Review->P1 remediation loops specifically, convergence is a distinct concept from the four disjuncts above -- see circuit_breakers.story_level_loop_breaker; a converged (APPROVED) verdict is a natural_final exit at the STORY level, composed from possibly several agent-loop runs underneath"
+  },
+
+  "token_budget_ceilings": {
+    "derivation_status": "DERIVED",
+    "derivation_summary": "tau_bar + 2 standard deviations on tokens/story-attempt (per-agent ceiling) and tokens/story cross-phase agreement (per-story-group ceiling), computed by harness-mathematics-expert against the empirical_grounding figures above. Per-agent ceiling divides the per-story-attempt tau_bar+2s figure by a conservative agents-per-story ratio observed across both workflows.",
+    "per_agent_ceiling_tokens": 375000,
+    "per_agent_ceiling_margin_note": "~18-23% margin over the observed mean tokens/agent across Waves 2-5 (38 agents / 12,479,018 tokens = ~328,395 mean) and P1 remediation (26 agents / 6,990,891 tokens = ~268,880 mean)",
+    "per_story_group_ceiling_tokens": 1250000,
+    "per_story_group_ceiling_margin_note": "~9% margin over the higher of the two observed cross-phase figures: 1,134,456 tokens/story (Waves 2-5) vs 1,165,149 tokens/story-attempt (P1 remediation) -- ceiling is set against the higher (P1 remediation) figure",
+    "enforcement": "cumulative tokens for a single dispatched agent >= per_agent_ceiling_tokens fires the budget_guard stop condition for that agent; cumulative tokens for all agents working a single story (across its full Fix->QA->Review->P1 loop) >= per_story_group_ceiling_tokens fires an ESCALATE recommendation to the coordinating session, independent of the story-level circuit breaker's attempt count",
+    "two_distinct_levers": {
+      "rate_limit_note": "this policy specifies budget (cumulative/stock) ceilings only; instantaneous rate-limit (token-bucket burst) governance is out of scope for this artifact and is deferred to the provider-level rate limits already in force for the Claude Code / Agent SDK dispatch mechanism -- see dispatch_mechanism_caveat above for why no separate token-bucket is implemented at the harness layer in this project",
+      "budget_limit": "governed by per_agent_ceiling_tokens and per_story_group_ceiling_tokens above; hard stop, no recovery within the run"
+    }
+  },
+
+  "retry_backoff_schedule": {
+    "description": "Transient agent-call / tool-dispatch retry layer. DISTINCT from the story-level circuit breaker below -- this layer handles a dropped, errored, or rate-limited tool/agent DISPATCH (a transport-level failure), not a review-quality rejection (Fix->QA->Review verdict of REJECTED, which is handled by the story-level breaker).",
+    "derivation_status": "DERIVED",
+    "derivation_summary": "k=3 total attempts derived from Clopper-Pearson exact upper confidence bound p_upper=4.57% at 0/64 observed transient-call failures (empirical_grounding.transient_call_reliability_sample). Backoff schedule derived per retry-backoff-circuit-breaker-core M1/M2 general form delay(n)=min(cap, base*2^n) with full jitter.",
+    "retry_cap_k": 3,
+    "retry_cap_composition": "1 initial attempt + up to 2 retries",
+    "retryable_error_classes": ["timeout", "connection reset", "429 too many requests", "500/502/503/504", "transient tool-dispatch drop"],
+    "non_retryable_error_classes": ["400 bad request / malformed args", "401/403 auth", "404 resource absent", "422 schema-validation failure", "review-quality REJECTED verdict (handled by story-level breaker, not this layer)"],
+    "backoff_function": "delay(n) = min(cap_seconds, base_seconds * 2^n)",
+    "backoff_base_seconds": 5,
+    "backoff_cap_seconds": 60,
+    "backoff_growth_factor": 2,
+    "jitter_strategy": "full_jitter",
+    "jitter_formula": "delay(n) = Uniform(0, min(cap_seconds, base_seconds * 2^n))",
+    "jitter_rationale": "full jitter selected over equal jitter for maximum decorrelation; derivation reports ~20x collision reduction at 10 concurrent agents (wave-level fan-out) vs no jitter, consistent with retry-backoff-circuit-breaker-core M2's collision-probability analysis",
+    "reachable_rounds_at_k3": {
+      "n0_delay_seconds": 5,
+      "n1_delay_seconds": 10,
+      "note": "only n=0 (5s deterministic ceiling) and n=1 (10s deterministic ceiling) are reachable at k=3; the cap (60s, reached at n>=4 for base=5) is never engaged at this retry-cap depth -- recorded here so a future reader does not mistake the 60s cap as operative at k=3"
+    },
+    "retry_budget_note": "a retry consumes a turn/token-equivalent and is charged against the same per_agent_ceiling_tokens / T_max bounds in stop_conditions and token_budget_ceilings above (per retry-backoff-circuit-breaker-core Section 1.3) -- retries are not a separate, unbudgeted allowance"
+  },
+
+  "circuit_breakers": {
+    "description": "Two mathematically and operationally DISTINCT breaker layers. Layer 1 (story-level) handles systemic REVIEW-QUALITY failure across a story's Fix->QA->Review->P1 remediation loop. Layer 2 (transient-call) is the classic Nygard CLOSED/OPEN/HALF-OPEN breaker for systemic TRANSPORT failure of the dispatch mechanism itself. Conflating the two -- e.g. applying the transient-call retry policy to a story that keeps failing review, or applying the story-level 2-attempt cap to a single flaky tool call -- is the anti-pattern retry-backoff-circuit-breaker-core names as the central failure mode.",
+
+    "story_level_loop_breaker": {
+      "layer": 1,
+      "scope": "per-story Fix -> QA -> Review -> P1 remediation loop",
+      "derivation_status": "DERIVED",
+      "derivation_summary": "k=2 attempts derived from Wilson confidence-interval + exact match against E[attempts]=1.5 observed: 2 of 4 P1-remediated stories (DASH-STORY-005, DASH-STORY-006) needed exactly a 2nd attempt, 0 of 4 needed a 3rd attempt (empirical_grounding.p1_remediation_workflow). Cost-asymmetry argument: the marginal cost of a 3rd attempt is much greater than the cost of escalating to the user at that point, so the breaker trips to human escalation rather than permitting a 3rd automated attempt.",
+      "max_attempts_k": 2,
+      "trip_action": "ESCALATE_TO_USER",
+      "trip_action_note": "NOT a silent abort and NOT an automatic 3rd attempt. On the 2nd attempt's Fix->QA->Review->P1 cycle failing to reach an APPROVED verdict, the coordinating agent must surface the story to the user for an explicit decision (continue manually, adjust scope, or accept as-is) rather than looping again or dropping the story silently.",
+      "observed_fit": "E[attempts]_observed = 1.5 (2 stories at 2 attempts, 2 stories at 1 attempt, out of 4 P1-remediated stories) -- consistent with k=2 as the trip point; 0/4 needed a 3rd attempt supports not permitting one",
+      "state_machine": {
+        "states": ["ATTEMPT_1_IN_PROGRESS", "ATTEMPT_2_IN_PROGRESS", "ESCALATED"],
+        "transitions": [
+          {"from": "ATTEMPT_1_IN_PROGRESS", "to": "ATTEMPT_1_IN_PROGRESS -> APPROVED (loop exits, not a breaker state)", "trigger": "Review verdict = APPROVED on attempt 1"},
+          {"from": "ATTEMPT_1_IN_PROGRESS", "to": "ATTEMPT_2_IN_PROGRESS", "trigger": "Review verdict = REJECTED on attempt 1"},
+          {"from": "ATTEMPT_2_IN_PROGRESS", "to": "ATTEMPT_2_IN_PROGRESS -> APPROVED (loop exits, not a breaker state)", "trigger": "Review verdict = APPROVED on attempt 2"},
+          {"from": "ATTEMPT_2_IN_PROGRESS", "to": "ESCALATED", "trigger": "Review verdict = REJECTED on attempt 2 (k exhausted)"}
+        ]
+      }
+    },
+
+    "transient_call_breaker": {
+      "layer": 2,
+      "scope": "per-dependency (per-tool, per-agent-endpoint) systemic transport failure, distinct from the k=3 per-call retry layer above -- the breaker trips only when the retry layer's failures cluster into a systemic pattern, not on any single call's failure",
+      "derivation_status": "APPROXIMATED",
+      "derivation_status_note": "the mathematical derivation package for this task covered the k=3 transient-retry cap and its backoff/jitter schedule explicitly (Clopper-Pearson), but did NOT hand down explicit (theta, N, tau) circuit-breaker parameters for this project. The values below are engineering-judgment defaults following retry-backoff-circuit-breaker-core's general form and MUST be re-derived by harness-mathematics-expert against this project's own future call-volume telemetry before being treated as tuned rather than provisional.",
+      "states": ["CLOSED", "OPEN", "HALF_OPEN"],
+      "rolling_window_calls_N": 20,
+      "failure_rate_threshold_theta": 0.5,
+      "threshold_rationale_approximated": "theta=0.5, N=20 chosen per retry-backoff-circuit-breaker-core M5's worked example, which shows this pair suppresses false trips from an assumed r0=0.10 baseline transient-failure rate to ~1.3e-9 -- PROVISIONAL, not fit to this project's own r0 (this project's observed baseline is 0/64, i.e. r0 currently indistinguishable from 0, which is too small a sample to fit theta/N against directly)",
+      "cooldown_seconds_tau": 30,
+      "cooldown_growth": "cooldown doubles on each consecutive trip up to a cap of 300s, reusing the retry_backoff_schedule's capped-exponential form on the breaker's own timescale",
+      "probe_policy": "single HALF_OPEN probe call per cooldown expiry; probe success -> CLOSED, probe failure -> OPEN (cooldown restarts, doubled)",
+      "trip_action": "fail-fast: calls to the tripped dependency return an immediate fallback/error without dispatching, until the next HALF_OPEN probe window"
+    }
+  },
+
+  "tool_call_mediation_rules": {
+    "description": "Per tool-call-mediation-core: intercept -> permission/approval gate -> JSON-schema validation -> dispatch -> result injection, in that order, for every tool call any dispatched agent requests.",
+    "mediation_sequence": ["intercept", "permission_approval_gate", "schema_validation", "dispatch", "result_injection"],
+    "permission_gating": {
+      "risk_tiers": {
+        "read_only": "auto-allow (Read, Glob, Grep, and equivalent read-only tools)",
+        "write_mutating": "allow with audit (Edit, Write, Bash commands that mutate local files/state)",
+        "destructive_external_financial": "require explicit human approval (force-push, destructive git ops, external API calls with side effects, payment/financial actions) -- none of the standard Phase B/P1-remediation dispatches in this project currently fall in this tier; flagged here so a future tool addition is checked against it before being auto-allowed"
+      }
+    },
+    "schema_validation": "every tool call's arguments must pass JSON-schema validation before dispatch; malformed arguments are rejected and fed back to the calling agent as a structured tool-result observation (never silently dispatched, never a harness crash), per tool-call-mediation-core Section 3",
+    "errors_as_observations": "a tool error (validation rejection or dispatch failure) is returned to the requesting agent as a normal tool-result message, tagged retryable or permanent so the agent's own policy can decide to retry (bounded by retry_backoff_schedule), switch approach, or finish -- never a harness crash",
+    "tool_set_sizing": {
+      "target_range": "3-5 deeply-known tools per specialist agent",
+      "rationale": "tool-selection accuracy degrades below ~80% past ~15-20 tools (empirical, vendor-reported, per tool-call-mediation-core Section 5) -- this project's implementer roles (python-backend-engineer, database-engineer, ai-engineer) and P1 reviewer roles (security-defense-architect, api-security-auditor) should each be dispatched with a tool allow-list in this range, decomposing further rather than overloading a single role's toolset"
+    },
+    "forbidden_tool_lists": {
+      "note": "no project-specific forbidden-tool list is defined by this policy at this time; the mandatory-skill-driven Operating Rules of each dispatched agent (e.g. harness-engineering-architect's own Rule 3 and Rule 12) already constrain destructive operations at the agent-persona level. This field is a placeholder for a future explicit deny-list if a specific tool is found to require blanket denial for a given role."
+    }
+  },
+
+  "routing_dispatch_policy": {
+    "description": "Dynamic re-routing policy for when a dispatched agent fails or is rate-limited, per agent-routing-dispatch-policy-core.",
+    "routing_type": "hybrid: deterministic role-to-agent-name mapping (Sprint 1's fixed roster -- python-backend-engineer, database-engineer, ai-engineer, security-defense-architect, api-security-auditor, mathematics-engineer) for the common case, with escalation to the coordinating session (dynamic, human-adjacent judgment) on failure",
+    "on_transient_call_failure": "apply retry_backoff_schedule (k=3, capped exponential + full jitter) before considering re-routing; do not re-route on a single transient failure",
+    "on_transient_call_breaker_open": "per transient_call_breaker.trip_action -- fail fast on the affected dependency; if the affected dependency is a specific agent role's required tool, the coordinating session substitutes an equivalent tool or defers that agent's dispatch until HALF_OPEN probe succeeds, rather than silently dropping the subtask",
+    "on_story_level_breaker_trip": "per story_level_loop_breaker.trip_action -- ESCALATE_TO_USER; the coordinating session does not auto-select a different implementer role or silently re-attempt a 3rd time",
+    "on_rate_limit": "per rules/model-fallback.md -- retry the same agent with the next model tier in the fallback chain (haiku->sonnet->opus->fable->escalate to user; sonnet->opus->fable->escalate to user, etc.), preserving the full original prompt, logging the fallback explicitly; this is a model-tier substitution, not a role substitution",
+    "model_switch_authority": "model-tier switching (Sonnet<->Opus) for ordinary specialist agents is governed by resource_elastic_policy.json (Phase A.6.1), not by this file; orchestrator-agent-equivalent coordination in this project runs at the coordinating session's own fixed tier and is exempt from that switcher, consistent with phase-A.6.md's orchestrator-agent exemption",
+    "decomposition_dag_note": "Sprint 1's 11-story / 58-SP backlog decomposes into a dependency DAG (see docs/phase-6-sprint-planning/backlog_draft.json and docs/phase-7-routing/ar1_assignments.json for the actual edges, e.g. DASH-STORY-011 depends_on DASH-STORY-007); this policy does not restate that DAG -- it governs the control-loop discipline applied AT each DAG node's dispatch, not the DAG's own topology"
+  },
+
+  "observability": {
+    "version_note": "v29.13.0 additive block, per phase-A.6.md -- additive-only, does not alter the BLOCKING gate language above",
+    "metric_emission": "each dispatched agent/task should emit per-task metrics (tokens consumed, turns used, tool_uses, wall-clock, outcome) at loop-end via the equivalent of tools/harness/metric_emitter.py into an observability.json rollup for this project",
+    "current_status_disclosure": "no observability.json rollup or metric_emitter.py equivalent currently exists in this repo as of this commit (2026-09-19) -- the empirical_grounding figures above were reconstructed from the Waves 2-5 and P1 remediation workflow summaries handed to this task, not from an automated rollup pipeline. This gap is disclosed rather than silently assumed closed; standing up the rollup pipeline is a follow-up, not claimed as already done here.",
+    "feeds_linucb_reward": "once a rollup exists, it feeds the resource_elastic_policy.json LinUCB reward signal for self-tuning Sonnet/Opus model-switching, per phase-A.6.md"
+  },
+
+  "field_provenance_legend": {
+    "DERIVED": "grounded in the harness-mathematics-expert derivation package supplied for this task and/or the empirical_grounding data reproduced verbatim above",
+    "APPROXIMATED": "engineering judgment applied where the supplied derivation package did not hand down an explicit value for this project; flagged inline at the point of use and must be re-derived or empirically calibrated before being treated as tuned"
+  }
+}

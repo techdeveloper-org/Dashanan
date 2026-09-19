@@ -1,0 +1,91 @@
+{
+  "phase": "A.6.1",
+  "step": "Resource-Elastic Orchestration",
+  "artifact": "resource_elastic_policy.json",
+  "extends": "harness_control_policy.json",
+  "owner_agent": "harness-engineering-architect",
+  "date": "2026-09-19",
+  "co_pruned_with": "harness_control_policy.json (Phase A.6) -- if the A.6 harness gate is skipped, A.6.1 is skipped too; here both are activated retroactively together, see harness_control_policy.json.retroactive_gap_disclosure",
+  "consulted": {
+    "harness_mathematics_expert": "Pareto / epsilon-constraint / LinUCB regret bounds, the R(m,x) reward function, the switch-rule derivation, and the illustrative token-saving figure -- consumed verbatim below, not re-derived here"
+  },
+  "skill_basis": "multi-objective-cost-optimization-core (ADR-3 optimizer architecture: weighted-sum scalarization default + epsilon-constraint hard-floor fallback + LinUCB online layer; ADR-4 model-switch trigger: complexity x cost-budget threshold)",
+
+  "scope": {
+    "action_space": "Sonnet <-> Opus only, for ordinary specialist agents (implementer roles, reviewer roles, and similar Phase B / P1-remediation dispatches)",
+    "exempt_roles": {
+      "orchestrator_role": "the coordinating-session / orchestrator-agent-equivalent role in this project is fixed at its own highest available tier and is exempt from this switcher entirely -- it is never a switching target, up or down, per phase-A.6.md's explicit exemption for orchestrator-agent",
+      "note": "this project's dispatch mechanism does not instantiate a literal 'orchestrator-agent' persona at runtime (see harness_control_policy.json.retroactive_gap_disclosure.dispatch_mechanism_caveat) -- the exemption is applied to whichever session/agent performs the coordinating role for a given dispatch"
+    }
+  },
+
+  "reward_function": {
+    "formula": "R(m, x) = accuracy(m, x) - lambda * cost(m, x)",
+    "derivation_status": "DERIVED",
+    "derivation_source": "multi-objective-cost-optimization-core M5, the gamma=0 (terminal/greedy) special case of the MDP Bellman optimality pi*(s) = argmax_a Q*(s,a); reward = accuracy - lambda*cost per step",
+    "terms": {
+      "accuracy(m, x)": "expected task-success probability of model m on task x; depends on both the model and the task's complexity score (STEP 4.5-equivalent complexity classification, or this project's equivalent role/story complexity signal)",
+      "cost(m, x)": "expected resource consumption of running m on x, in price-weighted token-budget units (an Opus token consumes more budget-unit than a Sonnet token, per multi-objective-cost-optimization-core Section 2 / M6)",
+      "lambda": "the shadow price of a budget unit -- the same value-density multiplier consumed from stop_condition_budget_control_core / harness_control_policy.json.token_budget_ceilings; high when the remaining budget is tight, low when budget is ample"
+    }
+  },
+
+  "switch_rule": {
+    "description": "Epsilon-constraint hard floor branch OR weighted-sum branch, per ADR-3's fixed optimizer architecture -- not a single uniform rule.",
+    "derivation_status": "DERIVED",
+    "primary_rule": {
+      "condition": "x_math = 1",
+      "action": "choose Opus unconditionally",
+      "rationale": "epsilon-constraint hard floor, not a soft weight -- applies when the task is a first-principles derivation feeding a BLOCKING gate (e.g. the mathematics-engineer / harness-mathematics-expert roles in this project's own roster). Accuracy floor for this task class is ~0.98-0.99; Sonnet is treated as INFEASIBLE for this class, not merely costlier, so no cost comparison against lambda is performed -- the floor cannot be traded away by any weighting.",
+      "roles_in_this_project_matching_x_math_1": ["mathematics-engineer", "harness-mathematics-expert (math-delegation role, Sprint 1 roster)"]
+    },
+    "secondary_rule": {
+      "condition": "x_math = 0 (ordinary task, no hard-floor first-principles derivation involved)",
+      "action": "choose Opus iff delta_acc(complexity) > lambda * delta_cost, else Sonnet",
+      "rationale": "weighted-sum / MDP gamma=0 branch, per multi-objective-cost-optimization-core Section 5 (ADR-4) and M5 -- escalate to Opus iff the complexity-driven accuracy gain of Opus over Sonnet exceeds the cost-scaled price of the upgrade; as the remaining budget tightens, lambda rises and the threshold pushes toward Sonnet; as task complexity rises, delta_acc(complexity) rises and the threshold pushes toward Opus",
+      "roles_in_this_project_matching_x_math_0": ["python-backend-engineer", "database-engineer", "ai-engineer", "security-defense-architect", "api-security-auditor", "harness-engineering-architect (this agent itself, per its own Model Usage Strategy: sonnet by default, escalate to opus only via the Model Fallback Protocol on rate-limit, never a preference switch)"]
+    },
+    "orchestrator_exemption_restated": "the coordinating/orchestrator-equivalent role is fixed at its own tier per scope.exempt_roles above and never enters either branch of this switch rule"
+  },
+
+  "linucb_online_layer": {
+    "role": "fallback / online-learning layer for BORDERLINE non-math cases only -- i.e. cases falling under switch_rule.secondary_rule where the delta_acc(complexity) vs lambda*delta_cost comparison is close and true accuracy(m,x) is not yet well-estimated for this task shape",
+    "derivation_status": "DERIVED (formula/regret bound) / APPROXIMATED (this project's own feature weights and reward telemetry)",
+    "derivation_status_note": "the LinUCB formula and its O(sqrt(dT log T)) regret bound are DERIVED per multi-objective-cost-optimization-core M4 and are cited verbatim. This project has NOT yet accumulated the observability.json rollup (see harness_control_policy.json.observability.current_status_disclosure) needed to fit theta_hat or measure actual per-arm reward -- so this layer is specified but not yet operative with real telemetry; treat it as a designed fallback awaiting its data feed, not as already tuned.",
+    "arms": ["sonnet", "opus"],
+    "arm_count_K": 2,
+    "context_features": {
+      "count_d": 4,
+      "features": ["complexity", "token_estimate", "latency_estimate", "role_type"]
+    },
+    "selection_rule": "UCB_t(m) = x^T theta_hat + beta * ||x||_{A^-1}",
+    "regret_bound": "O(sqrt(d * T * log T))",
+    "regret_bound_interpretation": "average regret -> 0 as T grows (the online selector's mean routing choice converges to the oracle's); regret grows with sqrt(d) and sqrt(K), which is why d is kept at 4 and K at 2 (Sonnet/Opus only) rather than expanding the arm or feature set casually, per multi-objective-cost-optimization-core M4's closing interpretation",
+    "reward_feed": "once harness_control_policy.json's observability rollup exists, the reward signal r_t for this layer is the realized R(m,x) = accuracy(m,x) - lambda*cost(m,x) for whichever arm was actually played, per multi-objective-cost-optimization-core Section 7's control-flow integration"
+  },
+
+  "token_saving_estimate": {
+    "value": "~77.6%",
+    "status": "APPROXIMATED / ILLUSTRATIVE -- NOT A MEASURED FACT",
+    "explicit_flag": "This figure is stated in the task's supplied mathematical derivation as an estimate versus an always-Opus baseline. It is NOT derived from this project's own real Anthropic billing data. The cost-ratio kappa (Opus-cost / Sonnet-cost) that the saving law S = q * (1 - kappa) depends on has not been measured from real billing for this project -- per multi-objective-cost-optimization-core M6, kappa and the simple-task-share q are both project-specific inputs that must be measured, not assumed, before this figure can be treated as a real projection.",
+    "saving_law": "S = q * (1 - kappa)",
+    "saving_law_source": "multi-objective-cost-optimization-core M6, DERIVED general form",
+    "what_would_be_needed_to_convert_to_measured": [
+      "an observability.json rollup (or equivalent) recording actual per-task model tier, token counts, and accuracy/outcome for a representative sample of this project's Phase B / P1-remediation dispatches",
+      "real Anthropic billing data to fix kappa (price-weighted cost ratio) rather than the illustrative kappa=0.20 (central estimate) / kappa=0.333 (conservative bound) instances given in multi-objective-cost-optimization-core M6",
+      "a measured q (fraction of this project's actual dispatched subtasks that are 'simple' -- i.e. Sonnet clears the accuracy floor) from this project's own STEP-4.5-equivalent complexity classification of its Sprint 1 roster's dispatches, rather than the skill's illustrative q=0.70/q=0.60 instances"
+    ],
+    "do_not": "do not cite ~77.6% (or the skill's own illustrative 56%/40% instances) as this project's actual or expected savings in any downstream report without first completing the measurement steps above"
+  },
+
+  "compliance_surface_carryover": {
+    "note": "multi-objective-cost-optimization-core Section 8 specifies DPDP Act 2023 s4 (PII isolation -- restrict model-switch candidate set to an approved in-tenant model whenever task context carries PII, cost never overrides isolation) and CERT-In Directions 2022 s6(a) (audit-log every model-switch decision) as hard India-regulatory hooks on the switch ACTION. This project (Dashanan) has not been confirmed to process PII-bearing task context in its Sprint 1 Phase B / P1-remediation dispatches; this field records the rule as applicable-if-triggered rather than asserting it is currently triggered.",
+    "dpdp_s4_rule": "IF a future dispatch's task context is confirmed to carry PII, restrict the candidate model set to the DPDP-approved in-tenant model and record the override in the dispatch log -- cost/latency optimization never overrides this.",
+    "cert_in_s6a_rule": "every model-switch decision (Sonnet<->Opus, or the Model Fallback Protocol's tier escalation) should be logged with: chosen model, complexity signal, PII flag, computed utility/rationale, and an injected (non-wall-clock) event id for deterministic replay -- this logging is not yet implemented in this repo (see harness_control_policy.json.observability.current_status_disclosure) and is recorded here as a known follow-up, not as already done."
+  },
+
+  "field_provenance_legend": {
+    "DERIVED": "grounded in the harness-mathematics-expert derivation package supplied for this task, or in a general-form theorem/formula from multi-objective-cost-optimization-core cited verbatim",
+    "APPROXIMATED": "engineering judgment or an explicitly-illustrative figure from the supplied derivation/skill, not yet fit against this project's own measured telemetry -- flagged inline and must not be presented as a measured fact until measured"
+  }
+}

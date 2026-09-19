@@ -10,7 +10,7 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 >
 > Full rationale: [`docs/orchestration/01-vision-and-prd.md`](docs/orchestration/01-vision-and-prd.md).
 
-> ⚠️ **Status (updated 2026-09-17):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review, added 2026-09-19 (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** (explicit user go-ahead given) — DASH-STORY-001 (Memory Orchestrator core facade) is implemented and reviewed (see Local development below); DASH-STORY-002 through 010 (and future-sprint FR-003/004/005/008/011/013) are not yet implemented.
+> ⚠️ **Status (updated 2026-09-19):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** — all 11 Sprint 1 stories are now implemented: DASH-STORY-001 landed first (`cba559f`); DASH-STORY-002 through 010 landed via a dependency-gated `Workflow`-tool run (`d888536`), including a full adversarial P1 security remediation round for DASH-STORY-004/005/006/007 (see Local development below). Future-sprint FR-003/004/005/008/011/013 (Zones 3/4/5/8) are not yet started. The **Harness Gate (Phase A.6/A.6.1)** was activated 2026-09-19, retroactively — see `docs/phase-A6-harness/`; Phase H (eval/regression gate) remains deferred.
 
 > **Implementation Ready — with these documented pre-implementation decisions pending** (added 2026-09-18, per a repo-wide consistency audit). "Implementation Ready" above means the planning pipeline's own gates all passed; it does not mean every underlying architecture question is closed. The following items in [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md)'s Open Architecture Questions table are genuinely still open and should be resolved (or explicitly accepted as-is) before or early in Phase B:
 > - **OAQ-10** — DPDP erasure via crypto-shredding of an append-only audit store. Status: Proposed. Whether key destruction constitutes erasure under DPDP Act 2023 requires legal confirmation, not an architect's judgment.
@@ -60,10 +60,23 @@ Recommended reading order for someone new to the project:
 
 ## Local development
 
-Phase B has begun (2026-09-19). DASH-STORY-001 (Memory Orchestrator core facade, FR-009) is
-implemented under `src/dashanan/`, Shape A (embedded library, in-process, no network) per HLD
-Section 2 — the remaining 10 Sprint-1 stories are not yet implemented; every zone request
-currently degrades gracefully with `zones_unavailable` populated (AC-009-SUPP-1), by design.
+Phase B is complete for Sprint 1 (2026-09-19). All 11 stories are implemented under
+`src/dashanan/`, Shape A (embedded library, in-process, no network) per HLD Section 2:
+DASH-STORY-001 (Memory Orchestrator facade, FR-009), DASH-STORY-002/003 (Zone 1/Zone 2),
+DASH-STORY-004 (Zone 2 cap/MaxAge backstop, with real cross-zone DPDP erasure cascade),
+DASH-STORY-005 (Zone 7 Provenance, append-only enforced by DB role ownership), DASH-STORY-006
+(WAL/outbox write-path gate), DASH-STORY-007 (Zone 6 hybrid retrieval, tenant-partitioned),
+DASH-STORY-008 (MemoryScore engine), DASH-STORY-009/010 (rotation state machine +
+deadline-invalidation wiring). DASH-STORY-011 (Qdrant spike) is a research/Jira artifact, not
+code, by design. Any zone request for a genuinely unregistered zone still degrades gracefully
+with `zones_unavailable` populated (AC-009-SUPP-1).
+
+DASH-STORY-004/005/006/007 initially failed a real adversarial P1 security review (a
+live-reproduced cross-tenant data leak, a forgeable write-path attestation, an unenforced
+append-only DB guarantee, and a non-functional DPDP erasure claim) and were remediated and
+re-verified against the same adversarial reviewers before merging — see
+`docs/phase-A6-harness/` for the harness policy now governing this kind of work, and Jira
+`DSHN-55`..`DSHN-58` for the remediation trail.
 
 ```bash
 # Requires Python 3.12+ (NFR-001)
@@ -71,10 +84,9 @@ pip install -e ".[dev]"
 python -m pytest -v
 ```
 
-31 tests pass as of this story: `MemoryOrchestrator`/`ContextAssemblyBuilder` unit tests
-(`tests/test_memory_orchestrator.py`, `tests/test_context_assembly_builder.py`) plus smoke
-tests (`tests/test_smoke.py`), including an AST-based architecture-fitness test enforcing HLD
-3.0 invariant 1 (no `dashanan/domain/**` module may import `dashanan/infrastructure/**`).
+878 tests pass as of this round, including an AST-based architecture-fitness test enforcing HLD
+3.0 invariant 1 (no `dashanan/domain/**` module may import `dashanan/infrastructure/**`) and a
+real Docker Postgres 16 regression test for DASH-STORY-005's append-only privilege fix.
 
 ## Repository layout
 
