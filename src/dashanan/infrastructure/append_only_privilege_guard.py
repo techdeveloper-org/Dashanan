@@ -91,6 +91,10 @@ def verify_append_only_role_is_safe(
                     f"CREATEROLE={bool(is_createrole)}, "
                     f"is_table_owner={bool(is_table_owner)}) -- connect as a "
                     f"LOGIN role that holds none of these and is granted "
-                    f"membership only in dashanan_app_role"
+                    f"membership only in this zone's own least-privilege "
+                    f"role (`dashanan_provenance_role` for Zone 7, "
+                    f"`dashanan_episodic_role` for Zone 2 -- DSHN-60 "
+                    f"narrowed these from one role shared across every "
+                    f"zone's schema to one distinct role per zone)"
                 ),
             )

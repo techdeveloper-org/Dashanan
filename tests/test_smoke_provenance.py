@@ -139,7 +139,7 @@ class TestPackageWiring:
     """Baseline: the adapter constructs and is importable, before any AC-level suite."""
 
     def test_repository_constructs_with_fake_connection(self) -> None:
-        repo = SqlProvenanceRepository(RecordingConnection())
+        repo = SqlProvenanceRepository(RecordingConnection(), verify_privileges=False)
         assert repo is not None
 
 
@@ -275,7 +275,7 @@ class TestMustNotDeviateAppendOnly:
     """Must-not-deviate item 1: no UPDATE grant / append-only, no mutation methods."""
 
     def test_repository_exposes_no_update_or_delete_method(self) -> None:
-        repo = SqlProvenanceRepository(RecordingConnection())
+        repo = SqlProvenanceRepository(RecordingConnection(), verify_privileges=False)
         assert not hasattr(repo, "update")
         assert not hasattr(repo, "delete")
 
@@ -300,7 +300,7 @@ class TestMustNotDeviateAppendOnlyO1Write:
 
     def test_append_issues_a_single_insert_statement(self) -> None:
         connection = RecordingConnection()
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
         record = _record()
 
         repo.append(record)
@@ -316,7 +316,7 @@ class TestMustNotDeviateTenantIdRequired:
 
     def test_find_by_item_id_rejects_blank_tenant_id_before_querying(self) -> None:
         connection = RecordingConnection()
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
 
         with pytest.raises(ValueError, match="tenant_id"):
             repo.find_by_item_id(tenant_id="", item_id="item-1")
@@ -326,7 +326,7 @@ class TestMustNotDeviateTenantIdRequired:
         self,
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
 
         with pytest.raises(ValueError, match="tenant_id"):
             repo.find_latest_by_item_id(tenant_id="", item_id="item-1")
@@ -334,7 +334,7 @@ class TestMustNotDeviateTenantIdRequired:
 
     def test_append_rejects_blank_tenant_id_before_querying(self) -> None:
         connection = RecordingConnection()
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
         record = _record(tenant_id="tenant-1")
         object.__setattr__(record, "tenant_id", "")
 
@@ -351,7 +351,7 @@ class TestAC007Retrievability:
         first = _record(provenance_id="prov-1", write_timestamp=_FIXED_TS)
         rows = [_row_for(first)]
         connection = RecordingConnection(rows=rows)
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
 
         found = repo.find_by_item_id(tenant_id="tenant-1", item_id="item-1")
 
@@ -365,7 +365,7 @@ class TestAC007Retrievability:
 
     def test_find_latest_by_item_id_returns_none_when_no_row_matches(self) -> None:
         connection = RecordingConnection(rows=[])
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
 
         assert (
             repo.find_latest_by_item_id(tenant_id="tenant-1", item_id="item-1")
@@ -450,7 +450,7 @@ class TestBoundaryAndNegativeCases:
             ProvenanceUpdateEntry(ts=_FIXED_TS, actor="  ", change="initial write")
 
     def test_find_by_item_id_rejects_blank_item_id(self) -> None:
-        repo = SqlProvenanceRepository(RecordingConnection())
+        repo = SqlProvenanceRepository(RecordingConnection(), verify_privileges=False)
         with pytest.raises(ValueError, match="item_id"):
             repo.find_by_item_id(tenant_id="tenant-1", item_id="")
 
@@ -459,7 +459,7 @@ class TestBoundaryAndNegativeCases:
     ) -> None:
         connection = RecordingConnection()
         connection.cursor_obj._raise = RuntimeError("connection refused")
-        repo = SqlProvenanceRepository(connection)
+        repo = SqlProvenanceRepository(connection, verify_privileges=False)
 
         with pytest.raises(ZoneRepositoryError):
             repo.find_by_item_id(tenant_id="tenant-1", item_id="item-1")

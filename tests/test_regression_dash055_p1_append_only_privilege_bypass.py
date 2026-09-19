@@ -5,7 +5,7 @@ exploit the P1 review demonstrated against a REAL PostgreSQL 16 instance (spun u
 ephemeral, disposable Docker container -- not mocked, not parsed as text) and proves that
 exploit is now blocked by the Fix sub-task's two-layer remediation
 (`trg_provenance_records_append_only` / `trg_episodic_entries_append_only` triggers plus
-the new `dashanan_app_role`), applied to both:
+the new, per-zone `dashanan_provenance_role` / `dashanan_episodic_role`), applied to both:
 
   src/dashanan/infrastructure/provenance_schema.sql   (Zone 7, CRITICAL finding)
   src/dashanan/infrastructure/episodic_schema.sql     (Zone 2, HIGH finding)
@@ -502,36 +502,52 @@ class TestEpisodicOwnerCannotMutateDespiteImplicitAllPrivileges:
 
 
 class TestDistinctLeastPrivilegedRoleNowExists:
-    """Proves must-not-deviate item 1's other half: a distinct, least-privileged
-    `dashanan_app_role` now genuinely exists (the P1 review's repo-wide grep for
-    `CREATE ROLE`/`CREATE USER`/`GRANT` found zero matches before this fix), and that
-    it is granted only SELECT and INSERT -- never UPDATE or DELETE -- on both zones'
-    tables, so a deployment that connects as this role (rather than as the owner) has no
+    """Proves must-not-deviate item 1's other half: a distinct, least-privileged,
+    PER-ZONE role now genuinely exists for each schema (the P1 review's repo-wide grep for
+    `CREATE ROLE`/`CREATE USER`/`GRANT` found zero matches before this fix), and that each
+    is granted only SELECT and INSERT -- never UPDATE or DELETE -- on its OWN zone's table
+    only, so a deployment that connects as this role (rather than as the owner) has no
     privilege-level path to UPDATE/DELETE either, independent of the trigger.
+
+    DSHN-60 P1 remediation note: attempt 1's `dashanan_app_role` was a single role shared
+    across both `provenance_records` and `episodic_entries` -- a credential granted
+    membership in it for one zone's write path was, by construction, already privileged to
+    SELECT/INSERT the OTHER zone's table too, with no schema-level control isolating the
+    two. This suite now proves each zone has its OWN role (`dashanan_provenance_role` for
+    Zone 7, `dashanan_episodic_role` for Zone 2) and that neither role is granted anything
+    on the other zone's table.
     """
 
-    def test_role_exists_as_nologin(self, pg_container: str):
+    @pytest.mark.parametrize(
+        "role_name", ["dashanan_provenance_role", "dashanan_episodic_role"]
+    )
+    def test_role_exists_as_nologin(self, pg_container: str, role_name: str):
         result = _psql(
             pg_container,
-            "SELECT rolname, rolcanlogin FROM pg_roles "
-            "WHERE rolname = 'dashanan_app_role';",
+            f"SELECT rolname, rolcanlogin FROM pg_roles WHERE rolname = '{role_name}';",
         )
         assert result.returncode == 0
-        assert "dashanan_app_role" in result.stdout
+        assert role_name in result.stdout
         assert " f" in result.stdout, (
-            "dashanan_app_role must be NOLOGIN (rolcanlogin = false); the application "
+            f"{role_name} must be NOLOGIN (rolcanlogin = false); the application "
             "is expected to be granted membership in it via a separate login role, not "
             "to log in as this role directly."
         )
 
     @pytest.mark.parametrize(
-        "table_name", ["provenance_records", "episodic_entries"]
+        ("role_name", "table_name"),
+        [
+            ("dashanan_provenance_role", "provenance_records"),
+            ("dashanan_episodic_role", "episodic_entries"),
+        ],
     )
-    def test_role_has_only_select_and_insert(self, pg_container: str, table_name: str):
+    def test_role_has_only_select_and_insert_on_its_own_zone(
+        self, pg_container: str, role_name: str, table_name: str
+    ):
         result = _psql(
             pg_container,
             "SELECT privilege_type FROM information_schema.role_table_grants "
-            f"WHERE grantee = 'dashanan_app_role' AND table_name = '{table_name}' "
+            f"WHERE grantee = '{role_name}' AND table_name = '{table_name}' "
             "ORDER BY privilege_type;",
         )
         assert result.returncode == 0
@@ -544,7 +560,39 @@ class TestDistinctLeastPrivilegedRoleNowExists:
             and "row)" not in line.lower()
         }
         assert granted == {"INSERT", "SELECT"}, (
-            f"dashanan_app_role's privileges on {table_name} were {granted}, expected "
+            f"{role_name}'s privileges on {table_name} were {granted}, expected "
             f"exactly {{'INSERT', 'SELECT'}} -- any UPDATE/DELETE grant here would "
             f"reopen must-not-deviate item 1 even with the trigger in place."
+        )
+
+    @pytest.mark.parametrize(
+        ("role_name", "other_zone_table"),
+        [
+            ("dashanan_provenance_role", "episodic_entries"),
+            ("dashanan_episodic_role", "provenance_records"),
+        ],
+    )
+    def test_role_has_no_privileges_on_the_other_zones_table(
+        self, pg_container: str, role_name: str, other_zone_table: str
+    ):
+        """DSHN-60 P1 remediation: proves the per-zone role split is real isolation,
+        not merely a rename -- a role provisioned for one zone must hold ZERO grants
+        on the other zone's table."""
+        result = _psql(
+            pg_container,
+            "SELECT privilege_type FROM information_schema.role_table_grants "
+            f"WHERE grantee = '{role_name}' AND table_name = '{other_zone_table}';",
+        )
+        assert result.returncode == 0
+        granted = {
+            line.strip()
+            for line in result.stdout.splitlines()
+            if line.strip() and line.strip() not in ("privilege_type", "")
+            and "---" not in line
+            and "rows)" not in line.lower()
+            and "row)" not in line.lower()
+        }
+        assert granted == set(), (
+            f"{role_name} unexpectedly holds {granted} on {other_zone_table} -- "
+            "per-zone roles must never be granted anything on a sibling zone's table."
         )

@@ -1,0 +1,25 @@
+# DSHN-60 LOW remediation: pinned dev-only dependency snapshot for reproducible
+# builds. `pyproject.toml`'s `[project.optional-dependencies].dev` intentionally
+# keeps open-ended `>=` ranges (so `pip install -e .[dev]` stays compatible with
+# a range of environments); this file is the exact, resolvable set this
+# repository's own dev environment is verified against, and is the closest
+# equivalent to a lock file this project has without adopting a lock-capable
+# tool (Poetry/uv/pip-tools were not already in use here, and none is
+# installed in this session's sandbox to generate one via `pip-compile`/
+# `uv pip compile` -- installing one was judged out of scope for a security
+# remediation pass).
+#
+# Regenerate after any dev dependency change with:
+#   pip install -e .[dev]
+#   pip freeze | grep -iE "^(pytest|pytest-cov|coverage|pluggy|iniconfig|packaging|pygments|colorama)=="
+#
+# `dependencies = []` in pyproject.toml means these never ship to production;
+# this is a hygiene/reproducibility file for local dev and CI only.
+colorama==0.4.6
+coverage==7.13.4
+iniconfig==2.3.0
+packaging==25.0
+pluggy==1.6.0
+pygments==2.19.2
+pytest==9.1.1
+pytest-cov==7.0.0

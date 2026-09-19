@@ -20,6 +20,7 @@ def test_assemble_context_degrades_when_no_zones_registered() -> None:
         zone_repositories={},
         event_bus=NoOpEventBus(),
         clock=SystemClock(),
+        tenant_credential_signing_key=None,
     )
     request = ContextAssemblyRequest(
         tenant_id="tenant-1",
@@ -41,6 +42,7 @@ def test_assemble_context_always_carries_unique_ids() -> None:
         zone_repositories={},
         event_bus=NoOpEventBus(),
         clock=SystemClock(),
+        tenant_credential_signing_key=None,
     )
     request = ContextAssemblyRequest(
         tenant_id="tenant-1",
@@ -64,6 +66,7 @@ def test_assemble_context_does_not_require_zone_level_knowledge() -> None:
         zone_repositories={},
         event_bus=NoOpEventBus(),
         clock=SystemClock(),
+        tenant_credential_signing_key=None,
     )
     request = ContextAssemblyRequest(
         tenant_id="tenant-1",

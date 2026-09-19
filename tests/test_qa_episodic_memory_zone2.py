@@ -276,7 +276,7 @@ def connection() -> FakeEpisodicConnection:
 def repo(
     connection: FakeEpisodicConnection, fixed_clock: FakeClock
 ) -> SqlEpisodicRepository:
-    return SqlEpisodicRepository(connection, fixed_clock)
+    return SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
 
 class TestAC002ChronologicalOrderRealBehavior:

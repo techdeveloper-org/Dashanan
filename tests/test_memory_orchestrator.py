@@ -113,6 +113,7 @@ class TestAC009NoZoneLevelRouting:
             zone_repositories=repos,
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=None)
 
@@ -145,6 +146,7 @@ class TestAC009NoZoneLevelRouting:
             },
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=None)
 
@@ -162,7 +164,8 @@ class TestAC009NoZoneLevelRouting:
     ) -> None:
         """The request DTO itself proves the caller need not name a zone."""
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request()
         assert request.zones is None
@@ -179,7 +182,8 @@ class TestAC009Supp1ZoneUnavailable:
         self, fixed_clock: FakeClock, event_bus: RecordingEventBus
     ) -> None:
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.EPISODIC])
 
@@ -199,6 +203,7 @@ class TestAC009Supp1ZoneUnavailable:
             zone_repositories={ZoneId.WORKING: failing_repo},
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.WORKING])
 
@@ -218,6 +223,7 @@ class TestAC009Supp1ZoneUnavailable:
             zone_repositories={ZoneId.WORKING: working_repo},
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.WORKING, ZoneId.EPISODIC])
 
@@ -231,7 +237,8 @@ class TestAC009Supp1ZoneUnavailable:
         self, fixed_clock: FakeClock, event_bus: RecordingEventBus
     ) -> None:
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.PROVENANCE])
 
@@ -257,6 +264,7 @@ class TestAC009R1UniqueIdentifiers:
             zone_repositories={ZoneId.WORKING: working_repo},
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.WORKING])
 
@@ -274,7 +282,8 @@ class TestAC009R1UniqueIdentifiers:
     ) -> None:
         """Explicit AC-009-SUPP-1 x AC-009-R1-1 interaction: degraded is not exempt."""
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=[ZoneId.CONSOLIDATION])
 
@@ -291,7 +300,8 @@ class TestAC009R1UniqueIdentifiers:
         self, fixed_clock: FakeClock, event_bus: RecordingEventBus
     ) -> None:
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request()
 
@@ -344,7 +354,8 @@ class TestBoundaryAndNegativeCases:
         self, fixed_clock: FakeClock, event_bus: RecordingEventBus
     ) -> None:
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=None)
 
@@ -367,7 +378,8 @@ class TestBoundaryAndNegativeCases:
     ) -> None:
         """Every one of the eight zones unregistered -- still a typed result, not an exception."""
         orchestrator = MemoryOrchestrator(
-            zone_repositories={}, event_bus=event_bus, clock=fixed_clock
+            zone_repositories={}, event_bus=event_bus, clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(zones=list(ZoneId))
 
@@ -388,6 +400,7 @@ class TestOrchestratorZoneQueryDelegation:
             zone_repositories={ZoneId.WORKING: repo},
             event_bus=event_bus,
             clock=fixed_clock,
+            tenant_credential_signing_key=None,
         )
         request = _request(
             zones=[ZoneId.WORKING],

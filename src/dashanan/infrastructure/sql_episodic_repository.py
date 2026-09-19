@@ -10,6 +10,7 @@ string-concatenate user input into SQL).
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol, cast, runtime_checkable
@@ -23,6 +24,8 @@ from dashanan.domain.zone import ZoneId
 from dashanan.infrastructure.append_only_privilege_guard import (
     verify_append_only_role_is_safe,
 )
+
+logger = logging.getLogger(__name__)
 
 _SELECT_COLUMNS = (
     "tenant_id, session_id, episode_id, seq, occurred_at, written_at, "
@@ -120,7 +123,7 @@ class SqlEpisodicRepository:
         connection: SqlConnection,
         clock: Clock,
         *,
-        verify_privileges: bool = False,
+        verify_privileges: bool,
     ) -> None:
         """Bind the adapter to its SQL connection and time source.
 
@@ -133,12 +136,22 @@ class SqlEpisodicRepository:
                 `append_only_privilege_guard`) that the connected role
                 cannot bypass `episodic_entries`' append-only enforcement
                 (SUPERUSER, CREATEROLE, or table ownership), raising
-                `ZoneRepositoryError` if it can. Defaults to False so
-                existing callers and tests are unaffected; a composition
-                root wiring a real production connection SHOULD pass True
-                (DSHN-55 P1 re-review, attempt 2 -- see this module's
-                docstring and `episodic_schema.sql` for why this is
-                defense-in-depth, not the primary control).
+                `ZoneRepositoryError` if it can (DSHN-55 P1 re-review,
+                attempt 2 -- see this module's docstring and
+                `episodic_schema.sql` for why this is defense-in-depth,
+                not the primary control).
+
+                DSHN-60 remediation, attempt 3: this parameter carries NO
+                default -- see `SqlProvenanceRepository.__init__`'s
+                identical note for why. Attempt 2's `= False` default left
+                the DSHN-55 check silently disabled at every real
+                construction site in this codebase; a required
+                keyword-only argument forces every caller to write
+                `verify_privileges=False` explicitly to accept that, a
+                visible and code-reviewable choice rather than an
+                invisible one. Pass `False` for a test double with no
+                `pg_roles`/`pg_class` catalog to query; pass `True` for
+                any connection backed by a real Postgres role.
         """
         self._connection = connection
         self._clock = clock
@@ -146,6 +159,14 @@ class SqlEpisodicRepository:
             cursor = connection.cursor()
             verify_append_only_role_is_safe(
                 cursor, "episodic_entries", ZoneId.EPISODIC.value
+            )
+        else:
+            logger.warning(
+                "SqlEpisodicRepository constructed with verify_privileges="
+                "False -- the DSHN-55 defense-in-depth append-only "
+                "privilege check is DISABLED for this connection. Pass "
+                "verify_privileges=True at the composition root once a "
+                "real production connection is wired."
             )
 
     def fetch(self, query: ZoneQuery) -> list[MemoryItem]:

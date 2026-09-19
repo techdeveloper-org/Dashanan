@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from dashanan.domain.tenant_credential import TenantCredential
 from dashanan.domain.zone import ZoneId
 
 
@@ -19,9 +20,14 @@ class ContextAssemblyRequest:
     no zone-level knowledge required.
 
     Attributes:
-        tenant_id: The verified tenant, normally injected from the
-            credential at the wire boundary (HLD 7.1); passed explicitly
-            here since that boundary does not exist yet this story.
+        tenant_id: The tenant this call claims to act as. Verified
+            against `tenant_credential` by `MemoryOrchestrator` whenever
+            it is constructed with a `tenant_credential_signing_key`
+            (HLD Threat S-1); normally this claim would instead be
+            injected from a verified credential at the wire boundary
+            once that boundary exists (see `tenant_credential`'s own
+            docstring for the composition-root gap this cannot close by
+            itself yet).
         session_id: The host's session identifier.
         task: Free-text task/query description. Required unless
             `query_embedding` is supplied.
@@ -34,6 +40,11 @@ class ContextAssemblyRequest:
         min_provenance_conf: Host-side trust floor on provenance
             confidence. Defaults to 0.0 (no filtering).
         as_of: Optional temporal query bound (episodic zone).
+        tenant_credential: A host-signed `TenantCredential` proving
+            `tenant_id` is genuine (HLD Threat S-1). Required only when
+            the receiving `MemoryOrchestrator` was constructed with a
+            `tenant_credential_signing_key`; `None` when tenant
+            verification is not configured for this deployment.
     """
 
     tenant_id: str
@@ -45,6 +56,7 @@ class ContextAssemblyRequest:
     max_items: int = 50
     min_provenance_conf: float = 0.0
     as_of: datetime | None = None
+    tenant_credential: TenantCredential | None = None
 
     def __post_init__(self) -> None:
         """Validate the preconditions this DTO must uphold before any zone adapter runs.

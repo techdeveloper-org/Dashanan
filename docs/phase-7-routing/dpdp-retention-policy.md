@@ -9,6 +9,26 @@ status is stated explicitly below, not smoothed over.
 
 ## Current implementation status — read this first
 
+**Update (2026-09-19, DSHN-60 docs-drift correction):** the "no shipped erasure mechanism to audit yet"
+claim two paragraphs below is now partially superseded. Commit `d888536` shipped
+`src/dashanan/infrastructure/dpdp_erasure_cascade.py` (`CrossZoneDpdpErasureCascade`), a real, tested,
+Shape A adapter — but it is **materially narrower** than AR1-G3/AC-013's target-state design this document
+describes, and closes a *different* obligation than the one this section is about:
+
+- It is keyed by `item_id`, not `subject_id` — the `subject_id → item_id` resolution step this
+  document's own "What is NOT yet specified" paragraph (below) already flags as unbuilt is still unbuilt.
+- It cascades to Zone 6 (vector + lexical) and Zone 2 (episodic, via the pluggable `Zone2EvictionPort` —
+  itself not yet backed by a real Postgres compliance-role adapter, only the seam for one). It does
+  **not** touch Zones 1, 3, 4, 5, 8, and does **not** implement crypto-shredding (key destruction) —
+  it performs an ordinary delete/evict call through existing zone ports.
+- It exists to satisfy `AC-002-CAP-DPDP-1` (DASH-STORY-004: a forced Zone-2 capacity eviction must not
+  bypass a pending erasure obligation) — a narrower, already-in-scope Sprint-1 concern — **not** to
+  implement the full `DELETE /tenants/{tenant_id}/subjects/{subject_id}` cascade AC-013 and the workflow
+  below describe. See `SRS.md` §4.1 for the full drift analysis.
+
+**AR1-G3 itself remains open.** The rest of this section (below) still accurately describes that
+routing-gap status for the FULL crypto-shredding, subject_id-keyed, all-8-zone cascade.
+
 **DPDP erasure is currently a P2, review-only obligation, not an implemented, shipped mechanism.**
 `ar1_assignments.json`'s routing gap `AR1-G3` records that no verified agent scored ≥0.75 as an
 *implementer* of a DPDP erasure mechanism (the agents carrying `data-security-privacy-core` are

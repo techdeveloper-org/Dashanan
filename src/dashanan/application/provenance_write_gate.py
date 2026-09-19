@@ -13,13 +13,15 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from uuid import uuid4
 
 from dashanan.domain.ports import Clock
 from dashanan.domain.write_gate import (
+    DEFAULT_USER_TURN_SIGNING_KEY_ID,
     ProvenanceJournalEntry,
     ProvenanceJournalPort,
+    UserTurnAttestation,
     WriteAccepted,
     WriteGateResult,
     WriteRejected,
@@ -28,6 +30,12 @@ from dashanan.domain.write_gate import (
     requires_user_turn_marker,
     resolve_source_type,
     verify_user_turn_attestation,
+)
+from dashanan.domain.write_rate_limiter import (
+    TokenBucketConfig,
+    TokenBucketState,
+    new_full_bucket,
+    try_consume,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,7 +47,30 @@ ERROR_MISSING_CALLER_BINDING = "missing_caller_binding"
 ERROR_IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_REQUEST = (
     "idempotency_key_reused_for_different_request"
 )
+ERROR_RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
 _REJECT_HTTP_STATUS = 422
+_RATE_LIMIT_HTTP_STATUS = 429
+_MIN_SIGNING_KEY_BYTES = 32
+"""HLD Threat S-2's HMAC-SHA256 signing key minimum length (DSHN-60 LOW
+remediation): RFC 2104 recommends an HMAC key at least as long as the
+underlying hash's digest (32 bytes for SHA-256); a shorter key narrows the
+effective keyspace an attacker attempting to brute-force or otherwise
+recover `user_turn_signing_key` must search."""
+
+DEFAULT_WRITE_RATE_LIMIT_CONFIG = TokenBucketConfig(
+    capacity=1000.0, refill_per_second=100.0
+)
+"""HLD Threat D-1's per-tenant write-throughput bound, applied by default.
+
+A generous production-sane starting point -- a 1000-write burst allowance
+refilling at 100 writes/second per tenant -- chosen so the mitigation is
+real and active out of the box (unlike `append_only_privilege_guard.
+verify_append_only_role_is_safe`'s `verify_privileges=False`-by-default,
+which a prior review flagged as effectively dead code) without being tight
+enough to throttle any legitimate single-tenant workload this codebase's
+own test suite exercises. An operator who needs a tighter bound for their
+deployment passes their own `TokenBucketConfig` to `ProvenanceWriteGate`.
+"""
 
 
 class ProvenanceWriteGate:
@@ -74,7 +105,13 @@ class ProvenanceWriteGate:
     `user_turn_signing_key`, a secret this gate holds but the write
     path's caller never sees. A caller that sets the marker without a
     genuine, host-issued attestation is rejected exactly like a caller
-    that omits the marker entirely.
+    that omits the marker entirely. Key rotation (DSHN-60 LOW
+    remediation): an attestation verifies against whichever configured
+    key its own `key_id` names -- the current `user_turn_signing_key` or
+    any `previous_user_turn_signing_keys` grace-period entry -- so
+    rotating to a new current key does not retroactively invalidate
+    attestations already minted under the previous one, for as long as
+    that previous key stays listed.
 
     Replay/idempotency: every `WriteRequest` carries a caller-supplied
     `idempotency_key`. Before minting a fresh `write_id`, `submit_write`
@@ -92,6 +129,14 @@ class ProvenanceWriteGate:
     `WriteAccepted`, which would otherwise hand the caller an
     unambiguous success signal for a write that was never actually
     applied.
+
+    HLD Threat D-1 hardening: every non-replayed `submit_write` call spends
+    one token from a per-`tenant_id` token bucket (`domain.
+    write_rate_limiter`) before any further validation runs. A tenant that
+    exhausts its bucket is rejected (429, `ERROR_RATE_LIMIT_EXCEEDED`)
+    rather than allowed to flood the journal/persistence layer with an
+    unbounded write burst; a verbatim replay (the idempotency-cache hit
+    above) never spends a token, since it performs no new journal append.
 
     Concurrency: the idempotency check (`find_by_idempotency_key`) and
     the subsequent journal append + `persist_fact` invocation are one
@@ -111,6 +156,9 @@ class ProvenanceWriteGate:
         journal: ProvenanceJournalPort,
         clock: Clock,
         user_turn_signing_key: bytes,
+        rate_limit_config: TokenBucketConfig = DEFAULT_WRITE_RATE_LIMIT_CONFIG,
+        user_turn_signing_key_id: str = DEFAULT_USER_TURN_SIGNING_KEY_ID,
+        previous_user_turn_signing_keys: Mapping[str, bytes] | None = None,
     ) -> None:
         """Compose the gate from its ports.
 
@@ -121,21 +169,94 @@ class ProvenanceWriteGate:
                 (testing-core: dependency injection over patching
                 `datetime.now` directly, matching `MemoryOrchestrator`'s
                 identical choice).
-            user_turn_signing_key: The host's exclusive secret used to
-                verify `WriteRequest.user_turn_attestation` (HLD Threat
-                S-2). Must be provisioned from a secrets manager or
-                environment variable at the composition root
+            user_turn_signing_key: The host's CURRENT exclusive secret
+                used to verify `WriteRequest.user_turn_attestation` (HLD
+                Threat S-2). Must be provisioned from a secrets manager
+                or environment variable at the composition root
                 (application-security-core: never hardcode secrets) and
                 must never be exposed to whatever submits
                 `WriteRequest`s to this gate -- that separation is what
                 makes a genuine attestation unforgeable by an ordinary
                 caller.
+            rate_limit_config: The per-tenant write-throughput token-bucket
+                policy (HLD Threat D-1). Defaults to
+                `DEFAULT_WRITE_RATE_LIMIT_CONFIG`; an operator with a
+                tighter or looser deployment-specific bound passes their
+                own `TokenBucketConfig` here.
+            user_turn_signing_key_id: Which key identifier
+                `user_turn_signing_key` is (DSHN-60 LOW remediation: key
+                rotation). Defaults to `DEFAULT_USER_TURN_SIGNING_KEY_ID`
+                for a deployment with a single, unrotated key.
+            previous_user_turn_signing_keys: Retired-but-still-accepted
+                keys, by `key_id`, for a rotation grace period: an
+                attestation signed under one of these still verifies
+                (so already-in-flight attestations minted before a
+                rotation are not suddenly all rejected), while
+                `sign_user_turn_attestation` should no longer be called
+                with them for NEW attestations. `None` (the default)
+                means no grace period -- only the current key verifies.
+
+        Raises:
+            ValueError: If `user_turn_signing_key`, or any key in
+                `previous_user_turn_signing_keys`, is shorter than
+                `_MIN_SIGNING_KEY_BYTES` (32 bytes) -- a composition root
+                that wires in a short or low-entropy key is a
+                misconfiguration this constructor fails closed on,
+                rather than silently accepting a weak HMAC key.
         """
+        self._user_turn_signing_keys: dict[str, bytes] = {}
+        for key_id, secret in (
+            {user_turn_signing_key_id: user_turn_signing_key}
+            | dict(previous_user_turn_signing_keys or {})
+        ).items():
+            if len(secret) < _MIN_SIGNING_KEY_BYTES:
+                raise ValueError(
+                    f"ProvenanceWriteGate signing key {key_id!r} must be at "
+                    f"least {_MIN_SIGNING_KEY_BYTES} bytes, got {len(secret)}"
+                )
+            self._user_turn_signing_keys[key_id] = secret
         self._journal = journal
         self._clock = clock
-        self._user_turn_signing_key = user_turn_signing_key
+        self._rate_limit_config = rate_limit_config
         self._idempotency_locks: dict[tuple[str, str], threading.RLock] = {}
         self._idempotency_locks_guard = threading.Lock()
+        self._rate_limit_buckets: dict[str, TokenBucketState] = {}
+        self._rate_limit_buckets_guard = threading.Lock()
+
+    def _resolve_user_turn_signing_key(
+        self, attestation: UserTurnAttestation | None
+    ) -> bytes | None:
+        """Look up the secret matching `attestation.key_id`, or `None` if unresolvable.
+
+        `None` covers both a missing attestation and one whose `key_id`
+        names neither the current key nor any configured
+        `previous_user_turn_signing_keys` entry -- both cases must reject
+        exactly like a forged attestation (HLD Threat S-2), never raise.
+        """
+        if attestation is None:
+            return None
+        return self._user_turn_signing_keys.get(attestation.key_id)
+
+    def _consume_rate_limit_token(self, tenant_id: str) -> bool:
+        """Atomically refill-and-consume one write's worth of `tenant_id`'s token bucket.
+
+        Guarded by its own lock (distinct from the per-idempotency-key
+        `RLock`s): the rate limiter's state is scoped to `tenant_id` alone,
+        not `(tenant_id, idempotency_key)`, so it must serialize across
+        every concurrent `submit_write` call for a tenant regardless of
+        which idempotency key each call carries -- otherwise two threads
+        under different keys could both read the same pre-consumption
+        balance and both be admitted, silently doubling the effective
+        burst allowance the configured `capacity` is meant to cap.
+        """
+        with self._rate_limit_buckets_guard:
+            now = self._clock.now()
+            state = self._rate_limit_buckets.get(tenant_id)
+            if state is None:
+                state = new_full_bucket(self._rate_limit_config, now)
+            new_state, allowed = try_consume(state, self._rate_limit_config, now)
+            self._rate_limit_buckets[tenant_id] = new_state
+            return allowed
 
     def _lock_for_idempotency_key(
         self, tenant_id: str, idempotency_key: str
@@ -270,6 +391,16 @@ class ProvenanceWriteGate:
                 write_id=replayed.write_id, accepted_at=replayed.written_at
             )
 
+        if not self._consume_rate_limit_token(request.tenant_id):
+            return self._reject(
+                request,
+                ERROR_RATE_LIMIT_EXCEEDED,
+                f"tenant {request.tenant_id!r} exceeded its per-tenant write "
+                "throughput admission limit (HLD Threat D-1); retry after "
+                "the token bucket has refilled",
+                http_status=_RATE_LIMIT_HTTP_STATUS,
+            )
+
         source_type = resolve_source_type(request.source_type_raw)
         if source_type is None:
             return self._reject(
@@ -287,9 +418,12 @@ class ProvenanceWriteGate:
                     "source_type 'user_stated' requires an explicit host-side "
                     "user-turn marker (HLD Threat S-2)",
                 )
-            if not verify_user_turn_attestation(
+            resolved_secret = self._resolve_user_turn_signing_key(
+                request.user_turn_attestation
+            )
+            if resolved_secret is None or not verify_user_turn_attestation(
                 request.user_turn_attestation,
-                secret=self._user_turn_signing_key,
+                secret=resolved_secret,
                 tenant_id=request.tenant_id,
                 item_id=request.item_id,
                 caller_identity=request.caller_identity,
@@ -349,9 +483,23 @@ class ProvenanceWriteGate:
         return WriteAccepted(write_id=write_id, accepted_at=written_at)
 
     def _reject(
-        self, request: WriteRequest, error_code: str, reason: str
+        self,
+        request: WriteRequest,
+        error_code: str,
+        reason: str,
+        *,
+        http_status: int = _REJECT_HTTP_STATUS,
     ) -> WriteRejected:
-        """Build the 422 outcome. Never reached after a journal append succeeds."""
+        """Build the rejection outcome. Never reached after a journal append succeeds.
+
+        Args:
+            http_status: Defaults to `422` (every validation/S-2 rejection
+                path). The rate-limit path passes `429` explicitly --
+                `WriteRejected.http_status` is a field rather than a
+                literal precisely so a rejection reason with a different
+                status has somewhere to put it (see that field's own
+                docstring).
+        """
         logger.warning(
             "provenance write-path gate rejected write",
             extra={
@@ -359,8 +507,9 @@ class ProvenanceWriteGate:
                 "item_id": request.item_id,
                 "source_zone": request.source_zone.value,
                 "error_code": error_code,
+                "http_status": http_status,
             },
         )
         return WriteRejected(
-            http_status=_REJECT_HTTP_STATUS, error_code=error_code, reason=reason
+            http_status=http_status, error_code=error_code, reason=reason
         )

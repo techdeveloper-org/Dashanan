@@ -17,6 +17,7 @@ input into SQL).
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Protocol, cast, runtime_checkable
@@ -32,6 +33,8 @@ from dashanan.domain.zone import ZoneId
 from dashanan.infrastructure.append_only_privilege_guard import (
     verify_append_only_role_is_safe,
 )
+
+logger = logging.getLogger(__name__)
 
 _SELECT_COLUMNS = (
     "tenant_id, provenance_id, item_id, source_zone, source_type, "
@@ -103,9 +106,7 @@ class SqlProvenanceRepository:
     (must-not-deviate item 1).
     """
 
-    def __init__(
-        self, connection: SqlConnection, *, verify_privileges: bool = False
-    ) -> None:
+    def __init__(self, connection: SqlConnection, *, verify_privileges: bool) -> None:
         """Bind the adapter to its SQL connection.
 
         Args:
@@ -115,19 +116,39 @@ class SqlProvenanceRepository:
                 `append_only_privilege_guard`) that the connected role
                 cannot bypass `provenance_records`' append-only
                 enforcement (SUPERUSER, CREATEROLE, or table ownership),
-                raising `ZoneRepositoryError` if it can. Defaults to False
-                so existing callers and tests that construct this adapter
-                against a connection with no such catalog to query are
-                unaffected; a composition root wiring a real production
-                connection SHOULD pass True (DSHN-55 P1 re-review, attempt
-                2 -- see this module's docstring and `provenance_schema.sql`
-                for why this is defense-in-depth, not the primary control).
+                raising `ZoneRepositoryError` if it can (DSHN-55 P1
+                re-review, attempt 2 -- see this module's docstring and
+                `provenance_schema.sql` for why this is defense-in-depth,
+                not the primary control).
+
+                DSHN-60 remediation, attempt 3: this parameter carries NO
+                default. Attempt 2's `= False` default meant every real
+                construction site -- there being no composition root any
+                caller in this codebase actually invokes -- silently ran
+                with the DSHN-55 defense-in-depth check DISABLED. A
+                required keyword-only argument closes that silent default
+                the same way `MemoryOrchestrator.tenant_credential_signing_
+                key` does: every caller, test double included, must now
+                write `verify_privileges=False` explicitly to accept the
+                weaker posture, which is a visible, grep-able,
+                code-reviewable choice rather than an invisible one. Pass
+                `False` explicitly for a test double with no
+                `pg_roles`/`pg_class` catalog to query; pass `True` for
+                any connection backed by a real Postgres role.
         """
         self._connection = connection
         if verify_privileges:
             cursor = connection.cursor()
             verify_append_only_role_is_safe(
                 cursor, "provenance_records", ZoneId.PROVENANCE.value
+            )
+        else:
+            logger.warning(
+                "SqlProvenanceRepository constructed with verify_privileges="
+                "False -- the DSHN-55 defense-in-depth append-only "
+                "privilege check is DISABLED for this connection. Pass "
+                "verify_privileges=True at the composition root once a "
+                "real production connection is wired."
             )
 
     def find_by_item_id(self, tenant_id: str, item_id: str) -> list[ProvenanceRecord]:

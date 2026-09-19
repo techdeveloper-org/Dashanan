@@ -127,7 +127,7 @@ class TestPackageWiring:
     def test_repository_constructs_with_fake_connection_and_clock(
         self, fixed_clock: FakeClock
     ) -> None:
-        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock)
+        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock, verify_privileges=False)
         assert repo is not None
 
 
@@ -173,7 +173,7 @@ class TestMustNotDeviateTenantIdRequired:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         query = ZoneQuery(
             tenant_id="",
             task="task",
@@ -190,7 +190,7 @@ class TestMustNotDeviateTenantIdRequired:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
         with pytest.raises(ValueError, match="tenant_id"):
             repo.fetch_page(tenant_id="", session_id="session-1", page_size=10)
@@ -200,7 +200,7 @@ class TestMustNotDeviateTenantIdRequired:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         episode_id = Episode.episode_id_for("tenant-1", "session-1", 0)
 
         with pytest.raises(ValueError, match="tenant_id"):
@@ -229,7 +229,7 @@ class TestMustNotDeviateKeysetNeverOffset:
     ) -> None:
         episode = _episode(seq=0)
         connection = RecordingConnection(rows=[_row_for(episode)])
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
         page = repo.fetch_page(tenant_id="tenant-1", session_id="session-1", page_size=10)
 
@@ -242,7 +242,7 @@ class TestMustNotDeviateKeysetNeverOffset:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection(rows=[])
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         cursor = EpisodicCursor(
             after_occurred_at=datetime(2026, 1, 3, tzinfo=UTC), after_seq=7
         )
@@ -269,7 +269,7 @@ class TestMustNotDeviateKeysetNeverOffset:
             for i in range(3)
         ]  # page_size=2 requested, 3 rows returned (over-fetch signal)
         connection = RecordingConnection(rows=rows)
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
         page = repo.fetch_page(tenant_id="tenant-1", session_id="session-1", page_size=2)
 
@@ -283,7 +283,7 @@ class TestMustNotDeviateKeysetNeverOffset:
     ) -> None:
         rows = [_row_for(_episode(seq=0))]
         connection = RecordingConnection(rows=rows)
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
         page = repo.fetch_page(tenant_id="tenant-1", session_id="session-1", page_size=5)
 
@@ -314,7 +314,7 @@ class TestAC002DPDP1LocatableByPkOnly:
     ) -> None:
         episode = _episode(seq=3)
         connection = RecordingConnection(rows=[_row_for(episode)])
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
 
         found = repo.locate(tenant_id="tenant-1", episode_id=episode.episode_id)
 
@@ -328,7 +328,7 @@ class TestAC002DPDP1LocatableByPkOnly:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection(rows=[])
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         episode_id = Episode.episode_id_for("tenant-1", "session-1", 99)
 
         assert repo.locate(tenant_id="tenant-1", episode_id=episode_id) is None
@@ -337,7 +337,7 @@ class TestAC002DPDP1LocatableByPkOnly:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         other_tenants_episode_id = Episode.episode_id_for(
             "tenant-OTHER", "session-1", 0
         )
@@ -353,7 +353,7 @@ class TestMustNotDeviateAppendOnly:
     def test_repository_exposes_no_update_or_delete_method(
         self, fixed_clock: FakeClock
     ) -> None:
-        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock)
+        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock, verify_privileges=False)
         assert not hasattr(repo, "update")
         assert not hasattr(repo, "delete")
 
@@ -371,7 +371,7 @@ class TestMustNotDeviateAppendOnly:
         self, fixed_clock: FakeClock
     ) -> None:
         connection = RecordingConnection()
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         episode = _episode(seq=0)
 
         repo.append(episode)
@@ -442,7 +442,7 @@ class TestBoundaryAndNegativeCases:
             Episode.parse_episode_id("tenant-1:session-1:not-a-number")
 
     def test_fetch_page_rejects_zero_page_size(self, fixed_clock: FakeClock) -> None:
-        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock)
+        repo = SqlEpisodicRepository(RecordingConnection(), fixed_clock, verify_privileges=False)
         with pytest.raises(ValueError, match="page_size"):
             repo.fetch_page(tenant_id="tenant-1", session_id="session-1", page_size=0)
 
@@ -451,7 +451,7 @@ class TestBoundaryAndNegativeCases:
     ) -> None:
         connection = RecordingConnection()
         connection.cursor_obj._raise = RuntimeError("connection refused")
-        repo = SqlEpisodicRepository(connection, fixed_clock)
+        repo = SqlEpisodicRepository(connection, fixed_clock, verify_privileges=False)
         query = ZoneQuery(
             tenant_id="tenant-1",
             task="task",

@@ -1,0 +1,60 @@
+name: CI
+
+# DSHN-60 Info remediation: this workflow is the pipeline the prior audit found
+# missing ("no CI/CD configuration exists anywhere in the repository ... so
+# there is no pipeline to attach an SCA gate to"). It runs the test suite on
+# every push/PR and gives `pip-audit` (application-security-core: SCA /
+# dependency scanning) a real gate to attach to, ahead of DPDP Act 2023
+# compliance-evidence requirements, even though `dependencies = []` in
+# pyproject.toml means there is currently nothing for pip-audit to flag.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the package and its dev dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run the test suite
+        run: python -m pytest -v
+
+  dependency-audit:
+    name: Dependency vulnerability scan (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the package
+        run: python -m pip install -e .
+
+      - name: Install pip-audit
+        run: python -m pip install pip-audit
+
+      - name: Audit installed dependencies for known vulnerabilities
+        run: python -m pip-audit

@@ -246,7 +246,7 @@ def connection() -> FakeProvenanceConnection:
 
 @pytest.fixture
 def repo(connection: FakeProvenanceConnection) -> SqlProvenanceRepository:
-    return SqlProvenanceRepository(connection)
+    return SqlProvenanceRepository(connection, verify_privileges=False)
 
 
 class TestAC007RetrievabilityRealBehavior:
@@ -609,12 +609,12 @@ class TestBoundaryAndAdversarialMatrix:
     def test_find_by_item_id_wraps_a_driver_failure_as_zone_repository_error(
         self,
     ) -> None:
-        repo = SqlProvenanceRepository(RaisingConnection())
+        repo = SqlProvenanceRepository(RaisingConnection(), verify_privileges=False)
         with pytest.raises(ZoneRepositoryError):
             repo.find_by_item_id(tenant_id="tenant-1", item_id="item-1")
 
     def test_append_wraps_a_driver_failure_as_zone_repository_error(self) -> None:
-        repo = SqlProvenanceRepository(RaisingConnection())
+        repo = SqlProvenanceRepository(RaisingConnection(), verify_privileges=False)
         with pytest.raises(ZoneRepositoryError):
             repo.append(_record())
 

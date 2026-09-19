@@ -11,9 +11,17 @@ from dashanan.application.context_assembly_builder import ContextAssemblyBuilder
 from dashanan.application.context_assembly_request import ContextAssemblyRequest
 from dashanan.domain.exceptions import ZoneRepositoryError
 from dashanan.domain.ports import Clock, EventBus, ZoneQuery, ZoneRepository
+from dashanan.domain.tenant_credential import (
+    TenantAuthenticationError,
+    verify_tenant_credential,
+)
 from dashanan.domain.zone import ZoneId
 
 logger = logging.getLogger(__name__)
+
+_MIN_SIGNING_KEY_BYTES = 32
+"""Mirrors `application.provenance_write_gate._MIN_SIGNING_KEY_BYTES`'s
+identical RFC 2104-derived HMAC-SHA256 minimum-key-length rationale."""
 
 
 class MemoryOrchestrator:
@@ -39,6 +47,8 @@ class MemoryOrchestrator:
         zone_repositories: Mapping[ZoneId, ZoneRepository],
         event_bus: EventBus,
         clock: Clock,
+        *,
+        tenant_credential_signing_key: bytes | None,
     ) -> None:
         """Compose the Orchestrator from its ports.
 
@@ -52,12 +62,57 @@ class MemoryOrchestrator:
                 deployments (HLD Section 6, "Embedded/offline mode" row).
             clock: Injectable time source, so assembly timestamps are
                 deterministic under test (testing-core).
+            tenant_credential_signing_key: The host's exclusive secret
+                used to verify `ContextAssemblyRequest.tenant_credential`
+                (HLD Threat S-1). When provided, every `assemble_context`
+                call is rejected (`TenantAuthenticationError`) unless it
+                carries a valid, matching `TenantCredential` -- see
+                `domain.tenant_credential`'s module docstring.
+
+                DSHN-60 remediation, attempt 3: this parameter carries NO
+                default. The prior `= None` default (application-security-
+                core: "Secure Defaults... require explicit opt-out for
+                less secure options") let every caller in this codebase --
+                including a would-be composition root -- silently get
+                HLD Threat S-1 verification DISABLED without writing a
+                single visible line about it (attempt 2's own re-audit
+                confirmed no caller anywhere ever supplied a key). A
+                required keyword-only argument cannot have that failure
+                mode: every construction site, present or future, must
+                now write `tenant_credential_signing_key=None` explicitly
+                to get the unverified posture, which is exactly the kind
+                of grep-able, code-reviewable, explicit opt-out the
+                Secure Defaults principle asks for. Passing an explicit
+                `None` still disables verification and still logs the
+                one-time warning below -- this change closes the SILENT
+                default, not the ability to run without a key, which
+                remains a legitimate choice for a single-tenant/embedded
+                deployment that has no host-issued credential to check.
         """
+        if (
+            tenant_credential_signing_key is not None
+            and len(tenant_credential_signing_key) < _MIN_SIGNING_KEY_BYTES
+        ):
+            raise ValueError(
+                "MemoryOrchestrator.tenant_credential_signing_key must be at "
+                f"least {_MIN_SIGNING_KEY_BYTES} bytes, got "
+                f"{len(tenant_credential_signing_key)}"
+            )
         self._zone_repositories: dict[ZoneId, ZoneRepository] = dict(
             zone_repositories
         )
         self._event_bus = event_bus
         self._clock = clock
+        self._tenant_credential_signing_key = tenant_credential_signing_key
+        if tenant_credential_signing_key is None:
+            logger.warning(
+                "MemoryOrchestrator constructed without "
+                "tenant_credential_signing_key -- HLD Threat S-1 tenant-"
+                "impersonation verification is DISABLED; every tenant_id "
+                "is trusted as caller-asserted with no credential check. "
+                "Provide a signing key at the composition root to enable "
+                "verification."
+            )
 
     def assemble_context(self, request: ContextAssemblyRequest) -> AssemblyResult:
         """Resolve and assemble context without the host naming a zone.
@@ -82,7 +137,20 @@ class MemoryOrchestrator:
             The budget-fitted `AssemblyResult`. `degraded` is True and
             `zones_unavailable` is non-empty whenever at least one
             targeted zone could not be reached.
+
+        Raises:
+            TenantAuthenticationError: If this Orchestrator was
+                constructed with a `tenant_credential_signing_key` and
+                `request.tenant_credential` is missing, expired, or does
+                not verify against `request.tenant_id` (HLD Threat S-1).
+                Raised BEFORE any zone is queried -- unlike a zone
+                failure (AC-009-SUPP-1's degraded-but-never-raises
+                contract), a rejected tenant claim is a request this
+                method must refuse to serve at all, never a partial
+                result.
         """
+        self._verify_tenant_credential(request)
+
         assembly_id = str(uuid4())
         trace_id = str(uuid4())
         target_zones = (
@@ -111,6 +179,34 @@ class MemoryOrchestrator:
         result = builder.build()
         self._publish_assembled_event(result)
         return result
+
+    def _verify_tenant_credential(self, request: ContextAssemblyRequest) -> None:
+        """Enforce HLD Threat S-1 when this Orchestrator has a signing key configured.
+
+        A no-op when `self._tenant_credential_signing_key` is `None`
+        (verification not configured for this deployment -- see
+        `__init__`'s docstring for that trust-boundary trade-off).
+        """
+        if self._tenant_credential_signing_key is None:
+            return
+        if not verify_tenant_credential(
+            request.tenant_credential,
+            secret=self._tenant_credential_signing_key,
+            tenant_id=request.tenant_id,
+            now=self._clock.now(),
+        ):
+            logger.warning(
+                "assemble_context rejected: tenant credential missing or "
+                "invalid (HLD Threat S-1)",
+                extra={"tenant_id": request.tenant_id},
+            )
+            raise TenantAuthenticationError(
+                tenant_id=request.tenant_id,
+                reason=(
+                    "missing, expired, or invalid TenantCredential for the "
+                    "claimed tenant_id"
+                ),
+            )
 
     def _fetch_zone(
         self,

@@ -25,6 +25,33 @@ from enum import Enum
 from dashanan.domain.zone import ZoneId
 
 _HEX_SHA256_LENGTH = 64
+_FIELD_LENGTH_PREFIX_WIDTH = 10
+
+
+def _canonicalize_fields(*fields: str) -> bytes:
+    """Encode `fields` into a byte string where no field-boundary forgery is possible.
+
+    DSHN-60 remediation (MEDIUM, same root cause as the CRITICAL
+    `write_gate._user_turn_attestation_message` finding): the prior
+    `compute_record_hash` construction joined fields with `"|"` (and
+    `source_refs` with `","`), so two structurally different records
+    whose fields differ only in where a delimiter character falls could
+    hash identically -- weakening the "unique by construction" guarantee
+    this module's docstring and `provenance_schema.sql` both claim for
+    `record_hash`.
+
+    Each field is prefixed with its own UTF-8 byte length, rendered as a
+    fixed-width decimal ASCII header (`_FIELD_LENGTH_PREFIX_WIDTH`
+    digits) followed by `":"`, so the mapping from `fields` to the
+    returned bytes is injective regardless of what characters any
+    individual field contains -- no delimiter character to collide with.
+    """
+    parts: list[bytes] = []
+    for field in fields:
+        encoded = field.encode("utf-8")
+        parts.append(f"{len(encoded):0{_FIELD_LENGTH_PREFIX_WIDTH}d}:".encode("ascii"))
+        parts.append(encoded)
+    return b"".join(parts)
 
 
 class SourceType(str, Enum):
@@ -200,23 +227,23 @@ def compute_record_hash(
     Returns:
         A lowercase 64-character hex SHA-256 digest.
     """
-    canonical = "|".join(
-        (
-            tenant_id,
-            provenance_id,
-            item_id,
-            source_zone,
-            source_type,
-            ",".join(source_refs),
-            write_timestamp.isoformat(),
-            retrieval_context_hash,
-            conflict_status,
-            "1" if invalidation_flag else "0",
-            f"{confidence:.10f}",
-            prev_hash or "",
-        )
+    refs = tuple(source_refs)
+    canonical_bytes = _canonicalize_fields(
+        tenant_id,
+        provenance_id,
+        item_id,
+        source_zone,
+        source_type,
+        str(len(refs)),
+        *refs,
+        write_timestamp.isoformat(),
+        retrieval_context_hash,
+        conflict_status,
+        "1" if invalidation_flag else "0",
+        f"{confidence:.10f}",
+        prev_hash or "",
     )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical_bytes).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

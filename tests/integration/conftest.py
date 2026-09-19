@@ -86,6 +86,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from dashanan.application.conflict_detection_sweep import (
+    ConflictDetectingProvenanceRepository,
+)
 from dashanan.application.memory_orchestrator import MemoryOrchestrator
 from dashanan.application.memory_score_engine import MemoryScoreEngine
 from dashanan.application.provenance_write_gate import ProvenanceWriteGate
@@ -456,7 +459,7 @@ def episodic_repository(
     decay computation (`ZoneQuery.as_of` unset) stays consistent with the
     rest of the composition (module docstring).
     """
-    return SqlEpisodicRepository(connection=episodic_connection, clock=clock)
+    return SqlEpisodicRepository(connection=episodic_connection, clock=clock, verify_privileges=False)
 
 
 @pytest.fixture
@@ -487,7 +490,50 @@ def provenance_repository(
     standalone fixture rather than a `zone_repositories` entry, exactly as
     `zone_repositories`' own docstring below states.
     """
-    return SqlProvenanceRepository(connection=provenance_connection)
+    return SqlProvenanceRepository(connection=provenance_connection, verify_privileges=False)
+
+
+@pytest.fixture
+def conflict_sweep_provenance_connection() -> RecordingConnection:
+    """A SEPARATE fake DB-API connection, dedicated to the FR-013 sweep fixture below.
+
+    DSHN-60 remediation, attempt 3. Kept separate from `provenance_connection`
+    (own docstring: separate connections avoid one fixture's canned rows
+    leaking into another's reads) so `test_smoke_fixture_wiring.py`'s
+    exact-executed-statement-count assertions against the bare, unwrapped
+    `provenance_repository` fixture stay meaningful -- this fixture never
+    shares a cursor with that one.
+    """
+    return RecordingConnection()
+
+
+@pytest.fixture
+def conflict_detecting_provenance_repository(
+    conflict_sweep_provenance_connection: RecordingConnection,
+    clock: SeedableClock,
+) -> ConflictDetectingProvenanceRepository:
+    """Zone 7, FR-013-swept: the real `SqlProvenanceRepository` wrapped for real.
+
+    DSHN-60 remediation, attempt 3 (closing the HIGH finding that "no live
+    code path constructs a repository through this builder, so the FR-013
+    sweep never runs against a real append"). Every collaborator here is
+    real and non-mock exactly like `provenance_repository` above: a real
+    `SqlProvenanceRepository` issuing real parameterized SQL against the
+    same `RecordingConnection`/`RecordingCursor` fake DB-API transport
+    every other adapter test in this repo uses, wrapped by the real
+    `ConflictDetectingProvenanceRepository` decorator -- not the isolated,
+    hand-rolled `FakeProvenanceRepository` double
+    `tests/test_conflict_detection_sweep.py` uses for its own pure unit
+    tests of the decorator alone. `tests/integration/
+    test_conflict_detection_sweep_wired.py` composes this fixture with
+    `write_gate` (the real `ProvenanceWriteGate`) to prove the sweep now
+    executes on a real, multi-component write path a test actually runs,
+    not only in isolation.
+    """
+    repository = SqlProvenanceRepository(
+        connection=conflict_sweep_provenance_connection, verify_privileges=False
+    )
+    return ConflictDetectingProvenanceRepository(wrapped=repository, clock=clock)
 
 
 @pytest.fixture
@@ -668,7 +714,8 @@ def memory_orchestrator(
 ) -> MemoryOrchestrator:
     """The Facade over Dashanan's eight memory zones (FR-009, HLD Section 3.1)."""
     return MemoryOrchestrator(
-        zone_repositories=zone_repositories, event_bus=event_bus, clock=clock
+        zone_repositories=zone_repositories, event_bus=event_bus, clock=clock,
+        tenant_credential_signing_key=None,
     )
 
 

@@ -1,0 +1,38 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:1f6b9c2e-5a4d-4e7a-9c2b-0f2a6b7c9d10",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-19T00:00:00Z",
+    "tools": [
+      {
+        "vendor": "dashanan",
+        "name": "manual-sbom-generation",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "library",
+      "bom-ref": "pkg:pypi/dashanan@0.1.0",
+      "name": "dashanan",
+      "version": "0.1.0",
+      "description": "Dashanan - multi-zone memory system for AI hosts. Memory Orchestrator core facade and unified context-assembly API.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/dashanan@0.1.0"
+    }
+  },
+  "components": [],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/dashanan@0.1.0",
+      "dependsOn": []
+    }
+  ]
+}

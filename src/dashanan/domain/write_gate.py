@@ -44,6 +44,44 @@ from dashanan.domain.zone import ZoneId
 
 _HEX_SHA256_LENGTH = 64
 _DEFAULT_USER_TURN_ATTESTATION_MAX_AGE_SECONDS = 300
+_FIELD_LENGTH_PREFIX_WIDTH = 10
+DEFAULT_USER_TURN_SIGNING_KEY_ID = "default"
+"""The implicit `key_id` a caller gets when it does not pass one explicitly
+to `sign_user_turn_attestation` -- matches `ProvenanceWriteGate`'s own
+default mapping of its single required `user_turn_signing_key` constructor
+argument, so every existing caller of either (pre-dating key rotation
+support, DSHN-60 LOW remediation) keeps behaving identically."""
+
+
+def _canonicalize_fields(*fields: str) -> bytes:
+    """Encode `fields` into a byte string where no field-boundary forgery is possible.
+
+    DSHN-60 remediation (CRITICAL, independently confirmed): the prior
+    construction, `"|".join(fields).encode()`, let any field containing
+    the `"|"` delimiter shift where the canonical string's field
+    boundaries fall. A genuine attestation signed for
+    `(tenant_id="tenantA", item_id="Y|victim-secret-item", ...)` and a
+    forged one for `(tenant_id="tenantA|Y", item_id="victim-secret-item",
+    ...)` produced the IDENTICAL canonical string and therefore the
+    IDENTICAL HMAC signature -- `verify_user_turn_attestation` could not
+    tell the two apart, letting a caller replay a genuine attestation
+    against a different (tenant_id, item_id) split with no access to the
+    signing key.
+
+    Each field is prefixed with its own UTF-8 byte length, rendered as a
+    fixed-width decimal ASCII header (`_FIELD_LENGTH_PREFIX_WIDTH`
+    digits) followed by `":"`. A length-prefixed field can never be
+    mistaken for a delimiter occurring inside an adjacent field's content
+    -- the mapping from `fields` to the returned bytes is injective
+    regardless of what characters any individual field contains, so no
+    encoding-level restriction on field content is required.
+    """
+    parts: list[bytes] = []
+    for field in fields:
+        encoded = field.encode("utf-8")
+        parts.append(f"{len(encoded):0{_FIELD_LENGTH_PREFIX_WIDTH}d}:".encode("ascii"))
+        parts.append(encoded)
+    return b"".join(parts)
 
 
 def is_hex_sha256(value: str) -> bool:
@@ -124,6 +162,18 @@ class UserTurnAttestation:
     accepting `user_turn_marker=True`; a bare marker with no valid
     attestation is rejected (422) exactly like a missing marker.
 
+    DSHN-60 LOW remediation: `key_id` identifies WHICH signing key
+    produced `signature`, so a host can rotate `user_turn_signing_key`
+    (provision a new key, keep the old one accepted for a grace period,
+    then retire it) without invalidating every attestation already
+    in-flight under the old key -- `ProvenanceWriteGate`'s
+    `previous_user_turn_signing_keys` constructor parameter is exactly
+    that grace-period mechanism. `key_id` is itself bound into the
+    signed payload (`_user_turn_attestation_message`), so a caller
+    cannot forge a different `key_id` onto a genuine signature to make
+    verification resolve a different (and possibly weaker or
+    attacker-known) secret than the one that actually produced it.
+
     Attributes:
         issued_at: When the host produced this attestation. Bound into
             the signed payload so a captured attestation cannot be
@@ -131,11 +181,16 @@ class UserTurnAttestation:
             rejects one older than its freshness window.
         signature: Lowercase hex HMAC-SHA256 digest over the canonical
             write-identifying payload (tenant_id, item_id,
-            caller_identity, retrieval_context_hash, issued_at).
+            caller_identity, retrieval_context_hash, key_id, issued_at).
+        key_id: Which signing key produced `signature`. Defaults to
+            `DEFAULT_USER_TURN_SIGNING_KEY_ID` for every caller that
+            predates key rotation support and never passes one
+            explicitly.
     """
 
     issued_at: datetime
     signature: str
+    key_id: str = DEFAULT_USER_TURN_SIGNING_KEY_ID
 
 
 def _user_turn_attestation_message(
@@ -144,6 +199,7 @@ def _user_turn_attestation_message(
     item_id: str,
     caller_identity: str,
     retrieval_context_hash: str,
+    key_id: str,
     issued_at: datetime,
 ) -> bytes:
     """Build the exact canonical payload `sign_user_turn_attestation` signs.
@@ -153,18 +209,18 @@ def _user_turn_attestation_message(
     different tenant, item, caller, or retrieval context -- only a
     replay of the identical write within the freshness window is
     possible, the same residual class `WriteRequest.idempotency_key`
-    (see below) independently closes.
+    (see below) independently closes. `key_id` is included too (DSHN-60
+    LOW remediation) so a caller cannot relabel a genuine signature under
+    a different `key_id` to make verification resolve a different secret.
     """
-    canonical = "|".join(
-        (
-            tenant_id,
-            item_id,
-            caller_identity,
-            retrieval_context_hash,
-            issued_at.isoformat(),
-        )
+    return _canonicalize_fields(
+        tenant_id,
+        item_id,
+        caller_identity,
+        retrieval_context_hash,
+        key_id,
+        issued_at.isoformat(),
     )
-    return canonical.encode("utf-8")
 
 
 def sign_user_turn_attestation(
@@ -175,27 +231,36 @@ def sign_user_turn_attestation(
     caller_identity: str,
     retrieval_context_hash: str,
     issued_at: datetime,
+    key_id: str = DEFAULT_USER_TURN_SIGNING_KEY_ID,
 ) -> UserTurnAttestation:
     """Produce a genuine `UserTurnAttestation` -- a host-only capability.
 
     Only code that holds `secret` (the host's exclusive user-turn
-    signing key, provisioned from a secrets manager or environment
-    variable at the composition root and never handed to whatever
-    submits `WriteRequest`s to `ProvenanceWriteGate`) can call this and
-    get back an attestation `verify_user_turn_attestation` will accept.
-    This is the module's only sanctioned way to construct a genuine
-    attestation, mirroring `ProvenanceRecord.create` being the sole
-    sanctioned constructor for its own invariant (DASH-STORY-005).
+    signing key identified by `key_id`, provisioned from a secrets
+    manager or environment variable at the composition root and never
+    handed to whatever submits `WriteRequest`s to `ProvenanceWriteGate`)
+    can call this and get back an attestation `verify_user_turn_
+    attestation` will accept. This is the module's only sanctioned way
+    to construct a genuine attestation, mirroring `ProvenanceRecord.
+    create` being the sole sanctioned constructor for its own invariant
+    (DASH-STORY-005).
+
+    Args:
+        key_id: Which signing key `secret` is (DSHN-60 LOW remediation:
+            key-rotation support). Defaults to
+            `DEFAULT_USER_TURN_SIGNING_KEY_ID` for a deployment with a
+            single, unrotated key.
     """
     message = _user_turn_attestation_message(
         tenant_id=tenant_id,
         item_id=item_id,
         caller_identity=caller_identity,
         retrieval_context_hash=retrieval_context_hash,
+        key_id=key_id,
         issued_at=issued_at,
     )
     signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
-    return UserTurnAttestation(issued_at=issued_at, signature=signature)
+    return UserTurnAttestation(issued_at=issued_at, signature=signature, key_id=key_id)
 
 
 def verify_user_turn_attestation(
@@ -223,8 +288,12 @@ def verify_user_turn_attestation(
         attestation: The caller-supplied attestation, or `None` if the
             caller asserted `user_turn_marker=True` with no attestation
             at all -- the forgery this function exists to catch.
-        secret: The same host-exclusive signing key
-            `sign_user_turn_attestation` was called with.
+        secret: The signing key matching `attestation.key_id` --
+            `ProvenanceWriteGate` resolves which key to pass here (its
+            current key, or one of its `previous_user_turn_signing_keys`
+            grace-period keys, DSHN-60 LOW remediation) before calling
+            this function; this function itself does not do key
+            lookup, keeping it a pure, single-key verification check.
         now: The gate's own clock reading (testing-core: injected,
             never `datetime.now()` directly).
         max_age_seconds: How long a genuine attestation remains valid.
@@ -242,6 +311,7 @@ def verify_user_turn_attestation(
         caller_identity=caller_identity,
         retrieval_context_hash=retrieval_context_hash,
         issued_at=attestation.issued_at,
+        key_id=attestation.key_id,
     )
     return hmac.compare_digest(expected.signature, attestation.signature)
 

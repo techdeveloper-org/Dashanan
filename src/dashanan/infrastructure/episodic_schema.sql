@@ -79,9 +79,12 @@ CREATE INDEX idx_episodic_entries_occurred_at_brin
 --      access outside the threat model" could bypass it (it could not:
 --      ordinary table OWNERSHIP grants ALTER implicitly, which the
 --      re-review used to disable this exact trigger).
---   2. The same distinct, least-privileged `dashanan_app_role`
---      (created idempotently, shared across both zones) is granted only
---      SELECT and INSERT here -- never UPDATE or DELETE. The
+--   2. A distinct, least-privileged, PER-ZONE role (`dashanan_episodic_role`,
+--      Zone 2 only -- DSHN-60 P1 remediation narrowed this from a role
+--      shared with provenance_schema.sql's Zone 7 remediation to one
+--      scoped to this table alone, so a credential granted membership
+--      here can never also read/write `provenance_records`) is granted
+--      only SELECT and INSERT here -- never UPDATE or DELETE. The
 --      REVOKE ... FROM PUBLIC below remains as a defense-in-depth layer
 --      for any other role that was never explicitly granted anything.
 --      As in provenance_schema.sql, this role is NOLOGIN; wiring an
@@ -125,19 +128,20 @@ CREATE TRIGGER trg_episodic_entries_append_only
     EXECUTE FUNCTION reject_episodic_entries_mutation();
 
 -- Idempotent role creation (IF NOT EXISTS via pg_roles, since PostgreSQL
--- has no `CREATE ROLE IF NOT EXISTS`): this role is shared with
--- provenance_schema.sql's Zone 7 remediation, so either migration file
--- may run first without erroring on a duplicate role.
+-- has no `CREATE ROLE IF NOT EXISTS`): this role is scoped to Zone 2
+-- (`episodic_entries`) alone -- provenance_schema.sql creates its own,
+-- separate `dashanan_provenance_role` for Zone 7 (DSHN-60 P1 remediation:
+-- see that file's identical comment for the rationale).
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashanan_app_role') THEN
-        CREATE ROLE dashanan_app_role NOLOGIN;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashanan_episodic_role') THEN
+        CREATE ROLE dashanan_episodic_role NOLOGIN;
     END IF;
 END
 $$;
 
 REVOKE ALL ON episodic_entries FROM PUBLIC;
-GRANT SELECT, INSERT ON episodic_entries TO dashanan_app_role;
+GRANT SELECT, INSERT ON episodic_entries TO dashanan_episodic_role;
 REVOKE UPDATE, DELETE ON episodic_entries FROM PUBLIC;
 
 -- Control 3 (DSHN-55 P1 re-review, attempt 2): identical mechanism to

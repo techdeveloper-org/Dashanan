@@ -138,18 +138,21 @@ CREATE INDEX idx_provenance_records_item
 --      the owner, and nothing before attempt 2 stopped that role from
 --      remaining the owner afterward). The trigger alone was therefore
 --      insufficient. Control 3 below closes that specific gap.
---   2. A distinct, least-privileged role (`dashanan_app_role`, shared with
---      episodic_schema.sql's identical Zone 2 remediation) that the
---      application connects as instead of the table owner, granted only
---      the two privileges its write path uses -- SELECT and INSERT --
---      with UPDATE and DELETE never granted. This is the actual
---      "distinct least-privileged service role" must-not-deviate item 1
---      requires to exist; the REVOKE ... FROM PUBLIC below is retained as
---      a further defense-in-depth layer for any other role that was never
+--   2. A distinct, least-privileged, PER-ZONE role (`dashanan_provenance_role`,
+--      Zone 7 only -- DSHN-60 P1 remediation narrowed this from a role
+--      shared with episodic_schema.sql's Zone 2 remediation to one scoped
+--      to this table alone, so a credential granted membership here can
+--      never also read/write `episodic_entries`) that the application
+--      connects as instead of the table owner, granted only the two
+--      privileges its write path uses -- SELECT and INSERT -- with
+--      UPDATE and DELETE never granted. This is the actual "distinct
+--      least-privileged service role" must-not-deviate item 1 requires
+--      to exist; the REVOKE ... FROM PUBLIC below is retained as a
+--      further defense-in-depth layer for any other role that was never
 --      explicitly granted anything, per application-security-core's
---      least-privilege and defense-in-depth guidance. `dashanan_app_role`
+--      least-privilege and defense-in-depth guidance. `dashanan_provenance_role`
 --      is NOLOGIN by design: the application is expected to connect as
---      its own LOGIN role and be GRANTed membership in `dashanan_app_role`
+--      its own LOGIN role and be GRANTed membership in `dashanan_provenance_role`
 --      (never to log in as this role directly), because the composition
 --      root that would wire a real connection string / login role to that
 --      membership is out of this schema-only story's scope (see
@@ -199,7 +202,7 @@ CREATE INDEX idx_provenance_records_item
 -- control 3 above reassigns ownership away from it unconditionally, as
 -- the file's own last step, regardless of which role ran the CREATE
 -- TABLE. That role does still need ordinary CREATEROLE-level privilege
--- (to create `dashanan_app_role` and `dashanan_schema_owner` idempotently
+-- (to create `dashanan_provenance_role` and `dashanan_schema_owner` idempotently
 -- and to grant itself brief, revoked-before-this-file-ends membership in
 -- the latter) -- it does not need to remain, or ever have been, a role
 -- the application logs in as.
@@ -218,19 +221,22 @@ CREATE TRIGGER trg_provenance_records_append_only
     EXECUTE FUNCTION reject_provenance_records_mutation();
 
 -- Idempotent role creation (IF NOT EXISTS via pg_roles, since PostgreSQL
--- has no `CREATE ROLE IF NOT EXISTS`): this role is shared with
--- episodic_schema.sql's Zone 2 remediation, so either migration file may
--- run first without erroring on a duplicate role.
+-- has no `CREATE ROLE IF NOT EXISTS`): this role is scoped to Zone 7
+-- (`provenance_records`) alone -- episodic_schema.sql creates its own,
+-- separate `dashanan_episodic_role` for Zone 2 (DSHN-60 P1 remediation:
+-- a single role shared across every zone's schema meant a credential
+-- provisioned for one zone was, by construction, already privileged on
+-- every other zone's append-only table too).
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashanan_app_role') THEN
-        CREATE ROLE dashanan_app_role NOLOGIN;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashanan_provenance_role') THEN
+        CREATE ROLE dashanan_provenance_role NOLOGIN;
     END IF;
 END
 $$;
 
 REVOKE ALL ON provenance_records FROM PUBLIC;
-GRANT SELECT, INSERT ON provenance_records TO dashanan_app_role;
+GRANT SELECT, INSERT ON provenance_records TO dashanan_provenance_role;
 REVOKE UPDATE, DELETE ON provenance_records FROM PUBLIC;
 
 -- Control 3 (DSHN-55 P1 re-review, attempt 2): reassign ownership of the
@@ -283,7 +289,7 @@ EXCEPTION WHEN insufficient_privilege THEN
         'function to dashanan_schema_owner (%): the migration role lacks '
         'CREATE ... WITH GRANT OPTION on schema "public" (it does not own '
         'that schema or the database). Controls 1 and 2 above (the '
-        'unconditional append-only trigger and dashanan_app_role''s '
+        'unconditional append-only trigger and dashanan_provenance_role''s '
         'SELECT/INSERT-only grant) still apply in full, but this '
         'migration role remains the table owner and can still run ALTER '
         'TABLE ... DISABLE TRIGGER. Re-run this migration under a role '
