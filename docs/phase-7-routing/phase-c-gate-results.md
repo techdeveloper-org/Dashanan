@@ -53,3 +53,15 @@ DASH-STORY-005's dev_prompt CONTEXT SOURCES line and PII note were extracted dir
 Both Phase C gates **PASS** for DASH-STORY-001..010 (2026-09-17 run). NLI 0.99, FactScore 0.99, RAGAS F/CP/CR all 1.00 (sampled), AR ~0.95 — all comfortably above the RS >= 0.95 component thresholds. PII hard-fail check clean. No blocking findings carried forward to reliability-auditor's RS computation.
 
 DASH-STORY-011 (2026-09-19 supplemental run, see addendum above): **PASS after resolution** — 1 real MEDIUM finding (a MUST-NOT-DEVIATE block misattributed to ar1_assignments.json) found and fixed, C-2 clean throughout. All 11 Sprint-1 stories now have a completed Phase C pass.
+
+**2026-09-19 addendum — Phase C / Phase B boundary (added as Phase B implementation begins):**
+Every PASS verdict in this file covers **prompt-to-source faithfulness only** — whether each
+story's CoT prompt in `implementation_execution_plan.json` accurately cites its real HLD/SRS/
+backlog sources. It does **not** cover, and was never run against, any actual code, because no
+code existed at the time these gates ran (Phase B was explicitly out of scope through STOP 8).
+Once Phase B produces real code for a story, that code's correctness is verified by the
+mechanisms `docs/orchestration/02-architecture-workflow.md` already scopes to Phase B — the
+**QA Pipeline Rule** ("full D.0-D.4 QA pipeline applies once Phase B begins") and, per-story, the
+specific routing already recorded in `docs/phase-7-routing/ar1_assignments.json` — not by
+re-running this Phase C gate. A prompt passing Phase C is a precondition for dispatching that
+prompt; it is not a substitute for testing the code the dispatch produces.

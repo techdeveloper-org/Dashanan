@@ -10,7 +10,7 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 >
 > Full rationale: [`docs/orchestration/01-vision-and-prd.md`](docs/orchestration/01-vision-and-prd.md).
 
-> ⚠️ **Status (updated 2026-09-17):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review, added 2026-09-19 (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** Phase B — actual code implementation — has **not** started and is intentionally out of scope until the user reviews everything above and gives explicit go-ahead.
+> ⚠️ **Status (updated 2026-09-17):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project, Sprint 1 planned), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review, added 2026-09-19 (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** (explicit user go-ahead given) — DASH-STORY-001 (Memory Orchestrator core facade) is implemented and reviewed (see Local development below); DASH-STORY-002 through 010 (and future-sprint FR-003/004/005/008/011/013) are not yet implemented.
 
 > **Implementation Ready — with these documented pre-implementation decisions pending** (added 2026-09-18, per a repo-wide consistency audit). "Implementation Ready" above means the planning pipeline's own gates all passed; it does not mean every underlying architecture question is closed. The following items in [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md)'s Open Architecture Questions table are genuinely still open and should be resolved (or explicitly accepted as-is) before or early in Phase B:
 > - **OAQ-10** — DPDP erasure via crypto-shredding of an append-only audit store. Status: Proposed. Whether key destruction constitutes erasure under DPDP Act 2023 requires legal confirmation, not an architect's judgment.
@@ -58,7 +58,23 @@ Recommended reading order for someone new to the project:
 4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
 5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
 
-Local development / build / run instructions will be added here once Phase B implementation begins and there is actual code to set up.
+## Local development
+
+Phase B has begun (2026-09-19). DASH-STORY-001 (Memory Orchestrator core facade, FR-009) is
+implemented under `src/dashanan/`, Shape A (embedded library, in-process, no network) per HLD
+Section 2 — the remaining 10 Sprint-1 stories are not yet implemented; every zone request
+currently degrades gracefully with `zones_unavailable` populated (AC-009-SUPP-1), by design.
+
+```bash
+# Requires Python 3.12+ (NFR-001)
+pip install -e ".[dev]"
+python -m pytest -v
+```
+
+31 tests pass as of this story: `MemoryOrchestrator`/`ContextAssemblyBuilder` unit tests
+(`tests/test_memory_orchestrator.py`, `tests/test_context_assembly_builder.py`) plus smoke
+tests (`tests/test_smoke.py`), including an AST-based architecture-fitness test enforcing HLD
+3.0 invariant 1 (no `dashanan/domain/**` module may import `dashanan/infrastructure/**`).
 
 ## Repository layout
 
