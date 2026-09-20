@@ -96,6 +96,10 @@ from dashanan.application.zone8_consolidation_store import (
     ArchiveWritten,
     Zone8ConsolidationStore,
 )
+from dashanan.application.zone8_crypto_shredding_store import (
+    Zone8CryptoShreddingStoreError,
+    Zone8SubjectIndexPort,
+)
 from dashanan.domain.archive_transition import (
     ArchiveTransitionError,
     guarded_archive_transition,
@@ -203,16 +207,35 @@ class ArchiveCandidateSnapshot:
         payload_tokens: The item's current token count -- OAQ-12's sole
             fast-track signal (`dashanan.domain.archive_transition.
             is_oaq12_fast_track_eligible`).
+        subject_id: The DPDP data subject `item_id` is derivably owned
+            by, when the source zone's own item carries one at re-score
+            time (DSHN-69). `None` when the source zone item has no
+            subject-linkable field at all (e.g. a Zone 4 Procedure, per
+            DSHN-70) -- a concrete `ArchiveCandidatePort` adapter for
+            such a zone always returns `None` here, never a fabricated
+            value. When non-`None`, `ArchiveEngine` carries it through
+            to `dashanan.domain.consolidated_blob.ArchiveBatchItem.
+            subject_id` and registers it with `Zone8SubjectIndexPort.
+            record_item` after a successful Zone 8 write, so a later
+            `Zone8SubjectKeyedArchiver.erase_subject` call can resolve
+            and account for this item (AC-008-DPDP-1's "cascade reaches
+            Zone 8 archives" read as a blanket promise, not one scoped
+            only to the separate subject-keyed crypto-shredding write
+            path). This field carries no encryption of its own -- full
+            crypto-shredding of un-keyed sweep payloads remains out of
+            this fix's scope; only the subject_id index entry is added.
     """
 
     lifecycle_state: RotationState
     memory_score: float
     payload_tokens: int
+    subject_id: str | None = None
 
     def __post_init__(self) -> None:
         """Raises:
-        ValueError: If `memory_score` is outside `[0, 1]`, or
-            `payload_tokens` is negative.
+        ValueError: If `memory_score` is outside `[0, 1]`,
+            `payload_tokens` is negative, or `subject_id` is a
+            non-`None` blank string.
         """
         if not (
             -_SCORE_GUARD_EPSILON
@@ -227,6 +250,11 @@ class ArchiveCandidateSnapshot:
             raise ValueError(
                 "ArchiveCandidateSnapshot.payload_tokens must be >= 0, got "
                 f"{self.payload_tokens}"
+            )
+        if self.subject_id is not None and not self.subject_id.strip():
+            raise ValueError(
+                "ArchiveCandidateSnapshot.subject_id must be None or "
+                "non-blank, never an empty/whitespace string"
             )
 
 
@@ -311,6 +339,23 @@ class ArchiveFailure:
 
 
 @dataclass(frozen=True, slots=True)
+class _MarkedCandidate:
+    """One candidate `_evaluate_and_mark` successfully transitioned, plus its subject_id.
+
+    Kept private and local to this module: the payload/generation pair
+    still comes from `ArchiveTransitionPort.mark_archived`'s own
+    `ArchiveMarkResult`, while `subject_id` comes from the same
+    `ArchiveCandidateSnapshot` re-score `_evaluate_and_mark` already read
+    -- combined here so both `run_weekly_archive_sweep` and
+    `fast_track_archive` can build a subject-carrying `ArchiveBatchItem`
+    and a subject-index registration from one return value.
+    """
+
+    mark_result: ArchiveMarkResult
+    subject_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveSweepResult:
     """The outcome of one `ArchiveEngine.run_weekly_archive_sweep` call.
 
@@ -367,12 +412,37 @@ class ArchiveEngine:
         zone8_store: Zone8ConsolidationStore,
         event_bus: EventBus,
         clock: Clock,
+        subject_index: Zone8SubjectIndexPort | None = None,
     ) -> None:
+        """Compose this engine's ports.
+
+        Args:
+            transition_port: Persists a successful source-zone transition.
+            candidate_port: Supplies each candidate's current, re-scored
+                state (including, per DSHN-69, its `subject_id` when the
+                source zone item carries one).
+            zone8_store: Zone 8's object-store + hot-manifest Facade.
+            event_bus: Publishes `memory.archived`.
+            clock: The shared `Clock` every sweep timestamps itself from.
+            subject_index: ADR-006's Zone 8 subject_id secondary index
+                (DSHN-69 fix). When supplied, `run_weekly_archive_sweep`
+                and `fast_track_archive` register every successfully
+                archived item that carries a non-`None` `subject_id`
+                (`ArchiveCandidateSnapshot.subject_id`) with `record_item`
+                immediately after its Zone 8 write, so a later DPDP
+                `erase_subject` call can resolve it. `None` (the default)
+                preserves every existing caller composed before this fix
+                and performs no subject-index registration -- a
+                deployment composition root that wants weekly-sweep
+                items reachable by subject-scoped erasure MUST supply a
+                real `Zone8SubjectIndexPort` adapter here.
+        """
         self._transition_port = transition_port
         self._candidate_port = candidate_port
         self._zone8_store = zone8_store
         self._event_bus = event_bus
         self._clock = clock
+        self._subject_index = subject_index
 
     def run_weekly_archive_sweep(
         self,
@@ -440,7 +510,7 @@ class ArchiveEngine:
         as_of = self._clock.now()
         skipped: list[ArchiveSkip] = []
         failed: list[ArchiveFailure] = []
-        marked: list[tuple[str, ArchiveMarkResult]] = []
+        marked: list[tuple[str, _MarkedCandidate]] = []
 
         for item_id in candidate_item_ids:
             outcome = self._evaluate_and_mark(tenant_id, zone_id, item_id)
@@ -466,16 +536,25 @@ class ArchiveEngine:
                 tenant_id=tenant_id,
                 item_id=item_id,
                 source_zone=zone_id,
-                payload=result.payload,
+                payload=candidate.mark_result.payload,
+                subject_id=candidate.subject_id,
             )
-            for item_id, result in marked
+            for item_id, candidate in marked
         ]
-        generation_by_item_id = {item_id: result.generation for item_id, result in marked}
+        generation_by_item_id = {
+            item_id: candidate.mark_result.generation for item_id, candidate in marked
+        }
+        subject_id_by_item_id = {item_id: candidate.subject_id for item_id, candidate in marked}
 
         batch_result = self._zone8_store.consolidate_batch(batch_items)
 
         archived: list[ArchiveTransitionOutcome] = []
         for written in batch_result.written:
+            self._record_subject_index(
+                tenant_id=tenant_id,
+                item_id=written.item_id,
+                subject_id=subject_id_by_item_id[written.item_id],
+            )
             self._publish_archived(
                 tenant_id=tenant_id,
                 zone_id=zone_id,
@@ -560,7 +639,8 @@ class ArchiveEngine:
                     tenant_id=tenant_id,
                     item_id=item_id,
                     source_zone=zone_id,
-                    payload=outcome.payload,
+                    payload=outcome.mark_result.payload,
+                    subject_id=outcome.subject_id,
                 )
             ]
         )
@@ -573,11 +653,14 @@ class ArchiveEngine:
             )
 
         written = batch_result.written[0]
+        self._record_subject_index(
+            tenant_id=tenant_id, item_id=item_id, subject_id=outcome.subject_id
+        )
         self._publish_archived(
             tenant_id=tenant_id,
             zone_id=zone_id,
             item_id=item_id,
-            generation=outcome.generation,
+            generation=outcome.mark_result.generation,
         )
         logger.info(
             "OAQ-12 fast-track archive completed",
@@ -585,19 +668,19 @@ class ArchiveEngine:
                 "tenant_id": tenant_id,
                 "zone": zone_id.value,
                 "item_id": item_id,
-                "generation": outcome.generation,
+                "generation": outcome.mark_result.generation,
             },
         )
         return ArchiveTransitionOutcome(
             item_id=item_id,
             archived_at=as_of,
-            generation=outcome.generation,
+            generation=outcome.mark_result.generation,
             manifest_blob_id=written.manifest_entry.blob_id,
         )
 
     def _evaluate_and_mark(
         self, tenant_id: str, zone_id: ZoneId, item_id: str
-    ) -> ArchiveMarkResult | ArchiveSkip | ArchiveFailure:
+    ) -> _MarkedCandidate | ArchiveSkip | ArchiveFailure:
         """Re-score, check eligibility, guard-transition, and mark one candidate.
 
         The shared per-item pipeline both `run_weekly_archive_sweep` and
@@ -633,7 +716,7 @@ class ArchiveEngine:
             )
 
         try:
-            return self._transition_port.mark_archived(tenant_id, zone_id, item_id)
+            mark_result = self._transition_port.mark_archived(tenant_id, zone_id, item_id)
         except ArchiveEnginePortError as exc:
             logger.error(
                 "archive engine failed to persist a transition",
@@ -641,6 +724,34 @@ class ArchiveEngine:
                 exc_info=True,
             )
             return ArchiveFailure(item_id=item_id, error=str(exc))
+
+        return _MarkedCandidate(mark_result=mark_result, subject_id=snapshot.subject_id)
+
+    def _record_subject_index(
+        self, tenant_id: str, item_id: str, subject_id: str | None
+    ) -> None:
+        """Best-effort `Zone8SubjectIndexPort.record_item` call after a Zone 8 write.
+
+        A no-op when this engine was composed without a `subject_index`
+        (`None`, the default) or when `item_id` carries no `subject_id`
+        (DSHN-70: not every archived item is subject-linkable). An index
+        write failure is logged and swallowed rather than raised: the
+        item's Zone 8 archive write already durably succeeded by the
+        time this is called, so a subject-index outage must not undo or
+        fail that already-completed archive outcome.
+        """
+        if self._subject_index is None or subject_id is None:
+            return
+        try:
+            self._subject_index.record_item(tenant_id, subject_id, item_id)
+        except Zone8CryptoShreddingStoreError:
+            logger.error(
+                "archive engine failed to register item in the Zone 8 "
+                "subject index -- a later DPDP erase_subject call for "
+                "this subject will not find this item",
+                extra={"tenant_id": tenant_id, "item_id": item_id},
+                exc_info=True,
+            )
 
     def _publish_archived(
         self, tenant_id: str, zone_id: ZoneId, item_id: str, generation: int

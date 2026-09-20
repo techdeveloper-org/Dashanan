@@ -97,6 +97,32 @@ class Zone8ConsolidationError(DashananError):
     """
 
 
+class Zone8UnprovisionedTenantError(Zone8ConsolidationError):
+    """Raised when a consolidation batch targets a tenant with no provisioned Zone 8 bucket.
+
+    Sibling of `Zone8ConsolidationError`, mirroring `ByteRange`'s and
+    `validate_source_zone`'s own "fail the whole batch, never partially
+    write" precedent (AC-008-2, AC-008-3): a subclass rather than a
+    bare `Zone8ConsolidationError` instance so a caller can catch this
+    specific, provisioning-scoped rejection distinctly, while still
+    being caught by any existing `except Zone8ConsolidationError`
+    handler that does not need the distinction (DSHN-69, AC-008-DPDP-2).
+
+    This is a structural, fail-closed rejection -- HLD Section 10
+    DPDP-4's "all stores in-region for tenants handling Indian personal
+    data" residency guarantee would be silently defeated if a batch for
+    a never-provisioned tenant were accepted and durably written before
+    that tenant's bucket exists. Raised by
+    `dashanan.application.zone8_consolidation_store.
+    Zone8ConsolidationStore.consolidate_batch` (an I/O-backed check
+    against an injected `TenantProvisioningCheckPort`), never by this
+    (I/O-free) domain module itself -- kept here only as the typed
+    vocabulary, mirroring how `read_blob_range`'s "no manifest entry"
+    case already reuses this module's `Zone8ConsolidationError` from
+    the application layer.
+    """
+
+
 def validate_source_zone(source_zone: ZoneId) -> None:
     """AC-008-2: reject any write not attributed to an allowed source zone.
 

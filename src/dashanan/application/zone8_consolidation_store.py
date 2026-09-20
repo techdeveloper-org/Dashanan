@@ -69,6 +69,7 @@ from dashanan.domain.consolidated_blob import (
     ByteRange,
     ManifestEntry,
     Zone8ConsolidationError,
+    Zone8UnprovisionedTenantError,
     compute_blob_id,
     validate_source_zone,
     validate_tenant_uniform_batch,
@@ -155,6 +156,33 @@ class ObjectStorePort(Protocol):
             Zone8StorePortError: For any other operational failure (e.g.
                 `blob_id` does not exist -- a manifest/object-store
                 consistency fault this adapter detected).
+        """
+        ...
+
+
+@runtime_checkable
+class TenantProvisioningCheckPort(Protocol):
+    """DSHN-69 / AC-008-DPDP-2: has `tenant_id`'s Zone 8 bucket been provisioned?
+
+    Kept local to this module per this story's file-disjointness
+    requirement, mirroring `ObjectStorePort`'s and `ManifestPort`'s
+    identical local-Protocol choice. Answers a pure existence question
+    -- it MUST NOT provision a bucket as a side effect of being asked;
+    provisioning is `dashanan.application.tenant_bucket_provisioner.
+    TenantBucketProvisioningService`'s own, separate responsibility.
+    A concrete adapter (e.g. `dashanan.infrastructure.
+    local_tenant_bucket_provisioner.LocalTenantBucketProvisioner`) may
+    satisfy this Protocol structurally alongside its own
+    `BucketProvisioningPort` -- the two Protocols name distinct
+    capabilities (check vs. provision) on the same adapter.
+    """
+
+    def is_tenant_provisioned(self, tenant_id: str) -> bool:
+        """Return whether `tenant_id` currently has a provisioned Zone 8 bucket.
+
+        Raises:
+            Zone8StorePortError: If the underlying provisioning store
+                cannot be queried.
         """
         ...
 
@@ -293,10 +321,34 @@ class Zone8ConsolidationStore:
         object_store: ObjectStorePort,
         manifest: ManifestPort,
         clock: Clock,
+        provisioning_check: TenantProvisioningCheckPort | None = None,
     ) -> None:
+        """Compose this Facade's ports.
+
+        Args:
+            object_store: ADR-009's object-store half.
+            manifest: ADR-009's hot-manifest half.
+            clock: The shared `Clock` every manifest write's
+                `written_at` is stamped from.
+            provisioning_check: DSHN-69 / AC-008-DPDP-2's tenant-bucket
+                existence check. When supplied, `consolidate_batch`
+                fails closed (raises `Zone8UnprovisionedTenantError`,
+                writes nothing) for any tenant this check reports as
+                unprovisioned -- never merely a logged warning. `None`
+                (the default) composes this Facade with NO provisioning
+                enforcement, preserving every existing caller that
+                predates DSHN-69 and is not exercising the India Layer
+                residency concern (e.g. a unit test wiring only
+                `ObjectStorePort`/`ManifestPort` test doubles); a real
+                deployment composition root MUST supply a real
+                `TenantProvisioningCheckPort` adapter (e.g.
+                `LocalTenantBucketProvisioner`) to satisfy
+                AC-008-DPDP-2's residency guarantee end to end.
+        """
         self._object_store = object_store
         self._manifest = manifest
         self._clock = clock
+        self._provisioning_check = provisioning_check
 
     def consolidate_batch(
         self, items: Sequence[ArchiveBatchItem]
@@ -313,7 +365,14 @@ class Zone8ConsolidationStore:
              the entire batch fails, not a subset of it (this is a
              RAISE, never a logged warning; see that function's own
              docstring).
-          2. Per-item source-zone check (AC-008-2): an item whose
+          2. Whole-batch precondition (DSHN-69, AC-008-DPDP-2): when
+             this Facade was composed with a `provisioning_check`, the
+             batch's single `tenant_id` (guaranteed uniform by step 1)
+             must already have a provisioned Zone 8 bucket. Raises
+             `Zone8UnprovisionedTenantError` immediately, before ANY
+             port is called, otherwise -- a RAISE, never a logged
+             warning, mirroring step 1's own fail-closed discipline.
+          3. Per-item source-zone check (AC-008-2): an item whose
              `source_zone` is not in `ALLOWED_SOURCE_ZONES` was already
              rejected at `ArchiveBatchItem` construction time (the
              domain layer's `__post_init__` calls `validate_source_zone`
@@ -321,17 +380,17 @@ class Zone8ConsolidationStore:
              practice; this method still reports it via `rejected` if a
              caller somehow constructs a batch bypassing that guard
              (defense in depth), isolated per-item.
-          3. Merge every accepted item's `payload` into one combined
+          4. Merge every accepted item's `payload` into one combined
              blob, in `items` order, recording each item's own
              `ByteRange` slice.
-          4. `object_store.put_if_absent(blob_id, merged_payload)` --
+          5. `object_store.put_if_absent(blob_id, merged_payload)` --
              ONE call for the whole batch (content-addressed over the
              merged bytes, must-not-deviate item 3). If this raises
              `Zone8ObjectStoreUnavailableError`, EVERY accepted item in
              this batch defers together (AC-008-4's "no partial write":
              the manifest is never told about a blob the object store
              does not durably hold).
-          5. `manifest.insert_batch(entries)` -- one atomic call
+          6. `manifest.insert_batch(entries)` -- one atomic call
              covering every accepted item's `ManifestEntry`.
 
         Args:
@@ -349,6 +408,11 @@ class Zone8ConsolidationStore:
                 `items` spans more than one `tenant_id` (AC-008-3) --
                 the whole-batch precondition failure, never narrowed to
                 a per-item outcome.
+            dashanan.domain.consolidated_blob.Zone8UnprovisionedTenantError:
+                If this Facade was composed with a `provisioning_check`
+                and `items`' tenant has no provisioned Zone 8 bucket
+                (DSHN-69, AC-008-DPDP-2) -- the whole-batch precondition
+                failure, raised before any port is called.
             Zone8StorePortError: If `manifest.insert_batch` fails for a
                 reason OTHER than object-store unavailability (a
                 programming/operational bug this method does not treat
@@ -358,6 +422,17 @@ class Zone8ConsolidationStore:
             return ConsolidationBatchResult(written=(), deferred=(), rejected=())
 
         validate_tenant_uniform_batch(items)
+
+        if self._provisioning_check is not None:
+            tenant_id = items[0].tenant_id
+            if not self._provisioning_check.is_tenant_provisioned(tenant_id):
+                raise Zone8UnprovisionedTenantError(
+                    f"tenant '{tenant_id}' has no provisioned Zone 8 bucket -- "
+                    "refusing to accept this consolidation batch (AC-008-DPDP-2 "
+                    "fail-closed; provision the tenant's bucket via "
+                    "TenantBucketProvisioningService before archiving any data "
+                    "for it)"
+                )
 
         accepted: list[ArchiveBatchItem] = []
         rejected: list[ArchiveRejected] = []

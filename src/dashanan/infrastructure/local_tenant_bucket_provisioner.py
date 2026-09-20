@@ -100,6 +100,42 @@ class LocalTenantBucketProvisioner:
         )
         return provisioned
 
+    def is_tenant_provisioned(self, tenant_id: str) -> bool:
+        """DSHN-69 / AC-008-DPDP-2: has `tenant_id` been provisioned under ANY residency?
+
+        Satisfies `dashanan.application.zone8_consolidation_store.
+        TenantProvisioningCheckPort` structurally, alongside this
+        class's own `BucketProvisioningPort.provision`. A pure existence
+        check: it never creates `_root_dir` or any bucket directory as
+        a side effect of being asked (unlike `provision`, which does).
+
+        Scans every residency subdirectory under `_root_dir` (never a
+        single hardcoded residency) because a `Zone8ConsolidationStore`
+        write path has no tenant-configuration store to resolve
+        `tenant_id`'s configured `ResidencyRegion` from (see
+        `dashanan.domain.tenant_bucket_policy.BucketProvisioningSpec`'s
+        own docstring: "no such store exists yet anywhere in this
+        codebase") -- this check answers "was this tenant provisioned
+        under its policy's residency, whichever one that was" rather
+        than requiring the caller to already know which residency to
+        look under.
+
+        Returns:
+            `True` if `tenant_id / _POLICY_FILE_NAME` exists under any
+            residency subdirectory of `_root_dir`; `False` if
+            `_root_dir` does not exist yet, or no residency subdirectory
+            holds a provisioned bucket for `tenant_id`.
+        """
+        if not self._root_dir.exists():
+            return False
+        for residency_dir in self._root_dir.iterdir():
+            if not residency_dir.is_dir():
+                continue
+            policy_path = residency_dir / tenant_id / _POLICY_FILE_NAME
+            if policy_path.exists():
+                return True
+        return False
+
     def _read_existing_policy(self, policy_path: Path) -> ProvisionedBucket | None:
         """Return the already-recorded `ProvisionedBucket`, or `None` if none exists yet.
 
