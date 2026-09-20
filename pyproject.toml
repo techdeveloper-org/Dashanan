@@ -9,7 +9,15 @@ description = "Dashanan - multi-zone memory system for AI hosts. Memory Orchestr
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-dependencies = []
+# cryptography: added by DASH-STORY-020 (DSHN-69) -- the first third-party
+# runtime dependency this project declares. DPDP-2 crypto-shredding (AES-256-GCM
+# per-subject envelope encryption, Zone 8) requires a peer-reviewed AEAD cipher;
+# application-security-core's OWASP A02 guidance explicitly forbids a hand-rolled
+# cipher built on hashlib/hmac alone. See dashanan.domain.zone8_crypto_shredding's
+# own module docstring and this story's dev report, judgment-call list.
+dependencies = [
+    "cryptography>=42.0",
+]
 
 [project.optional-dependencies]
 dev = [
