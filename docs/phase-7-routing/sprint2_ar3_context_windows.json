@@ -1,0 +1,210 @@
+{
+  "document_id": "AR3-CONTEXT-WINDOWS-SPRINT2-20260920-01",
+  "version": "1.0.0",
+  "author": "context-engineering-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.3 per-story context window design, Sprint 2)",
+  "date": "2026-09-20",
+  "correlation_id": "DASH-PH7-AR3-SPRINT2-20260920",
+  "depends_on": [
+    "docs/phase-7-routing/sprint2_ar1_assignments.json v1.2.0",
+    "docs/phase-6-sprint-planning/backlog_draft.json v1.1.0 (sprint_2_stories DASH-STORY-012..020)",
+    "docs/phase-1-architecture/HLD.md v1.2.0 (Sections 3.4-3.11, 7.4, 8.4, 10, 12A-12G; ADR-006, ADR-009, ADR-012)",
+    "docs/phase-7-routing/ar3_context_windows.json v1.0.0 (classification model and per-story context-window method reused verbatim from Sprint 1; not re-derived)"
+  ],
+  "methodology_reuse_note": "Same per-story context-window design method as ar3_context_windows.json: sources are the exact HLD section / SRS-AC / backlog-AC / AR1 must-not-deviate citations the story's own routing record names, never invented additions. context_budget_tokens is a judgment call scaled to how much real source content (HLD prose + pseudocode/tables, ACs, must_not_deviate items, cross-references) the story actually cites, following the same 3500-7000 band Sprint 1 used, not a fixed formula.",
+  "classification_model": {
+    "name": "Bell-LaPadula classification-ceiling (carried forward from ar3_context_windows.json, now with Zone 5 activated)",
+    "rule": "No story's context window may include Zone 2 (Episodic) or Zone 5 (Entity) content bearing PII unless the story itself is security-cleared. No Sprint 2 story is security-cleared for raw PII read access. Where a story's implementation reasoning needs to reference Zone 2/5 content shape, a redacted/pseudonymized synthetic example is substituted for any real or realistic PII value - this explicitly includes an HLD-authored illustrative example that uses realistic-looking names/places (e.g. the Section 3.4 'Sachin lives in Mumbai' worked example), not only literal user data.",
+    "zone_5_activation_note": "ar3_context_windows.json recorded Zone 5 as 'N/A-not-yet-applicable' because FR-005 was out of Sprint 1 scope. Sprint 2 ships Zone 5 (DASH-STORY-017), so the Zone 5 half of the ceiling is now LIVE, not hypothetical: DASH-STORY-017 is the first story in either sprint where the Bell-LaPadula ceiling actually fires on Zone 5 content, and is treated with the same strictest-redaction discipline ar3_context_windows.json applied to Zone 2 (DASH-STORY-003) and Zone 6-over-Zone-2 (DASH-STORY-007).",
+    "zone_3_extension_note": "Zone 3 (Semantic) is not itself named in the ceiling rule, but HLD Section 3.4's owned entities (SemanticEdge subject_ref/predicate/object_ref, GeneralFact statement) are directly about entities and the HLD's own worked example pairs a realistic person-name with a location. Per Hard Rule 2 (HLD Section 3.10) Zone 3 never copies an entity attribute value - only entity_id references - so it does not hold Zone 5's raw attribute PII, but its relationship-fact content is treated with the same redaction caution as a Zone 2/5-adjacent zone for any story whose decisive content is the worked example itself (DASH-STORY-012, DASH-STORY-013).",
+    "zone_8_extension_note": "Zone 8 (Consolidation) is not named in the ceiling rule either, but ADR-009's own India Layer text calls it out explicitly: 'Zone 8 holds the longest-lived PII' and requires per-subject destroyable encryption keys for crypto-shredding erasure. DASH-STORY-018 (the store) and DASH-STORY-020 (the erasure cascade) are treated with ceiling-equivalent discipline even though the rule's literal text names only Zones 2 and 5."
+  },
+  "context_windows": [
+    {
+      "story_id": "DASH-STORY-012",
+      "title": "Zone 3 Semantic Memory store - SemanticEdge and GeneralFact schema with non-duplication CHECK constraint",
+      "assigned_agent": "database-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_Section_3.4_SemanticEdge_GeneralFact_OwnedEntities_CHECK_Constraint_ClosesR-005",
+        "HLD_Section_3.10_DataOwnershipMap_Zone3Owns_HardRule1_HardRule2",
+        "HLD_Section_3.11_DependencyMatrix_ZonesAreLeaves",
+        "HLD_ADR-006_PostgreSQL_SQLite_StructuredZoneStorage_SubjectIdIndexMandatory",
+        "backlog_draft.json_DASH-STORY-012_hld_citation",
+        "backlog_draft.json_DASH-STORY-012_acceptance_criteria_AC-003_AC-003-SCHEMA-1_AC-003-GF-1_AC-003-OWN-1",
+        "backlog_draft.json_DASH-STORY-012_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-012_hld_ownership_crosscheck_and_must_not_deviate_list"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 3's owned entities (SemanticEdge subject_ref/predicate/object_ref, GeneralFact statement) are relationship facts about real-world entities, and HLD Section 3.4's own worked example is a realistic name-plus-location pair ('Sachin lives in Mumbai' -> SemanticEdge(located_in, Sachin, Mumbai)). Per the classification model's synthetic-example rule this is substituted with a pseudonymized entity placeholder (e.g. <ENTITY_A>/<ENTITY_B>) wherever the schema-design rationale is illustrated in this context window - the literal HLD names are not carried into the implementer's context. Per Hard Rule 2 (HLD 3.10), Zone 3 never copies an attribute value from Zone 5, so the schema itself stores entity_id references, not raw PII attribute content; the CHECK constraint and non-duplication design are schema-shape decisions that do not require any real fact content to specify."
+    },
+    {
+      "story_id": "DASH-STORY-013",
+      "title": "EntityOwnershipSpecification classification gate (|subjects|==0, |subjects|>1, conditional |subjects|==1 index_reverse sub-branch)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5000,
+      "sources": [
+        "HLD_Section_3.4_EntityOwnershipSpecification_Pseudocode_Lines235-249_RoutingTable",
+        "HLD_Section_3.4_WorkedExample_SachinMumbai_IndexReverseDefaultFalse",
+        "HLD_Section_3.10_HardRule2_NoAttributeValueCopy",
+        "backlog_draft.json_DASH-STORY-013_hld_citation",
+        "backlog_draft.json_DASH-STORY-013_acceptance_criteria_AC-003-CLASS-1_2_3_4",
+        "backlog_draft.json_DASH-STORY-013_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-013_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "cross_reference_DASH-STORY-012_schema_dependency_same_sprint"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "This story's decisive content IS the Sachin/Mumbai worked example - the |subjects|==1,|objects|==1 branch and its index_reverse=true/false sub-cases are defined entirely in terms of it. The routing table (the |subjects|==0/>1/==1 branching logic itself) is structural pseudocode, not PII, and is admitted verbatim. The illustrative worked example is admitted with the entity names replaced by pseudonymized placeholders (<ENTITY_A> for 'Sachin', <PLACE_A> for 'Mumbai'), consistent with the classification model's rule that a realistic-looking synthetic example is treated the same as real PII for redaction purposes. The context window explicitly excludes any Zone 5 attribute-write implementation detail, since that branch is out of this story's build scope (must_not_deviate)."
+    },
+    {
+      "story_id": "DASH-STORY-014",
+      "title": "Zone 3 to Zone 6 retrieval-index projection (async event emission only)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 4000,
+      "sources": [
+        "HLD_Section_3.10_DataOwnershipMap_Zone3ProjectsIntoZone6",
+        "HLD_Section_3.7_Line279_Zone6DerivedTier_RecallDegradationNotDataLoss_OAQ-16",
+        "HLD_Section_3.11_DependencyMatrix_ZonesAreLeaves",
+        "backlog_draft.json_DASH-STORY-014_hld_citation",
+        "backlog_draft.json_DASH-STORY-014_acceptance_criteria_AC-003-PROJ-1_2_3",
+        "backlog_draft.json_DASH-STORY-014_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-014_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "cross_reference_DASH-STORY-007_Zone6_index_consumer_Sprint1_landed",
+        "cross_reference_DASH-STORY-006_TransactionalOutboxGate_Sprint1_sameagentpattern"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "The projected items originate in Zone 3, which per the DASH-STORY-012/013 entries above can carry entity-relationship content. This story's own scope is strictly the async event-publish mechanics (EventBus wiring, non-blocking durability independence per OAQ-16) - it does not read, transform, or log the Zone 3 item's fact content, only its event envelope (item_id, zone, per HLD Section 7.6's memory.written contract shape). No fact content or entity name is admitted into this context window; nothing needed redaction beyond confirming the exclusion, the same posture ar3_context_windows.json used for DASH-STORY-009's rotation-sweep wiring."
+    },
+    {
+      "story_id": "DASH-STORY-015",
+      "title": "Procedural Memory zone (Zone 4) core store, point lookup, and Importance ratio",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5500,
+      "sources": [
+        "HLD_Section_3.5_Zone4_ProceduralMemory_AccessPattern_ImportanceRatio",
+        "HLD_Section_3.10_DataOwnershipMap_Zone4OwnsProcedure_ProjectsIntoZone6_NoReadsLine",
+        "HLD_Section_3.11_DependencyMatrix_ZonesAreLeaves",
+        "HLD_Section_12A_PerZonePolicyTable_Zone4Row",
+        "HLD_Section_12G_ImportanceZone4UnchangedSuccessFailureRatio_NoClampNeeded",
+        "backlog_draft.json_DASH-STORY-015_hld_citation",
+        "backlog_draft.json_DASH-STORY-015_acceptance_criteria_AC-004-1_2_3_4_5",
+        "backlog_draft.json_DASH-STORY-015_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-015_hld_ownership_crosscheck_and_must_not_deviate_list"
+      ],
+      "pii_exclusion_applied": false,
+      "pii_note": "Zone 4 owns Procedure records (task_signature_hash, steps[], success_count, failure_count) - learned task/tool-use procedures, not conversational or entity-attribute content. HLD Section 3.10's Data Ownership Map records no READS line for Zone 4 and Section 10's asset list does not name it among the flagged PII-bearing stores the way it does Zones 2, 5 and 8. The classification model's ceiling is scoped to Zone 2/Zone 5 (and, by extension in this file, Zone 8); Zone 4's own content does not trigger it, so no redaction was necessary for this story's schema, point-lookup, or Importance-ratio content."
+    },
+    {
+      "story_id": "DASH-STORY-016",
+      "title": "Zone 4 (Procedural) capacity cap and MaxAge rotation backstop wiring",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 4500,
+      "sources": [
+        "HLD_Section_12A_PerZonePolicyTable_Zone4Row_HalfLife120d_DecayConstant6.68e-8_Cap50000_MaxAge730d",
+        "HLD_Section_12C_ClosedFormDeadline_TimerWheel_O1_O_logN",
+        "HLD_Section_12F_SprintCoherenceCheck_CompressedIndefiniteDwellWhileZone8Absent",
+        "backlog_draft.json_DASH-STORY-016_hld_citation",
+        "backlog_draft.json_DASH-STORY-016_acceptance_criteria_AC-004-CAP-1_2_3_4",
+        "backlog_draft.json_DASH-STORY-016_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-016_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "sprint2_ar1_assignments.json_AR1-S2-016_mathematical_delegation_mathematics-engineer_advisory_decayconstant_verification",
+        "cross_reference_DASH-STORY-009_deadline-scheduled_sweep_engine_Sprint1_wireInto"
+      ],
+      "pii_exclusion_applied": false,
+      "pii_note": "This story evicts Zone 4 (Procedural) items only, ranked by MemoryScore - unlike its Sprint 1 analogue DASH-STORY-004, which evicted Zone 2 (PII-bearing Episodic) items and therefore carried a REDACTED DPDP acceptance criterion (AC-002-CAP-DPDP-1). DASH-STORY-016 has no DPDP acceptance criterion attached (confirmed in sprint2_ar1_assignments.json's p1_trigger_evaluation for this story) because Zone 4 content is not classification-ceiling material. No redaction was required."
+    },
+    {
+      "story_id": "DASH-STORY-017",
+      "title": "Entity Memory zone (Zone 5) - canonical per-entity attribute store with sub-record provenance and alias Trie resolution",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 7000,
+      "sources": [
+        "HLD_Section_3.6_Zone5_EntityMemory_CanonicalSoleOwner_SubRecordProvenanceGranularity",
+        "HLD_Section_3.10_DataOwnershipMap_Zone5OwnsEntityRecordAndAllAttributes_HardRule2",
+        "HLD_Section_3.11_DependencyMatrix_ZonesAreLeaves",
+        "HLD_ADR-006_SubjectIdSecondaryIndexMandatory_DPDP",
+        "backlog_draft.json_DASH-STORY-017_hld_citation",
+        "backlog_draft.json_DASH-STORY-017_acceptance_criteria_AC-005-1_2_3_4_5_6",
+        "backlog_draft.json_DASH-STORY-017_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-017_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "cross_reference_DASH-STORY-006_AC-010_422RejectionContract_Sprint1_reused_not_reinvented"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 5 is the classification model's other explicitly-named ceiling zone, and this is the story that activates it for real in either sprint (Sprint 1 recorded it as N/A-not-yet-applicable). EntityRecord's attributes{attr -> {value, provenance_id, updated_at}} shape is, by HLD Section 3.6's own description, the canonical sole-owner store for a real entity's real attribute values - exactly the content class the ceiling exists to protect. This context window admits only the structural shape: the point-lookup index design, the per-attribute sub-record provenance write pattern (one new provenance record per attribute, no whole-record rewrite), and the Trie prefix-match mechanism for alias resolution - no real or realistic attribute value (name, address, phone, or any other entity attribute) is included anywhere, and no worked example is illustrated with a concrete value the way DASH-STORY-012/013 illustrate Zone 3's routing logic. This is the strictest redaction discipline in this Sprint 2 file, matching the treatment ar3_context_windows.json gave DASH-STORY-003 and DASH-STORY-007 for their direct/indirect Zone 2 exposure."
+    },
+    {
+      "story_id": "DASH-STORY-018",
+      "title": "Zone 8 Consolidation store - object-store blobs with hot manifest index (ADR-009)",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 7000,
+      "sources": [
+        "HLD_Section_3.9_Zone8_ConsolidationMemory_ConsolidatedBlob_ColdAccessPattern",
+        "HLD_ADR-009_ObjectStoreHotManifestIndex_IndiaLayer_LongestLivedPII_CryptoShreddingKeys",
+        "HLD_Section_3.10_DataOwnershipMap_Zone8ReceivesRule_HardRule1",
+        "HLD_Section_3.11_DependencyMatrix_ZonesAreLeaves",
+        "HLD_Section_10_Threat_I-5_ConsolidationCrossTenantMergeControl",
+        "HLD_Section_8.4_FailureModeTable_ObjectStoreRow_DegradedModeDeferral",
+        "backlog_draft.json_DASH-STORY-018_hld_citation",
+        "backlog_draft.json_DASH-STORY-018_acceptance_criteria_AC-008-1_2_3_4",
+        "backlog_draft.json_DASH-STORY-018_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-018_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "sprint2_ar1_assignments.json_AR1-S2-018_p1_security_review_true_reviewer_api-security-auditor_maker_checker"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "Zone 8 receives archived items from Zones 2/3/4/5 and ADR-009's India Layer states outright that 'Zone 8 holds the longest-lived PII.' This context window admits only the manifest/index shape (item_id -> (blob_id, byte_range, compression_generation) resolution, per AC-008-1) and the tenant-uniformity merge-assertion and degraded-mode control logic (AC-008-2..4) - never decoded blob content, which is opaque compressed payload the implementer's own adapter code does not need to inspect to satisfy these ACs. This story is P1-gated (api-security-auditor, Maker-Checker per sprint2_ar1_assignments.json) on the cross-tenant merge risk (HLD threat I-5); the implementing agent (python-backend-engineer) is not security-cleared for raw PII, and the reviewer's separate review scope is not folded into this implementer context window."
+    },
+    {
+      "story_id": "DASH-STORY-019",
+      "title": "Compressed to Archived rotation transition completion",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 5000,
+      "sources": [
+        "HLD_Section_12A_PerZonePolicyTable_Zone8Row_HalfLife270d_WeeklyBatchSweep",
+        "HLD_Section_12B.2-12B.3_ArchiveThreshold0.25_Derivation_CompressedDwellTime",
+        "HLD_Section_12C_ADR-012_ClosedFormDeadline_ReadTriggeredPromotion",
+        "backlog_draft.json_DASH-STORY-019_hld_citation",
+        "backlog_draft.json_DASH-STORY-019_acceptance_criteria_AC-008-ROT-1_2_3_4",
+        "backlog_draft.json_DASH-STORY-019_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-019_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "cross_reference_DASH-STORY-009_ActiveToCompressed_StateMachine_Sprint1_sameagent",
+        "cross_reference_DASH-STORY-010_DeadlineInvalidationWiring_Sprint1_AC-008-ROT-4_dependency",
+        "cross_reference_DASH-STORY-018_Zone8WritePath_SameSprint_dependency"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "This story transitions items (including PII-bearing Zone 2/3/5 items already archived via DASH-STORY-018's write path) between rotation states, keyed on item_id, MemoryScore and the stored rotation deadline only - it never reads item payload content, matching ar3_context_windows.json's exact treatment of the analogous DASH-STORY-009 rotation state machine in Sprint 1. AC-008-ROT-4's post-mutation deadline requirement is a scheduling-correctness concern (ADR-012), not a content concern, so no payload example or redaction was needed beyond confirming the exclusion."
+    },
+    {
+      "story_id": "DASH-STORY-020",
+      "title": "DPDP erasure-cascade reach into Zone 8 archives plus India residency and crypto-shredding",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 6000,
+      "sources": [
+        "HLD_Section_7.4_DELETE_TenantsSubjectsCascade_202JobId_DPDPErasureCascade",
+        "HLD_Section_10_DPDP-2_CryptoShreddingResolution_DPDP-3_ErasureReach_DPDP-4_Residency",
+        "HLD_ADR-009_IndiaLayer_InRegionVersionedObjectLockedBucket_PerSubjectKeyDestructibility",
+        "HLD_Section_3.10_ADR-006_SubjectIdSecondaryIndexMandatory_DPDP",
+        "HLD_Section_11_OAQ-10_CryptoShreddingLegalSufficiencyOpenQuestion",
+        "backlog_draft.json_DASH-STORY-020_hld_citation",
+        "backlog_draft.json_DASH-STORY-020_acceptance_criteria_AC-008-DPDP-1_2_3",
+        "backlog_draft.json_DASH-STORY-020_must_not_deviate",
+        "sprint2_ar1_assignments.json_AR1-S2-020_hld_ownership_crosscheck_and_must_not_deviate_list",
+        "sprint2_ar1_assignments.json_AR1-S2-020_advisory_review_crypto-security-specialist_key_lifecycle",
+        "sprint2_ar1_assignments.json_AR1-S2-020_advisory_review_2_cloud-security-architect_india_residency",
+        "sprint2_ar1_assignments.json_AR1-S2-G1_routing_gap_marginal_implementer_score_non-blocking-advisory-not-P1",
+        "cross_reference_DASH-STORY-018_Zone8AdapterContinuity_SameAgentSameSprint"
+      ],
+      "pii_exclusion_applied": true,
+      "pii_note": "The single most direct PII/DPDP story in Sprint 2: its own subject matter is per-subject encryption key generation/storage/destruction and India-region bucket provisioning for erasure. The context window carries the DPDP legal/technical framing (Section 10 DPDP-2/3/4, the still-open OAQ-10 legal-sufficiency question, ADR-009's India Layer text) and the key-lifecycle CONTRACT (destruction-is-erasure, no in-place blob rewrite, subject_id secondary index dependency) but never any actual or example subject_id, key material value, or archived content - the story is specified entirely in terms of mechanism and contract, not example data, so no synthetic-example substitution was even needed the way DASH-STORY-012/013/017 required one. The implementing agent (python-backend-engineer, the most marginal above-threshold score in Sprint 2 per AR1-S2-G1) is not security-cleared; the two accepted advisory reviews (crypto-security-specialist, cloud-security-architect) run in their own separate review contexts, not folded into this implementer's context window, and OAQ-10's legal question is carried as explicitly open, never asserted as resolved."
+    }
+  ],
+  "summary": {
+    "stories_total": 9,
+    "total_context_budget_tokens": 49500,
+    "stories_with_pii_exclusion_applied": 7,
+    "stories_without_pii_exclusion_trigger": ["DASH-STORY-015", "DASH-STORY-016"],
+    "zone_5_stories_in_sprint_2": 1,
+    "zone_5_ceiling_activation": "DASH-STORY-017 is the first story in either Sprint 1 or Sprint 2 where the classification model's Zone 5 ceiling is live rather than N/A-not-yet-applicable (ar3_context_windows.json's own note for Sprint 1).",
+    "strictest_redaction": "DASH-STORY-017 (direct Zone 5 EntityRecord activation - canonical per-entity attribute store) and DASH-STORY-020 (per-subject crypto-shredding key lifecycle and India residency, the sprint's most direct DPDP/PII subject matter) carry the strictest redaction discipline. DASH-STORY-012 and DASH-STORY-013 also required active redaction of HLD's own realistic-looking worked example (Sachin/Mumbai), substituting pseudonymized entity placeholders.",
+    "note_on_security_clearance": "No Sprint 2 story is security-cleared for raw PII, matching Sprint 1's posture. DASH-STORY-018's P1 reviewer (api-security-auditor) and DASH-STORY-020's two accepted advisory reviewers (crypto-security-specialist, cloud-security-architect) each operate in their own separate review context per sprint2_ar1_assignments.json - none of that reviewer-level access is granted to, or folded into, the implementing agent's (python-backend-engineer / database-engineer) context window documented here."
+  }
+}

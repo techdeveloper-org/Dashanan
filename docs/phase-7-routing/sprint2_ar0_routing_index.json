@@ -1,0 +1,474 @@
+{
+  "document_id": "AR0-ROUTING-INDEX-SPRINT2-20260920-01",
+  "version": "1.0.0",
+  "author": "orchestrator-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.0 routing index, Sprint 2)",
+  "date": "2026-09-20",
+  "correlation_id": "DASH-PH7-AR0-SPRINT2-20260920",
+  "retroactive_disclosure": {
+    "status": "RETROACTIVE-BUT-DISCLOSED",
+    "note": "This AR.0 routing index was assembled on 2026-09-20, after AR.1 (docs/phase-7-routing/sprint2_ar1_assignments.json v1.2.0, dated 2026-09-19, last amended 2026-09-20) already existed, had already been reviewed, and had already had three of its five open decisions (SP2-DEC-001, SP2-DEC-002) partially or fully accepted by the user before this index was written. The nominal pipeline order is AR.0 (index) preceding AR.1 (assignment) - that order was inverted here. This is disclosed rather than concealed, the same retroactive-but-disclosed pattern this project already used for its Harness Gate activation. No new scoring, no new signal computation, and no new candidate evaluation occurred in the writing of this file: every score, signal, evidence string, and rationale below is reused verbatim from sprint2_ar1_assignments.json v1.2.0 and is only restructured into AR.0's index-level shape (agent_existence_verification, scoring_model, stories[].candidates, index_level_findings). The one piece of genuinely new work performed while assembling this file was agent_existence_verification itself - re-run fresh in this session (directory glob of every candidate name referenced in sprint2_ar1_assignments.json), not copied from that file's own (separately dated, 2026-09-19) verification pass."
+  },
+  "source_of_truth": {
+    "backlog": "docs/phase-6-sprint-planning/backlog_draft.json v1.1.0 (sprint_2_stories DASH-STORY-012..020, sprint_2_dependency_graph)",
+    "hld": "docs/phase-1-architecture/HLD.md v1.0.0 (Sections 3.4-3.6, 3.9-3.11, 7.4, 8.4, 10, 12, 12A-12G; ADR-006, ADR-007, ADR-009, ADR-012)",
+    "agent_registry": "claude-global-library/agents/ - re-verified by directory glob in this session (2026-09-20) for every candidate agent named in sprint2_ar1_assignments.json",
+    "upstream_assignment_file": "docs/phase-7-routing/sprint2_ar1_assignments.json v1.2.0 - already-computed candidate_scores, signals, evidence, rationale, and assignment_rule for all 9 Sprint 2 stories (DASH-STORY-012..020). Reused verbatim; not re-scored. This index restructures that file's assignment-level shape into AR.0's index-level shape, mirroring docs/phase-7-routing/ar0_routing_index.json's structure for Sprint 1."
+  },
+  "agent_existence_verification": {
+    "method": "Directory glob of claude-global-library/agents/{name}/agent.md for every distinct agent name that appears anywhere in sprint2_ar1_assignments.json (candidate_scores, assigned_agent, runner_up, p1_reviewer, advisory_review(_2), and its own rejected_by_name_or_capability_check / carried_forward_from_sprint_1_verification lists). Run fresh in this session on 2026-09-20, independent of sprint2_ar1_assignments.json's own 2026-09-19 verification pass.",
+    "rule": "No agent name appears in this index unless its agents/{name}/agent.md was confirmed to exist by glob in this session.",
+    "verified_candidates": [
+      "python-backend-engineer",
+      "database-engineer",
+      "database-storage-engineer",
+      "algorithm-complexity-analyst",
+      "api-security-auditor",
+      "crypto-security-specialist",
+      "cloud-security-architect",
+      "iam-security-engineer",
+      "india-crypto-regulatory-specialist",
+      "security-defense-architect",
+      "ai-engineer",
+      "data-engineer"
+    ],
+    "existence_result": "All 12 distinct agent names referenced in sprint2_ar1_assignments.json exist at claude-global-library/agents/{name}/agent.md. No name-does-not-exist rejections this pass (contrast with Sprint 1's ar0_routing_index.json, which rejected two proposed names - storage-adapter-engineer, provenance-audit-engineer - that did not exist at all).",
+    "rejected_by_capability_not_existence": [
+      {
+        "agent": "database-storage-engineer",
+        "exists": true,
+        "reason": "Exists, but is a name-similarity trap: it builds a database's own storage-engine internals (WAL/ARIES, LSM-tree, B+tree, MVCC, buffer pool), not application-layer schema on top of PostgreSQL. Rejected as a DASH-STORY-012 candidate on capability grounds, same rejection ar0_routing_index.json applied to it for DASH-STORY-002 in Sprint 1.",
+        "source": "sprint2_ar1_assignments.json candidate_scores for DASH-STORY-012"
+      },
+      {
+        "agent": "cloud-security-architect",
+        "exists": true,
+        "reason": "Exists, but its frontmatter tools list has no Edit (Read, Glob, Grep, Write, WebFetch, WebSearch only) - an architecture/audit-report role, not an implementer. Scored only as a review/advisory candidate on DASH-STORY-020, never as an implementer.",
+        "source": "sprint2_ar1_assignments.json agent_existence_verification.rejected_by_name_or_capability_check"
+      },
+      {
+        "agent": "crypto-security-specialist",
+        "exists": true,
+        "reason": "Exists, but its own description scopes it to Phase F security review (adversarial auditor, no Edit tool). Scored only as an advisory review candidate on DASH-STORY-020, never as an implementer.",
+        "source": "sprint2_ar1_assignments.json agent_existence_verification.rejected_by_name_or_capability_check"
+      },
+      {
+        "agent": "iam-security-engineer",
+        "exists": true,
+        "reason": "Exists, but is scoped to Active Directory/Azure AD/PAM/Kerberos/Aadhaar AUA-KUA identity infrastructure - no fit to object-store blob encryption key lifecycle or Postgres schema work. Not used as a candidate on any Sprint 2 story.",
+        "source": "sprint2_ar1_assignments.json agent_existence_verification.rejected_by_name_or_capability_check"
+      }
+    ]
+  },
+  "scoring_model": {
+    "signals": [
+      {
+        "id": "domain_match",
+        "weight": 0.30,
+        "definition": "Overlap between the agent's declared domain/description keywords and the story's primary engineering domain."
+      },
+      {
+        "id": "skill_coverage",
+        "weight": 0.35,
+        "definition": "Fraction of the story's required capability set covered by the agent's frontmatter `skills:` list (mandatory skills only)."
+      },
+      {
+        "id": "hld_component_ownership",
+        "weight": 0.20,
+        "definition": "Agreement between the agent's role and the HLD's named owner/pattern/DSA for the component the story implements."
+      },
+      {
+        "id": "tech_stack_fit",
+        "weight": 0.15,
+        "definition": "Fit against the locked stack in HLD Section 2: Python 3.12, gRPC/FastAPI, PostgreSQL, Redis, Qdrant, OpenSearch, S3-compatible."
+      }
+    ],
+    "formula": "score = 0.30*domain_match + 0.35*skill_coverage + 0.20*hld_component_ownership + 0.15*tech_stack_fit",
+    "assignment_threshold": 0.75,
+    "threshold_source": "Reused verbatim from ar0_routing_index.json / ar1_assignments.json - not re-derived for Sprint 2, per sprint2_ar1_assignments.json's own methodology_reuse_note.",
+    "range": "[0.0, 1.0] per signal and per composite score"
+  },
+  "stories": [
+    {
+      "story_id": "DASH-STORY-012",
+      "jira_key": "DSHN-61",
+      "title": "Zone 3 Semantic Memory store - SemanticEdge and GeneralFact schema with non-duplication CHECK constraint",
+      "hld_component": "HLD 3.4 (SemanticEdge, GeneralFact schema) / Section 3.10 (Zone 3 OWNS, Hard Rule 1: no two zones share a table)",
+      "hld_patterns": ["Repository port + adapter (ZoneRepository port, reused from DASH-STORY-001)"],
+      "hld_dsa": "DB-level CHECK/partial-unique constraint on SemanticEdge.object_ref enforces the non-duplication guarantee at the schema layer, not in application logic (HLD Section 3.4, closes PRD risk R-005).",
+      "required_capabilities": ["postgresql-check-partial-unique-constraint", "rdbms-core", "database-schema-migration-core", "ports-and-adapters", "zone-repository-port-compliance"],
+      "candidates": [
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.90, "skill_coverage": 0.88, "hld_component_ownership": 0.88, "tech_stack_fit": 0.85},
+          "score": 0.8815,
+          "above_threshold": true,
+          "evidence": "The story's own Review sub-task states the non-duplication guarantee is DB-level, not application-review-level. HLD Section 3.4's CHECK/partial-unique constraint on SemanticEdge.object_ref is a schema-design decision, the same class of work that won database-engineer DASH-STORY-003 and DASH-STORY-005 in Sprint 1 (rdbms-core + database-schema-migration-core)."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.82, "skill_coverage": 0.78, "hld_component_ownership": 0.72, "tech_stack_fit": 1.00},
+          "score": 0.8130,
+          "above_threshold": true,
+          "evidence": "Clears threshold at 0.813 and is the natural owner of the storage-adapter half (ports-and-adapters, consistent with its ownership of the ZoneRepository port from DASH-STORY-001) if the work is split."
+        },
+        {
+          "agent": "database-storage-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.35, "skill_coverage": 0.30, "hld_component_ownership": 0.20, "tech_stack_fit": 0.25},
+          "score": 0.2875,
+          "above_threshold": false,
+          "evidence": "Same name-similarity trap rejected in ar0_routing_index.json for DASH-STORY-002 - builds a database's own storage engine internals, not a schema on top of PostgreSQL."
+        }
+      ],
+      "assigned_agent": "database-engineer",
+      "margin": 0.0685,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no ZoneRepository port-interface change (implements a new adapter behind the existing frozen port), no cross-tenant isolation claim.",
+      "mathematical_delegation": null,
+      "story_points": 5,
+      "traces_to_fr": "FR-003"
+    },
+    {
+      "story_id": "DASH-STORY-013",
+      "jira_key": "DSHN-62",
+      "title": "EntityOwnershipSpecification classification gate (|subjects|==0, |subjects|>1, conditional |subjects|==1 index_reverse sub-branch)",
+      "hld_component": "HLD Section 3.4 (EntityOwnershipSpecification, lines 235-249; Sachin/Mumbai worked example)",
+      "hld_patterns": ["Strategy / guard-clause routing over |subjects| cardinality branches"],
+      "hld_dsa": "Pure branching/classification logic over HLD Section 3.4's pseudocode routing table - no new data structure, control flow only.",
+      "required_capabilities": ["python-3.12", "python-design-patterns-core", "dsa-core", "entity-ownership-classification-gate", "guard-clause-branching"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.90, "skill_coverage": 0.85, "hld_component_ownership": 0.84, "tech_stack_fit": 1.00},
+          "score": 0.8855,
+          "above_threshold": true,
+          "evidence": "This is a pure classification gate over the HLD Section 3.4 pseudocode's routing table (|subjects|==0/>1/==1 branches, the conditional index_reverse=true SemanticEdge sub-case). No schema change, no index decision - Strategy/guard-clause application logic consuming DASH-STORY-012's already-defined schema. python-design-patterns-core and dsa-core are a direct match."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.40, "skill_coverage": 0.35, "hld_component_ownership": 0.30, "tech_stack_fit": 0.60},
+          "score": 0.3925,
+          "above_threshold": false,
+          "evidence": "No schema, index or constraint content in this story - it is pure branching/classification logic over an existing schema."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.4930,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no port-interface change, no cross-tenant isolation logic. Pure in-process classification.",
+      "mathematical_delegation": null,
+      "story_points": 5,
+      "traces_to_fr": "FR-003"
+    },
+    {
+      "story_id": "DASH-STORY-014",
+      "jira_key": "DSHN-63",
+      "title": "Zone 3 to Zone 6 retrieval-index projection (async event emission only)",
+      "hld_component": "HLD Section 3.10 (Zone 3 PROJECTS INTO Zone 6) / Section 3.7 line 279 (OAQ-16) / Section 3.11 (zones are leaves)",
+      "hld_patterns": ["Observer / Event Bus (async projection-event publish)", "Transactional Outbox (reused from DASH-STORY-006's write-path gate)"],
+      "hld_dsa": "N/A - one-way async event publish, no new data structure introduced.",
+      "required_capabilities": ["python-3.12", "message-queues-core", "event-bus-publish", "async-non-blocking-projection"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.88, "skill_coverage": 0.86, "hld_component_ownership": 0.85, "tech_stack_fit": 1.00},
+          "score": 0.8850,
+          "above_threshold": true,
+          "evidence": "Wiring a durable write-commit to an EventBus projection-event publish, non-blocking and independent of the underlying write's durability (HLD Section 3.7's 'recall degradation, not a data-loss event', OAQ-16), is the same message-queues-core territory python-backend-engineer already owns from DASH-STORY-006's Transactional Outbox gate. Widest margin of the sprint alongside DASH-STORY-019."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.30, "skill_coverage": 0.20, "hld_component_ownership": 0.25, "tech_stack_fit": 0.40},
+          "score": 0.2700,
+          "above_threshold": false,
+          "evidence": "No event-bus/messaging skill; this story has no schema content."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.6150,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no port-interface change, no tenant-isolation logic - a one-way async event publish.",
+      "mathematical_delegation": null,
+      "story_points": 3,
+      "traces_to_fr": "FR-003"
+    },
+    {
+      "story_id": "DASH-STORY-015",
+      "jira_key": "DSHN-64",
+      "title": "Procedural Memory zone (Zone 4) core store, point lookup, and Importance ratio",
+      "hld_component": "HLD Section 3.5 (Zone 4 Procedural Memory) / Section 3.10 (Zone 4 OWNS Procedure) / Section 12G (Importance formula)",
+      "hld_patterns": ["Repository port + adapter (ZoneRepository port)"],
+      "hld_dsa": "O(1) HashMap point-lookup adapter behind the ZoneRepository port (Zone 4 core store), directly parallel to DASH-STORY-002's Zone 1 adapter.",
+      "required_capabilities": ["python-3.12", "dsa-hashmap-point-lookup", "python-design-patterns-core", "message-queues-core", "importance-ratio-computation", "no-similarity-search-contract"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.88, "skill_coverage": 0.85, "hld_component_ownership": 0.84, "tech_stack_fit": 1.00},
+          "score": 0.8795,
+          "above_threshold": true,
+          "evidence": "Directly parallel to DASH-STORY-002 (Zone 1) in Sprint 1: an O(1) HashMap point-lookup adapter behind the ZoneRepository port, an Importance ratio computation (success_count/(success_count+failure_count), no clamp needed), and a projection-event publish - application-layer python-design-patterns-core/dsa-core/message-queues-core work, not schema/index-decisive work. AC-004-2 requires a contract test asserting NO similarity-search method exists on the adapter, an interface-shape guarantee, not a database concern."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.78, "skill_coverage": 0.75, "hld_component_ownership": 0.68, "tech_stack_fit": 0.85},
+          "score": 0.7600,
+          "above_threshold": true,
+          "evidence": "Viable runner-up on schema/index shape, marginal above threshold - weaker on the O(1) HashMap point-lookup adapter and the Importance-ratio config surface."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.1195,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no port-interface change (implements a new adapter behind the existing frozen port), no cross-tenant isolation logic.",
+      "mathematical_delegation": null,
+      "story_points": 5,
+      "traces_to_fr": "FR-004"
+    },
+    {
+      "story_id": "DASH-STORY-016",
+      "jira_key": "DSHN-65",
+      "title": "Zone 4 (Procedural) capacity cap and MaxAge rotation backstop wiring",
+      "hld_component": "HLD Section 12 rotation-parameters table (Zone 4 row) / Section 12C / Section 12F",
+      "hld_patterns": ["Template Method - sweep skeleton (reused from DASH-STORY-009)", "Strategy - per-zone rotation policy"],
+      "hld_dsa": "MemoryScore-ranked sweep predicate wired into DASH-STORY-009's existing bucketed min-heap / timer-wheel sweep engine - no new data structure, reuse of the existing one.",
+      "required_capabilities": ["python-3.12", "sweep-predicate-wiring", "memoryscore-ranked-eviction", "runtime-configuration-surface (capacity cap 50,000, MaxAge 730 days)"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.85, "skill_coverage": 0.82, "hld_component_ownership": 0.80, "tech_stack_fit": 1.00},
+          "score": 0.8520,
+          "above_threshold": true,
+          "evidence": "Structurally the Zone 4 analogue of DASH-STORY-004 (Zone 2 backstop): a sweep predicate wired into the shared rotation-sweep engine, ranked by MemoryScore, with capacity cap (50,000) and MaxAge (730 days) as deployment configuration. This story's own sub-task explicitly says 'wire into the existing deadline-scheduled sweep engine (DASH-STORY-009)' rather than building new bulk-delete/index logic."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.75, "skill_coverage": 0.72, "hld_component_ownership": 0.65, "tech_stack_fit": 0.80},
+          "score": 0.7270,
+          "above_threshold": false,
+          "evidence": "Below threshold this time (unlike DASH-STORY-004's 0.7785 database-engineer showing): this story is explicitly wiring into DASH-STORY-009's existing sweep engine, not a fresh bulk-delete/index design, so it has less standalone schema content than the Zone 2 backstop did."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.1250,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no port-interface change, no tenant-isolation logic, and no DPDP acceptance criterion attached (unlike DASH-STORY-004's AC-002-CAP-DPDP-1).",
+      "mathematical_delegation": {
+        "to": "mathematics-engineer",
+        "model": "opus",
+        "trigger": "Confirmation that the published decay constant (~6.68e-8) is the correct ln(2)/half-life conversion for a 120-day half-life expressed in the sweep engine's time unit.",
+        "position": "Advisory - non-blocking, may run in parallel with implementation."
+      },
+      "story_points": 3,
+      "traces_to_fr": "FR-004"
+    },
+    {
+      "story_id": "DASH-STORY-017",
+      "jira_key": "DSHN-66",
+      "title": "Entity Memory zone (Zone 5) - canonical per-entity attribute store with sub-record provenance and alias Trie resolution",
+      "hld_component": "HLD Section 3.6 (Zone 5 Entity Memory), cross-referenced with Section 3.10 (Data Ownership Map) and Section 3.11 (Dependency Matrix)",
+      "hld_patterns": ["Value Object (immutable per-attribute provenance sub-records)", "Reuse of DASH-STORY-006/AC-010's HTTP 422 rejection contract"],
+      "hld_dsa": "Trie for alias prefix resolution (Zone 5 alias lookup) - HLD Section 3.6.",
+      "required_capabilities": ["python-3.12", "dsa-trie-prefix-resolution", "python-design-patterns-core", "fastapi-core", "sub-record-provenance-write-path", "entity-id-only-cross-zone-reference"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.87, "skill_coverage": 0.85, "hld_component_ownership": 0.82, "tech_stack_fit": 1.00},
+          "score": 0.8725,
+          "above_threshold": true,
+          "evidence": "The story's decisive content is a Trie for alias prefix resolution (dsa-core), a per-attribute sub-record provenance write path implemented as immutable value objects (python-design-patterns-core), and reuse of DASH-STORY-006/AC-010's HTTP 422 rejection contract (fastapi-core) - three python-application-layer capabilities in the same agent that already owns the write-path gate and the Orchestrator facade."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.78, "skill_coverage": 0.74, "hld_component_ownership": 0.72, "tech_stack_fit": 0.85},
+          "score": 0.7645,
+          "above_threshold": true,
+          "evidence": "Viable runner-up and correct owner of the sub-record provenance schema shape (one new provenance record per attribute, no whole-record rewrite) if the work is split."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.1080,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "AC-005-5 reuses (does not modify) DASH-STORY-006's existing Zone 7 write-path rejection contract and does not itself write to Zone 7. No ZoneRepository port-interface change, no cross-tenant isolation claim.",
+      "mathematical_delegation": null,
+      "story_points": 8,
+      "traces_to_fr": "FR-005"
+    },
+    {
+      "story_id": "DASH-STORY-018",
+      "jira_key": "DSHN-67",
+      "title": "Zone 8 Consolidation store - object-store blobs with hot manifest index (ADR-009)",
+      "hld_component": "HLD Section 3.9 (Zone 8, ConsolidatedBlob) / ADR-009 Section 4 (storage adapter decision) / Section 3.10 (RECEIVES rule, Hard Rule 1)",
+      "hld_patterns": ["Adapter (object-store per ADR-009)", "Circuit Breaker-style degraded-mode handling when the object store is unavailable"],
+      "hld_dsa": "Hot PostgreSQL manifest index with a single-lookup-plus-one-ranged-GET resolution path (AC-008-1) - HLD Section 3.9 / ADR-009.",
+      "required_capabilities": ["python-3.12", "object-store-adapter (ADR-009)", "circuit-breaker-degraded-mode", "tenant-uniformity-merge-assertion", "rdbms-core (hot manifest index)", "cross-tenant-isolation"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.85, "skill_coverage": 0.82, "hld_component_ownership": 0.78, "tech_stack_fit": 1.00},
+          "score": 0.8480,
+          "above_threshold": true,
+          "evidence": "Three of the story's four Dev sub-bullets (object-store adapter per ADR-009, tenant-uniformity merge assertion, degraded-mode/circuit-breaker-style handling when the object store is unavailable) are application-layer ports-and-adapters and error-handling-patterns work, the same profile that won python-backend-engineer DASH-STORY-002 in Sprint 1. Narrowest margin in Sprint 2 (0.0575), comparable to DASH-STORY-004's 0.0735 in Sprint 1."
+        },
+        {
+          "agent": "database-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.80, "skill_coverage": 0.78, "hld_component_ownership": 0.75, "tech_stack_fit": 0.85},
+          "score": 0.7905,
+          "above_threshold": true,
+          "evidence": "Genuine co-owner candidate: the hot PostgreSQL manifest index and its single-lookup-plus-one-ranged-GET resolution path (AC-008-1) is squarely rdbms-core/performance-optimization territory."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.0575,
+      "p1_security_review": true,
+      "p1_trigger_evaluation": "TRIGGERED on the literal cross-tenant-isolation criterion. AC-008-3 requires that a consolidation merge batch spanning more than one tenant_id fails that batch rather than completing a cross-tenant merge, directly tied to HLD threat I-5 - a direct match to the stated criterion, not an analogical extension.",
+      "p1_reviewer": {
+        "agent": "api-security-auditor",
+        "model": "sonnet",
+        "review_fit_score": 0.80,
+        "review_fit_signals": {"domain_match": 0.83, "skill_coverage": 0.80, "hld_component_ownership": 0.76, "tech_stack_fit": 0.78},
+        "review_scope": "Adversarially test the tenant-uniformity merge assertion with mixed-tenant batches, confirm the batch fails closed rather than only logging a warning.",
+        "maker_checker": "Reviewer is distinct from implementer (python-backend-engineer). Story cannot close on the implementer's report alone. Confirmed mandatory, not waived, by user decision SP2-DEC-005 (2026-09-20)."
+      },
+      "mathematical_delegation": null,
+      "story_points": 8,
+      "traces_to_fr": "FR-008"
+    },
+    {
+      "story_id": "DASH-STORY-019",
+      "jira_key": "DSHN-68",
+      "title": "Compressed to Archived rotation transition completion",
+      "hld_component": "HLD Section 12A per-zone policy table (Zone 8 row) / Section 12B.2-12B.3 (ArchiveThreshold=0.25) / Section 12C / ADR-012",
+      "hld_patterns": ["State Machine (reused from DASH-STORY-009)", "Template Method - sweep skeleton (reused from DASH-STORY-009)"],
+      "hld_dsa": "Reuses DASH-STORY-009's bucketed min-heap timer wheel and DASH-STORY-010's O(log N) deadline re-insert - no new data structure introduced by this story.",
+      "required_capabilities": ["python-3.12", "state-machine-transition-completion", "deadline-invalidation-consumption", "archive-threshold-gating (fixed 0.25)"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.90, "skill_coverage": 0.87, "hld_component_ownership": 0.86, "tech_stack_fit": 1.00},
+          "score": 0.8965,
+          "above_threshold": true,
+          "evidence": "This story closes the gap DASH-STORY-009 deliberately deferred (Archived transition), on the SAME State Machine and Template Method sweep skeleton python-backend-engineer already built in DASH-STORY-009, and consumes DASH-STORY-010's non-stale deadline-invalidation wiring (AC-008-ROT-4). Same-agent continuity across all three stories removes the cross-agent handoff risk this story's own AC depends on. Widest margin in Sprint 2."
+        },
+        {
+          "agent": "algorithm-complexity-analyst",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.45, "skill_coverage": 0.40, "hld_component_ownership": 0.32, "tech_stack_fit": 0.30},
+          "score": 0.3840,
+          "above_threshold": false,
+          "evidence": "Same profile as ar1_assignments.json's DASH-STORY-009/010 showing - can verify complexity claims, cannot implement the transition."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.5125,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no port-interface change, no tenant-isolation claim - a rotation-engine extension consuming already-established Zone 8 write paths from DASH-STORY-018 (whose own P1 review already covers the cross-tenant risk on the write side).",
+      "mathematical_delegation": null,
+      "story_points": 5,
+      "traces_to_fr": "FR-008"
+    },
+    {
+      "story_id": "DASH-STORY-020",
+      "jira_key": "DSHN-69",
+      "title": "DPDP erasure-cascade reach into Zone 8 archives plus India residency and crypto-shredding",
+      "hld_component": "HLD Section 7.4 (DELETE /v1/tenants/{id}/subjects/{subject_id}) / Section 10 DPDP-2/DPDP-3/DPDP-4 / ADR-009 India Layer",
+      "hld_patterns": ["Continuity of Zone 8 adapter ownership (from DASH-STORY-018); no new structural pattern introduced by this story"],
+      "hld_dsa": "Per-subject cryptographic key lifecycle (generation/storage/destruction, i.e. crypto-shredding) plus the subject_id secondary index (ADR-006) on the Zone 8 manifest table, required for the erasure-cascade lookup.",
+      "required_capabilities": ["python-3.12", "application-security-core", "per-subject-key-lifecycle-crypto-shredding", "india-region-bucket-provisioning (advisory review)", "dpdp-erasure-cascade-endpoint"],
+      "candidates": [
+        {
+          "agent": "python-backend-engineer",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.78, "skill_coverage": 0.72, "hld_component_ownership": 0.68, "tech_stack_fit": 0.95},
+          "score": 0.7645,
+          "above_threshold": true,
+          "evidence": "Marginal - clears threshold on application-security-core plus continuity ownership of the Zone 8 adapter from DASH-STORY-018, but carries neither cryptography-core nor india-cyber-regulatory-core, so key-lifecycle design correctness and residency-policy correctness are not independently verified by this agent's own skills. Most marginal above-threshold assignment in Sprint 2."
+        },
+        {
+          "agent": "cloud-security-architect",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.55, "skill_coverage": 0.50, "hld_component_ownership": 0.30, "tech_stack_fit": 0.40},
+          "score": 0.4600,
+          "above_threshold": false,
+          "evidence": "Carries data-security-privacy-core and india-cyber-regulatory-core (a strong fit for the residency/DPDP half), but its frontmatter tools list has no Edit - a CSPM/policy-design and audit role, not an implementer of blob-read-path key integration."
+        },
+        {
+          "agent": "crypto-security-specialist",
+          "model": "sonnet",
+          "signals": {"domain_match": 0.50, "skill_coverage": 0.45, "hld_component_ownership": 0.25, "tech_stack_fit": 0.35},
+          "score": 0.4100,
+          "above_threshold": false,
+          "evidence": "Carries cryptography-core and india-cyber-regulatory-core (correct skills for crypto-shredding correctness), but is explicitly a Phase F adversarial AUDIT agent with no Edit tool - review-only, not an implementer."
+        }
+      ],
+      "assigned_agent": "python-backend-engineer",
+      "margin": 0.3045,
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "Considered and NOT triggered under the literal three P1 criteria: does not touch Zone 7 itself, implements adapter-internal behavior behind the existing frozen ZoneRepository port rather than modifying the port interface, and in-region bucket provisioning is data-residency rather than cross-tenant isolation. Routed instead to a non-blocking advisory-review routing gap (AR1-S2-G1).",
+      "advisory_review": {
+        "status": "ACCEPTED by user 2026-09-19 (SP2-DEC-001). Not yet run.",
+        "agent": "crypto-security-specialist",
+        "model": "sonnet",
+        "review_scope": "Adversarially review the per-subject cryptographic key generation/storage/destruction (crypto-shredding) design and the blob-read-path key integration against cryptography-core. Non-blocking, not a P1 Maker-Checker gate.",
+        "maker_checker": false
+      },
+      "advisory_review_2": {
+        "status": "ACCEPTED by user 2026-09-20 (SP2-DEC-002). Not yet run.",
+        "agent": "cloud-security-architect",
+        "model": "sonnet",
+        "review_scope": "India in-region bucket provisioning, versioning/object-lock configuration, and per-tenant residency-policy correctness against india-cyber-regulatory-core.",
+        "maker_checker": false
+      },
+      "mathematical_delegation": null,
+      "story_points": 5,
+      "traces_to_fr": "FR-008"
+    }
+  ],
+  "index_level_findings": [
+    {
+      "id": "AR0-S2-F1",
+      "severity": "INFO",
+      "finding": "9 of 9 Sprint 2 stories (DASH-STORY-012..020) have at least one candidate at or above the 0.75 threshold; no story required a force-assignment or a below-threshold fallback. DASH-STORY-020 has the most marginal above-threshold score in the sprint (python-backend-engineer, 0.7645) - see AR0-S2-F4."
+    },
+    {
+      "id": "AR0-S2-F2",
+      "severity": "WARNING",
+      "finding": "python-backend-engineer is the top-scoring (and assigned) candidate on 8 of 9 Sprint 2 stories (013, 014, 015, 016, 017, 018, 019, 020) - 42 of 47 story points, 89% concentration - sharper than Sprint 1's already-flagged 64% (AR0-F2). Combined with Sprint 1, python-backend-engineer now holds 15 of 20 stories across both sprints (75%). This is a system-design bottleneck finding, not a routing defect: the HLD locks one Python 3.12 codebase, so concentration is the honest scoring result. The user reviewed a rebalance option (SP2-DEC-004, 2026-09-20) and deferred it rather than reassigning - database-engineer's above-threshold showings on DASH-STORY-015 (0.7600), DASH-STORY-017 (0.7645) and DASH-STORY-018 (0.7905) remain a pre-scored fallback roster if python-backend-engineer becomes the critical path during Phase B execution grouping."
+    },
+    {
+      "id": "AR0-S2-F3",
+      "severity": "WARNING",
+      "finding": "The database-storage-engineer name-similarity trap was scored and explicitly rejected again on DASH-STORY-012 (0.2875, below threshold) - the identical rejection reasoning ar0_routing_index.json applied to it for DASH-STORY-002 in Sprint 1 (builds a database's own storage-engine internals, not application-layer schema on top of PostgreSQL). Recorded with its score so a later reviewer sees the rejection was measured, not assumed."
+    },
+    {
+      "id": "AR0-S2-F4",
+      "severity": "HIGH",
+      "finding": "DASH-STORY-020 (DSHN-69) has a single valid implementer (python-backend-engineer, 0.7645 - the most marginal above-threshold score in Sprint 2) for a story whose decisive content is per-subject cryptographic key lifecycle management and India data-residency bucket provisioning. Neither cloud-security-architect (0.4600, right skills - data-security-privacy-core, india-cyber-regulatory-core - but no Edit tool) nor crypto-security-specialist (0.4100, right skills - cryptography-core, india-cyber-regulatory-core - but no Edit tool, explicitly audit-only) clears threshold as an IMPLEMENTER. Neither would be a compliant force-assignment (both below 0.75 AND structurally lack an Edit tool). The user accepted this implementer risk and authorized both non-blocking advisory reviews (SP2-DEC-001 on 2026-09-19, SP2-DEC-002 on 2026-09-20); OAQ-10's legal question (whether crypto-shredding satisfies DPDP Act 2023 erasure) stays explicitly open regardless of either review's outcome. Tracked as routing gap AR1-S2-G1 in the upstream assignment file."
+    },
+    {
+      "id": "AR0-S2-F5",
+      "severity": "INFO",
+      "finding": "The P1 security override (Maker-Checker gate, reviewer distinct from implementer) fired for exactly one Sprint 2 story: DASH-STORY-018, on the literal cross-tenant-isolation criterion (AC-008-3 / HLD threat I-5) - a direct, non-analogical match, confirmed mandatory and not waived by user decision SP2-DEC-005 (2026-09-20). DASH-STORY-020 was considered against the same three literal P1 criteria and did NOT trigger (it touches Zone 8, not Zone 7; it implements adapter-internal behavior behind the existing frozen ZoneRepository port rather than modifying the port interface; and in-region bucket provisioning is data-residency, not cross-tenant isolation) - it was routed to a non-blocking advisory review instead of an invented P1 extension, the same discipline ar1_assignments.json applied to DASH-STORY-003's DPDP obligation in Sprint 1 (AR1-G3)."
+    },
+    {
+      "id": "AR0-S2-F6",
+      "severity": "INFO",
+      "finding": "Two of the sprint's three narrowest margins involve database-engineer as a genuine above-threshold co-owner rather than a coverage gap: DASH-STORY-018 (0.0575 margin, python-backend-engineer 0.8480 vs database-engineer 0.7905) and, more loosely, DASH-STORY-015 (0.1195) and DASH-STORY-017 (0.1080). All three are preference decisions, not coverage gaps, and are pre-scored for a rebalance without a new AR.0-equivalent scoring pass if needed (see AR0-S2-F2)."
+    }
+  ]
+}
