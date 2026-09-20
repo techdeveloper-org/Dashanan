@@ -8,7 +8,7 @@
   "depends_on": [
     "docs/phase-7-routing/sprint2_ar1_assignments.json v1.2.0",
     "docs/phase-6-sprint-planning/backlog_draft.json v1.1.0 (sprint_2_stories DASH-STORY-012..020)",
-    "docs/phase-1-architecture/HLD.md v1.2.0 (Sections 3.4-3.11, 7.4, 8.4, 10, 12A-12G; ADR-006, ADR-009, ADR-012)",
+    "docs/phase-1-architecture/HLD.md v1.0.0 (Sections 3.4-3.11, 7.4, 8.4, 10, 12A-12G; ADR-006, ADR-009, ADR-012)",
     "docs/phase-7-routing/ar3_context_windows.json v1.0.0 (classification model and per-story context-window method reused verbatim from Sprint 1; not re-derived)"
   ],
   "methodology_reuse_note": "Same per-story context-window design method as ar3_context_windows.json: sources are the exact HLD section / SRS-AC / backlog-AC / AR1 must-not-deviate citations the story's own routing record names, never invented additions. context_budget_tokens is a judgment call scaled to how much real source content (HLD prose + pseudocode/tables, ACs, must_not_deviate items, cross-references) the story actually cites, following the same 3500-7000 band Sprint 1 used, not a fixed formula.",

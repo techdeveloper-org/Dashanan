@@ -17,8 +17,9 @@
   Phase 7 baseline computation, where C-2 had not produced a directly comparable FactScore and
   its RAGAS Faithfulness score was used as a conservative proxy for b).
 - c (1-ECE, calibration): **N/A** — no logit/confidence calibration data exists pre-Phase-B.
-- d (DRE / Coverage): **N/A** — no code or tests exist yet; Phase B (implementation) is
-  explicitly out of scope for this entire project bundle.
+- d (DRE / Coverage): **N/A** — no Sprint 2 code or tests exist yet (Sprint 1's code/tests do
+  exist and are unaffected — this component is scoped to Sprint 2, whose Phase B implementation
+  is explicitly out of scope for this document).
 
 ## Computation
 Phase-7-scoped RS (2-component geometric mean of the genuinely measurable components a, b):
