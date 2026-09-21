@@ -101,7 +101,7 @@ methodology, against the full 6-story set — every story, every citation, non-s
   Sprint 1 nor Sprint 2 has a `pii_note` describing a network-facing-host or
   production-credential exclusion) — verified true, not merely asserted.
 - Context-source citation accuracy: exact match after the two fixes above (both reviewers
-  independently confirmed, 6/6 stories, 62 individual `sources[]` entries).
+  independently confirmed, 6/6 stories, 71 individual `sources[]` entries -- corrected 2026-09-21 from a miscount of 62; see the Addendum below).
 
 **Verdict: PASS after resolution.** Same discipline as Sprint 1's and Sprint 2's rounds: two
 real findings found by genuine, non-sampled, source-level review (a fabricated/inconsistent
@@ -121,7 +121,7 @@ that they are the sprint's highest-novelty, highest-citation-density entries.
   fully entailed by their named real sources after the operationId-count and role-name
   corrections; 0 remaining contradictions or unsupported claims)
 - **FactScore (RAG atomic-fact check): 1.00 after fix** (every checked claim — 6 story
-  routings, 62 context-source list entries, 16 acceptance-criteria entries, 6 must-not-deviate
+  routings, 71 context-source list entries (corrected from 62, see Addendum), 16 acceptance-criteria entries, 6 must-not-deviate
   sets, all quoted HLD/SRS/openapi.yaml/schema-SQL/source-code passages, all source-code
   line-number citations — traced to and supported by real content in
   `sprint3_ar1_assignments.json` / `sprint3_ar3_context_windows.json` / `HLD.md` / `SRS.md` /
@@ -142,7 +142,7 @@ that they are the sprint's highest-novelty, highest-citation-density entries.
 ## C-2: context-faithfulness-engineer
 
 - **RAGAS Context Precision: 1.00** (6/6 stories, 0 extraneous citations)
-- **RAGAS Context Recall: 1.00** (62/62 `sources[]` entries reproduced against real, traceable
+- **RAGAS Context Recall: 1.00** (71/71 `sources[]` entries reproduced against real, traceable
   content)
 - **RAGAS Faithfulness (citation-verbatim dimension): 1.00 after fix** (no story's `sources[]`
   or `pii_note` contains an invented/paraphrased source label after the two corrections above)
@@ -188,3 +188,50 @@ type would check instead). Once Phase B produces real code and a
 `sprint3_implementation_execution_plan.json`-driven CoT prompt set for these stories, that
 artifact is the correct target for a Sprint-3-implementation Phase C pass, not a re-run of this
 routing-level gate.
+
+
+## Addendum (2026-09-21) — External review findings, post-hoc reconciliation
+
+An external review of this Phase 6 planning pass (human review, 2026-09-21) found 7 real
+defects beyond this gate's original scope, all independently verified and fixed:
+
+1. **Source-count miscount (this document)**: the "62 individual `sources[]` entries" figure
+   used throughout this document was wrong. A script-based recount of
+   `sprint3_ar3_context_windows.json`'s 6 `context_windows[].sources[]` arrays gives
+   `11+11+7+15+13+14 = 71`, not 62. IR.1 had already disclosed this exact discrepancy
+   (IR1-S3-F3) as a LOW-severity finding it lacked edit authority to fix in this document;
+   the external review correctly flagged it as still unfixed. All "62" occurrences in this
+   file are now corrected to 71.
+2. **Agent-field drift (AR.3, execution plan)**: after this gate ran, the user's own follow-up
+   decisions (SP3-DEC-103/106/107, applied 2026-09-20) updated `sprint3_ar1_assignments.json`'s
+   `assigned_agent` fields for DASH-STORY-021/011/024, but `sprint3_ar3_context_windows.json`
+   and `sprint3_implementation_execution_plan.json` were not fully re-synced at the time —
+   this gate's own scope (AR.1/AR.3 citation faithfulness) predates that drift and did not
+   catch it, since it was introduced afterward, not present when this gate ran. Now fixed:
+   both files' `assigned_agent`/`implementing_agent` fields, and the execution plan's actual
+   prompt-body persona headers, match AR.1's current (post-decision) assignments.
+3. **Stale "29 operationIds" inside the execution plan's own prompt bodies**: this gate's
+   original fix pass corrected `sprint3_ar1_assignments.json` and
+   `sprint3_ar3_context_windows.json` (the files in its authorized edit scope) but never
+   checked `sprint3_implementation_execution_plan.json`, which had already been generated
+   from the pre-fix AR.1/AR.3 content and carried the same stale "29" text forward into 3
+   locations across its DASH-STORY-023 prompt bodies. Now fixed to 32.
+4. **Stale `dashanan_app_role` inside the execution plan's own prompt bodies**: same root
+   cause as (3) — the execution plan's DASH-STORY-024 prompts (including AC-024-2's own text)
+   still named the pre-DSHN-60 role `dashanan_app_role` in 3 locations. Now corrected to name
+   `dashanan_provenance_role`/`dashanan_episodic_role`/`dashanan_schema_owner` with an inline
+   explanation, matching AR.1's already-corrected AC-024-2 text.
+5. **Decision-status drift**: `sprint3_ar1_assignments.json`'s `open_user_decisions` were marked
+   ANSWERED after the user's 2026-09-20 follow-up round, but this gate document and
+   `sprint3_ir1_agent_flags.json` (both written before that round) still read as if all 7
+   decisions were open. See `sprint3_ir1_agent_flags.json`'s own 2026-09-21 addendum for the
+   corrected execution-readiness statement.
+6. **RS recomputation**: see `sprint3-ar5-rs-computation.md`'s own 2026-09-21 addendum.
+7. **QA prompt genericness**: reviewed separately; see execution plan file's own per-story QA
+   prompts, narrowed where found overly generic.
+
+All fixes applied directly to the affected files (`sprint3_ar3_context_windows.json`,
+`sprint3_implementation_execution_plan.json`), re-validated as syntactically correct JSON. This
+document's own substantive PASS verdict for the AR.1/AR.3 citation-faithfulness check it actually
+performed is unchanged — items 2-4 above are scope gaps (this gate never checked the execution
+plan file), not errors in what it did check.

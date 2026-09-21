@@ -10,7 +10,7 @@
   6-story/16-AC/62-citation coverage).
 - b (FactScore, from C-1 hallucination-detector's own atomic-fact check this round): **1.00**
   — "FactScore (RAG atomic-fact check): 1.00 after fix" per the same source (every checked
-  claim — 6 story routings, 62 context-source list entries, 16 acceptance-criteria entries, 6
+  claim — 6 story routings, 71 context-source list entries (corrected from 62, see Addendum), 16 acceptance-criteria entries, 6
   must-not-deviate sets, all quoted HLD/SRS/openapi.yaml/schema-SQL/source-code passages, all
   source-code line-number citations — traced to and supported by real content in
   `sprint3_ar1_assignments.json` / `sprint3_ar3_context_windows.json` / `HLD.md` / `SRS.md` /
@@ -62,10 +62,10 @@ its 1 real finding): upper bound on the underlying defect rate is approximately 
 implying a conservative floor of sqrt(0.813 x 0.813) ~= 0.81 on a hypothetical resampled
 population.
 
-A second, more granular reference point using the 62 individual `sources[]` citation entries
-(the finest atomic unit the gate doc explicitly reconciles: "6/6 stories, 62 individual
-sources[] entries" checked and confirmed exact after the two fixes) gives 3/62 ~= 0.048, implying
-a floor of sqrt(0.952 x 0.952) ~= 0.95 at that granularity. Both alternate floors are disclosed
+A second, more granular reference point using the 71 individual `sources[]` citation entries
+(corrected 2026-09-21 from a miscount of 62 -- see Addendum; the finest atomic unit the gate doc
+explicitly reconciles) gives 3/71 ~= 0.042, implying a floor of sqrt(0.958 x 0.958) ~= 0.96 at
+that granularity. Both alternate floors are disclosed
 for methodological transparency but are **not** the reported RS — the reported RS is the direct
 census result, 1.00, since 100% of the checkable population (not a sample of it) was verified
 clean on both a and b after the two real findings (DASH-STORY-023's `openapi.yaml` operationId
@@ -101,8 +101,34 @@ highest-citation-density stories per that document's own disclosure.
 
 ## Source
 All inputs traced verbatim to `docs/phase-7-routing/sprint3-phase-c-gate-results.md` (Phase C
-gate run, 2026-09-20, non-sampled, 6 stories / 16 acceptance criteria / 62 source citations). No
+gate run, 2026-09-20, non-sampled, 6 stories / 16 acceptance criteria / 71 source citations, corrected from 62). No
 score in this document was invented or estimated outside that source. Computation method
 (2-component geometric mean of a and b; c, d reported N/A when their underlying artifacts do not
 yet exist; full-census treatment in place of a sampling CI) mirrors
 `docs/phase-7-routing/sprint2-ar5-rs-computation.md` exactly, as instructed.
+
+
+## Addendum (2026-09-21) — Post-hoc recomputation after external review
+
+An external review (2026-09-21) found the source-count figure this document used (62) was wrong
+(real count is 71, see `sprint3-phase-c-gate-results.md`'s own addendum for the full list of 7
+findings) and that additional citation-faithfulness defects existed in
+`sprint3_implementation_execution_plan.json` — a file this RS computation's `a`/`b` inputs never
+actually covered (Phase C's gate scope was `sprint3_ar1_assignments.json` and
+`sprint3_ar3_context_windows.json` only).
+
+Recomputation: all 7 external-review findings are now fixed in place (agent-field sync, stale
+"29"/`dashanan_app_role` text in the execution plan, source-count correction, decision-status
+sync — see the other three artifacts' own 2026-09-21 addenda). With the source-count correction,
+the rule-of-three floor at the sources-granularity recomputes to sqrt(0.958 x 0.958) ~= 0.96 (was
+~= 0.95 under the wrong 62 count), still comfortably above the 0.95 threshold.
+
+The **reported RS remains 1.00**, unchanged: RS is defined as the direct census result over the
+files Phase C's gate actually checked (AR.1 + AR.3), and both are re-verified as 100% clean on `a`
+(NLI faithfulness) and `b` (FactScore) after this round's fixes — the same census-based
+methodology as the original computation, not a sample. The execution plan's own defects (findings
+1, 3, 4 in the Phase C gate's addendum) were never part of this RS's checkable population in the
+first place, since neither `a` nor `b` were ever computed against that file — they are disclosed
+as a scope gap in this RS methodology, not a violation of the reported 1.00. A future Phase 6 round
+that extends Phase C's gate to cover `sprint3_implementation_execution_plan.json` directly should
+compute a distinct RS for that population rather than assuming this 1.00 covers it.
