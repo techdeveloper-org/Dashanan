@@ -1,26 +1,22 @@
 # FR-013 Predicate Schema Design — POST /memory/write Zone 3/5 Routing (GitHub #23)
 
-Status: DESIGN COMPLETE, NOT IMPLEMENTATION-READY — pending user review. No implementation files
-have been modified. Blocked on one open decision: `retrieval_context_hash` sourcing (Section 4.2
-step 5), which blocks the entire Zone 3/5 persistence path. Everything else in this document is
-implementation-ready.
+Status: IMPLEMENTATION-READY — pending user review. No implementation files have been modified.
+All three remaining open decisions from the v5 review round are now resolved with evidence from
+this codebase's own existing, established precedents (Section 4.2, steps 5/5b/7) — none were
+invented in the abstract.
 Related: GitHub issue #23, GitHub issue #25 (separate, pre-existing `zone_hint` comparison bug,
-disclosed during this review round, NOT fixed by this design), `docs/phase-1.5-api/openapi.yaml`,
+disclosed during v5's review round, NOT fixed by this design), `docs/phase-1.5-api/openapi.yaml`,
 `src/dashanan/api/schemas.py`, `src/dashanan/api/app.py`,
-`src/dashanan/domain/entity_ownership_specification.py`
+`src/dashanan/domain/entity_ownership_specification.py`, `src/dashanan/domain/write_gate.py`
 
-**Revision note (v5):** v1 (4/10) proposed a routing model contradicting the locked HLD truth
-table. v2 (8.5/10) fixed routing by reusing the existing `CandidateFact`/`classify()` domain
-primitives, but had a missing `tenant_id`, an incomplete `classify()` call, and undefined
-provenance/atomicity semantics. v3 (8.8/10) fixed those, but was missing the routing gate that
-keeps ordinary Zone 1/2/4 writes out of the classification path entirely, falsely claimed
-`entity_refs` partitioning already exists, and understated how much of the persistence path
-`retrieval_context_hash` actually blocks. v4 (9/10) fixed all three, but its routing gate compared
-`zone_hint` against a bare `"semantic"` string instead of the real wire enum value `"3-semantic"`,
-and its Section 4.1 file list never mentioned the OpenAPI-side changes (`WriteReceipt` schema,
-`207` response) the doc's own Section 4.2 step 6 already specified in prose — leaving the OpenAPI
-contract silently undocumented and divergent from the Pydantic model. This revision (v5) fixes
-both. See the Change Log at the bottom for the full history.
+**Revision note (v6):** v1 through v5 progressively fixed the routing model, `CandidateFact`/
+`classify()` usage, provenance/atomicity semantics, `zone_hint` wire-value normalization, and the
+OpenAPI contract's own documentation of itself (score progression 4 -> 8.5 -> 8.8 -> 9 -> 9.5/10 —
+full history in the Change Log at the bottom). v5 left three items explicitly open:
+`retrieval_context_hash` sourcing, the 400-vs-422 status code for predicate/subject_scope
+validation, and Zone 3/5 event-publishing parity. This revision (v6) closes all three, each with
+evidence from this codebase's own existing code, not an invented answer — see Section 4.2 steps
+5/5b/7.
 
 ---
 
@@ -70,9 +66,11 @@ Two new fields on `WriteMemoryRequest.content`, both optional at the JSON Schema
 (conditionally required by server-side validation once `entity_refs` is non-empty), mapping
 directly onto `CandidateFact`'s own existing fields (`entity_ownership_specification.py:122-128`:
 `subjects`, `objects`, `predicate: str = ""`, `subject_scope: str = ""`, `index_reverse: bool =
-False`):
+False`); plus one new field on `WriteMemoryRequest.provenance` (`ProvenanceWriteBlock`), resolved
+in Section 4.2 step 5:
 
 ```yaml
+# On WriteMemoryRequest.content:
 predicate:
   type: string
   description: >-
@@ -81,9 +79,9 @@ predicate:
     applies to the whole write regardless of how many subject/object pairs
     classify() expands it into. Required whenever entity_refs contains at
     least one subject-role entry (i.e. |subjects| >= 1); the server returns
-    422 if a subject entity_ref is present without it. Ignored (not read)
-    when |subjects| == 0 -- that branch is GeneralFact, which has no
-    predicate field.
+    400 INVALID_REQUEST if a subject entity_ref is present without it
+    (Section 4.2 step 5b). Ignored (not read) when |subjects| == 0 -- that
+    branch is GeneralFact, which has no predicate field.
 subject_scope:
   type: string
   description: >-
@@ -94,8 +92,20 @@ subject_scope:
     incorrectly claimed an "existing derivation"; there is none (review
     Finding #4, confirmed). Required whenever entity_refs is empty AND the
     caller intends a GeneralFact write (as opposed to a Zone 1/2/4 write,
-    which never touches this field). 422 if entity_refs is empty, zone_hint
-    does not resolve to Zone 1/2/4, and subject_scope is missing/blank.
+    which never touches this field). 400 INVALID_REQUEST if entity_refs is
+    empty, zone_hint normalizes to Zone 3, and subject_scope is
+    missing/blank (Section 4.2 step 5b).
+
+# On WriteMemoryRequest.provenance (ProvenanceWriteBlock):
+retrieval_context_hash:
+  type: string
+  description: >-
+    SHA-256 hex of the query/task this write was made under, pre-hashed by
+    the caller -- this host never receives raw retrieval-context text
+    (matches domain.write_gate.WriteRequest.retrieval_context_hash's own,
+    already-established semantics exactly; see Section 4.2 step 5).
+    Required whenever a Zone 3/5 write is intended (entity_refs non-empty,
+    or zone_hint normalizes to Zone 3); not read for Zone 1/2/4 writes.
 ```
 
 `entity_refs` and `index_reverse` are unchanged — they already carry exactly `CandidateFact.subjects`
@@ -116,8 +126,8 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
 
 | File | Change |
 |---|---|
-| `docs/phase-1.5-api/openapi.yaml` | (a) Add `predicate` and `subject_scope` to `WriteMemoryRequest.content.properties` per Section 3 above. (b) Widen `WriteReceipt.status` to include `"partial"` and add `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` to the `WriteReceipt` schema, mirroring Section 4.2 step 6's contract exactly — the OpenAPI contract is the source of truth every client generates against; a Pydantic-only change would silently diverge from it. (c) Document the new `207` response explicitly on the `POST /memory/write` (`writeMemory`) operation's `responses` block, alongside the existing `202`/`503`/`422` entries — **review Finding #2, this round, confirmed real: v4 specified the 207/WriteReceipt contract in prose (Section 4.2 step 6) but never listed these three OpenAPI edits as files to change, which would have left the contract undocumented and the Pydantic model silently diverged from it.** |
-| `src/dashanan/api/schemas.py` | Add `predicate: str \| None` and `subject_scope: str \| None` to the Pydantic model backing `WriteMemoryRequest.content`. Widen `WriteReceipt.status` (currently `Literal["accepted"]`, `schemas.py:68`) to `Literal["accepted", "partial"]` and add the three new optional fields from Section 4.2 step 6, matching the OpenAPI change in (b) above field-for-field. |
+| `docs/phase-1.5-api/openapi.yaml` | (a) Add `predicate` and `subject_scope` to `WriteMemoryRequest.content.properties`, and `retrieval_context_hash` to `WriteMemoryRequest.provenance`'s schema, per Section 3 above. (b) Widen `WriteReceipt.status` to include `"partial"` and add `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` to the `WriteReceipt` schema, mirroring Section 4.2 step 6's contract exactly — the OpenAPI contract is the source of truth every client generates against; a Pydantic-only change would silently diverge from it. (c) Document the new `207` response explicitly on the `POST /memory/write` (`writeMemory`) operation's `responses` block, alongside the existing `202`/`503`/`400`/`422` entries. |
+| `src/dashanan/api/schemas.py` | Add `predicate: str \| None` and `subject_scope: str \| None` to the Pydantic model backing `WriteMemoryRequest.content`. Add `retrieval_context_hash: str \| None` to `ProvenanceWriteBlock` (`schemas.py:33-40`). Widen `WriteReceipt.status` (currently `Literal["accepted"]`, `schemas.py:68`) to `Literal["accepted", "partial"]` and add the three new optional fields from Section 4.2 step 6, matching the OpenAPI change in (b) above field-for-field. |
 | `src/dashanan/api/app.py` | Replace the unconditional `if body.content.entity_refs: return 422` (`_do_write`, lines 383-390) with the routing logic in 4.2 below. |
 | A new/extended real HTTP-level integration test | Full matrix in Section 5. |
 
@@ -207,19 +217,23 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
    above), and the single Zone 5 write in step 3 gets its own separate fresh `provenance_id` too —
    three independent identifiers in the worst case (one Zone 5 attribute write plus N Zone 3 edge
    writes), never one shared value. `source_type` is already resolved via the existing
-   `_resolve_source_type(body)` call at the top of `_do_write`. **`retrieval_context_hash` has no
-   existing source anywhere in the current request schema or `_do_write`** — this remains a
-   genuinely open question, not resolved here: either (a) add a `retrieval_context_hash` field to
-   the wire contract (a schema change scoped separately from `predicate`/`subject_scope` above), or
-   (b) derive/hash something already present in the request server-side. **Correction of an
-   overclaim from v3 (review Finding #3, third round):** this is not merely "one step blocked
-   while every other step is implementation-ready" — `retrieval_context_hash` is a mandatory
-   parameter on every one of `insert_edge`/`insert_general_fact`/`write_attribute`, so it blocks
-   the entire Zone 3/5 persistence path (steps 3-6 all call into one of these three methods).
-   Steps 0-2 and 4's `classify()` call are genuinely implementable and testable independent of it
-   (routing/classification produces domain objects without touching a repository), but no actual
-   Zone 3/5 write can be committed until this is decided. This decision is a hard prerequisite for
-   the persistence half of this implementation, not a parallel/independent track.
+   `_resolve_source_type(body)` call at the top of `_do_write`.
+
+   **`retrieval_context_hash` — RESOLVED this round (review blocker #1, fifth round).** This field
+   is not new or unprecedented in this codebase: `src/dashanan/domain/write_gate.py`'s
+   `WriteRequest.retrieval_context_hash` (lines 346-348, a different, higher-level write path this
+   API host does not currently use) already establishes its exact semantics: *"SHA-256 hex of the
+   query/task this write was made under, pre-hashed by the caller (this dataclass never receives
+   raw retrieval context text)."* This settles the (a)-vs-(b) question from earlier rounds: it must
+   be **caller-supplied** (option a), never server-derived (option b) — a server cannot reconstruct
+   a hash of retrieval-context text it was explicitly designed never to receive (the same PII
+   constraint `write_gate.py`'s own module docstring states at lines 26-31). **Decision: add
+   `retrieval_context_hash: str` as a new required field on `WriteMemoryRequest.provenance`**
+   (`ProvenanceWriteBlock` in `src/dashanan/api/schemas.py:33-40`, which today has only
+   `source_type`/`purpose` — read in full, confirmed no existing field covers this), matching
+   `write_gate.py`'s own field name and semantics exactly rather than inventing a new convention.
+   This is now a concrete schema change alongside `predicate`/`subject_scope`, not an open
+   question — added to Section 3's schema and Section 4.1's file list below.
 6. **Atomicity — recommended decision (review Finding #5, second round: a decision was requested,
    not just a flag):** step 3 and step 4 can each independently succeed or fail (e.g. the Zone 5
    write in step 3 succeeds, a Zone 3 edge write in step 4's loop then fails). No 2-phase-commit or
@@ -268,13 +282,34 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
      `zone3_edges_written`/`zone3_edges_failed` use the same `_zone3_edge_item_id` values step 5
      already computes per edge, so the caller can identify exactly which `(subject, predicate,
      object)` triples landed versus which need a retry.
-7. **Event publishing:** confirm during implementation whether Zone 1/2/4 writes in `_do_write`
-   publish any event today (not verified in this design pass) and, if so, whether Zone 3/5 writes
-   need parity — flagged as an implementation-time check, not assumed either way here.
+5b. **Predicate/subject_scope validation status code — RESOLVED this round (review blocker #2,
+   fifth round).** `_do_write`'s sibling handler `assemble_context` (`app.py:175-193`, read in
+   full) already establishes the exact precedent for "a domain constructor raises `ValueError` on
+   caller input": `except (ValueError, KeyError) as exc: return _error(400, "INVALID_REQUEST",
+   str(exc))`. `CandidateFact.__post_init__` raising on a blank `tenant_id`/`subjects`/`objects`
+   entry, and `SemanticEdge.__post_init__`/`GeneralFact.__post_init__` raising on a blank
+   `predicate`/`statement`/`subject_scope`, are the exact same class of error this precedent
+   already covers. **Decision: `400 INVALID_REQUEST`, not `422`**, with `str(exc)` as the message,
+   mirroring `assemble_context`'s handling verbatim rather than introducing a second convention for
+   the same error class within the same file. (`422` remains reserved for the pre-existing
+   `ZONE_3_5_PREDICATE_UNRESOLVABLE` semantics this design removes, and for FastAPI's own automatic
+   request-body-schema validation — neither applies here, since `predicate`/`subject_scope` are
+   valid at the JSON Schema level, optional strings, and only become invalid via the domain
+   object's own business-rule validation.)
+7. **Event publishing — RESOLVED this round (review blocker #3, fifth round): no parity work is
+   needed.** Read `src/dashanan/api/composition.py` in full for this: `AppContext.event_bus` is
+   unconditionally constructed as `NoOpEventBus()` (`composition.py:177`) for every deployment
+   configuration this codebase has today — there is no real event-publishing path anywhere in the
+   API host to achieve parity with. Confirmed further: `ConflictAwareSemanticRepository`/
+   `ConflictAwareEntityMemoryRepository` (`conflict_aware_zone_writes.py`, both constructors read
+   in full) accept no `event_bus` parameter at all, unlike `EntityMemoryRepository`/
+   `InMemoryProceduralMemoryRepository` elsewhere in `composition.py` which do (and which are
+   themselves wired to the same no-op instance). "Verify parity at implementation time" from v5 is
+   therefore already answered: there is nothing to make parity with, and nothing new to wire.
 
 ---
 
-## 5. Test matrix (review Finding #5, first round; expanded again this round — 12 cases)
+## 5. Test matrix (review Finding #5, first round; expanded again this round — 13 cases)
 
 All as real HTTP-level integration tests, mirroring
 `tests/integration/test_api_real_postgres_e2e_dash3.py`'s Scenario style (real Postgres, real
@@ -295,10 +330,10 @@ All as real HTTP-level integration tests, mirroring
    subjects, per the truth table).
 6. `\|subjects\|>1`, `\|objects\|==0` → `classify()`'s own documented empty-cross-product case
    (`SemanticEdgeRouting(edges=())`) — assert no edge is written and no error is raised.
-7. Missing/blank `predicate` when `\|subjects\|>=1` → 422/400 (exact code TBD at implementation
-   time), no partial write.
+7. Missing/blank `predicate` when `\|subjects\|>=1` → `400 INVALID_REQUEST` (Section 4.2 step 5b),
+   no partial write.
 8. Missing/blank `subject_scope` when `\|subjects\|==0` and a `GeneralFact` write is intended →
-   422/400, no partial write.
+   `400 INVALID_REQUEST` (Section 4.2 step 5b), no partial write.
 9. Object-only `entity_refs` (no subject-role entries, only object-role) → confirm this collapses
    to the `\|subjects\|==0` GeneralFact branch per the truth table (objects are only meaningful
    paired with a subject), not silently dropped.
@@ -310,25 +345,35 @@ All as real HTTP-level integration tests, mirroring
     WRITE_REJECTED_NOT_DURABLE`, identical shape to the existing `except ZoneRepositoryError`
     response, and that no Zone 3 write was attempted (`zone3_edges_written` and
     `zone3_edges_failed` both empty, not merely absent from the body).
+12. Missing/blank `retrieval_context_hash` when a Zone 3/5 write is intended (`entity_refs`
+    non-empty or `zone_hint` normalizes to Zone 3) → `400 INVALID_REQUEST` (Section 4.2 step 5b's
+    same precedent applies), no partial write. (New this round, alongside the resolution of
+    review blocker #1.)
 
 ---
 
-## 6. What this revision does NOT resolve (explicitly, not silently)
+## 6. What remains genuinely out of scope (by design, not oversight)
 
-- `retrieval_context_hash` sourcing (Section 4.2 step 5) — needs a maintainer decision. This blocks
-  the entire persistence path (steps 3-6, every call into `insert_edge`/`insert_general_fact`/
-  `write_attribute`), not just one isolated step — corrected from v3's understated framing.
-- Exact HTTP status code for predicate/subject_scope validation failures (400 vs 422) — should
-  match whatever convention `SemanticEdge.__post_init__`/`GeneralFact.__post_init__` errors
-  already use elsewhere in this handler once that's confirmed during implementation.
-- Event-publishing parity for the new write paths (Section 4.2 step 7) — unverified, flagged for
-  implementation-time confirmation.
+As of v6, every open question raised across five review rounds is resolved with evidence from this
+codebase's own existing code — none invented in the abstract:
 
-Resolved this round (previously open): the routing gate for ordinary Zone 1/2/4 writes (Section
-4.2 step 0), and the exact partial-failure response contract — `207`, widened `WriteReceipt.status`,
-and the `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields (Section 4.2 step 6).
-True cross-zone atomicity (2PC/saga) remains explicitly out of scope under `AR1-S3-G3`, by design,
-not as an oversight.
+- `retrieval_context_hash` sourcing → resolved (Section 4.2 step 5): caller-supplied, matching
+  `domain.write_gate.WriteRequest.retrieval_context_hash`'s own established semantics.
+- 400 vs 422 status code → resolved (Section 4.2 step 5b): `400 INVALID_REQUEST`, matching
+  `assemble_context`'s own existing precedent for a domain-constructor `ValueError`.
+- Event-publishing parity → resolved (Section 4.2 step 7): not applicable — `event_bus` is
+  unconditionally a no-op everywhere in this codebase today, and the conflict-aware repositories
+  don't accept one at all.
+- The routing gate for ordinary Zone 1/2/4 writes (Section 4.2 step 0) and the exact
+  partial-failure response contract — `207`, widened `WriteReceipt.status`, and the
+  `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields (Section 4.2 step 6) — were
+  resolved in v4/v5 and remain unchanged.
+
+Only one item remains explicitly, permanently out of scope by design: **true cross-zone atomicity
+(2-phase-commit/saga) for the Zone 5 + Zone 3 write pair.** This is not an oversight — it is
+tracked under the existing, pre-dating `AR1-S3-G3` limitation (connection-pooling-adjacent, FR-015
+scope), and this design's fail-fast-plus-honest-partial-reporting contract (Section 4.2 step 6) is
+the deliberate, infrastructure-free substitute for it, not a placeholder pending a future decision.
 
 ---
 
@@ -340,4 +385,5 @@ not as an oversight.
 | 2026-09-21 | v2: Replaced the routing model by reusing the existing, locked `CandidateFact`/`classify()` domain primitives instead of reinventing routing. Corrected predicate to a single fact-level field. Added `subject_scope`. Expanded the implementation plan to cover provenance/conflict wiring, atomicity, and event-publishing parity. Expanded the test matrix from 4 to 10 cases. Reviewed, scored 8.5/10 -- CandidateFact construction omitted the required `tenant_id`, the `classify()` call omitted its required `edge_id_factory`/`fact_id_factory` keyword args, multi-edge provenance-per-edge semantics were undefined, and atomicity was flagged but no concrete failure contract was proposed; the "8-case" heading also didn't match the actual 10-case matrix. |
 | 2026-09-21 | v3: Fixed all five v2 review findings (`tenant_id`, `classify()` factory args, per-edge provenance, an atomicity decision, the "8-case" heading typo). Reviewed, scored 8.8/10 -- the routing gate for ordinary Zone 1/2/4 writes was missing entirely (every write would have incorrectly entered classification and failed on a missing `subject_scope`), v3 falsely claimed `entity_refs` role-partitioning "already exists" in `_do_write` when it does not, and v3 understated `retrieval_context_hash` as blocking "one step" when it actually blocks the entire persistence path. |
 | 2026-09-21 | v4: Added the missing routing gate (Section 4.2 step 0) so ordinary Zone 1/2/4 writes provably never enter the classification path. Corrected the false "already exists" claim about `entity_refs` partitioning -- it is new code this implementation must write. Corrected the `retrieval_context_hash` framing to state it blocks the whole persistence path, not one isolated step. Committed to the exact partial-failure response contract the second round asked for: `207 Multi-Status`, a widened `WriteReceipt.status: Literal["accepted","partial"]`, and new `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields. Expanded the test matrix from 10 to 12 cases. Reviewed, scored 9/10 -- the routing gate compared `zone_hint` against a bare `"semantic"` string instead of the real wire enum value `"3-semantic"` (`openapi.yaml`'s `ZoneId` enum), and Section 4.1's file list never mentioned the OpenAPI-side changes (`WriteReceipt` schema widening, the new `207` response) that Section 4.2 step 6 already specified in prose. |
-| 2026-09-21 | v5 (this revision): Fixed the routing gate to normalize `zone_hint` via the existing `_WIRE_TO_DOMAIN_ZONE` map (`app.py:71-80`) against `ZoneId.SEMANTIC`, never a bare string. Disclosed, as a separate GitHub issue (#25) rather than silently fixing in-scope, a genuinely separate pre-existing bug this review surfaced: `_do_write`'s existing `zone_hint == "procedural"`/`"episodic"` comparisons don't match their own OpenAPI-contract wire values either, and don't use `_WIRE_TO_DOMAIN_ZONE`. Added the missing OpenAPI-side file changes to Section 4.1: widening `WriteReceipt.status` and adding the three new response fields in `openapi.yaml` itself (not just `schemas.py`), and documenting the new `207` response on the `writeMemory` operation. Status line now explicitly reads "DESIGN COMPLETE, NOT IMPLEMENTATION-READY" pending the `retrieval_context_hash` decision, rather than an ambiguous "DESIGN ONLY." Still no implementation performed. |
+| 2026-09-21 | v5: Fixed the routing gate to normalize `zone_hint` via the existing `_WIRE_TO_DOMAIN_ZONE` map (`app.py:71-80`) against `ZoneId.SEMANTIC`, never a bare string. Disclosed, as a separate GitHub issue (#25) rather than silently fixing in-scope, a genuinely separate pre-existing bug this review surfaced: `_do_write`'s existing `zone_hint == "procedural"`/`"episodic"` comparisons don't match their own OpenAPI-contract wire values either, and don't use `_WIRE_TO_DOMAIN_ZONE`. Added the missing OpenAPI-side file changes to Section 4.1. Status line now explicitly reads "DESIGN COMPLETE, NOT IMPLEMENTATION-READY" pending the `retrieval_context_hash` decision. Reviewed, scored 9.5/10 -- three items still explicitly open: `retrieval_context_hash` sourcing, the 400-vs-422 status code decision, and Zone 3/5 event-publishing parity verification. |
+| 2026-09-21 | v6 (this revision): Closed all three remaining open items, each with evidence from this codebase's own existing code, not invented. `retrieval_context_hash`: resolved as caller-supplied (new required field on `WriteMemoryRequest.provenance`), matching `domain.write_gate.WriteRequest.retrieval_context_hash`'s own already-established semantics exactly (`write_gate.py:346-348`). 400 vs 422: resolved as `400 INVALID_REQUEST`, matching the existing `assemble_context` handler's own precedent (`app.py:192-193`) for a domain-constructor `ValueError`. Event-publishing parity: resolved as not applicable -- `AppContext.event_bus` is unconditionally `NoOpEventBus()` everywhere in this codebase today (`composition.py:177`), and the conflict-aware repositories don't accept an `event_bus` parameter at all. Added `retrieval_context_hash` to Section 3's schema and Section 4.1's file list. Added a new step 5b and test case 12 for the validation-status decision. Expanded the test matrix from 12 to 13 cases. Status line now reads "IMPLEMENTATION-READY." |
