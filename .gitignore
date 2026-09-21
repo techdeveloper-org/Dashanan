@@ -9,3 +9,10 @@ build/
 dist/
 .venv/
 venv/
+
+# DASH-STORY-024 (FR-015): real Shape B credentials live only in a local,
+# gitignored .env -- .env.example (committed) documents the variable names
+# only, never real values (application-security-core: never commit secrets).
+.env
+.env.local
+.env.*.local

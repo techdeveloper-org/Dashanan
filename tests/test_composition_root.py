@@ -14,15 +14,22 @@ Runtime assumptions recorded per rule 33/40 test-roadmap conventions:
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 
 import pytest
 
 from dashanan.application.context_assembly_request import ContextAssemblyRequest
+from dashanan.application.conflict_aware_zone_writes import (
+    ConflictAwareEntityMemoryRepository,
+    ConflictAwareSemanticRepository,
+)
 from dashanan.application.conflict_detection_sweep import (
     ConflictDetectingProvenanceRepository,
 )
 from dashanan.domain.exceptions import ZoneRepositoryError
+from dashanan.domain.provenance_record import SourceType
+from dashanan.domain.semantic_memory import SemanticEdge
 from dashanan.domain.tenant_credential import (
     TenantAuthenticationError,
     sign_tenant_credential,
@@ -31,13 +38,21 @@ from dashanan.domain.zone import ZoneId
 from dashanan.infrastructure.composition_root import (
     TENANT_CREDENTIAL_SIGNING_KEY_ENV_VAR,
     CompositionRootConfigurationError,
+    PostgresConnectionError,
+    build_conflict_aware_entity_memory_repository,
+    build_conflict_aware_semantic_repository,
     build_episodic_repository,
     build_memory_orchestrator,
+    build_postgres_connection,
     build_provenance_repository,
     load_tenant_credential_signing_key_from_env,
 )
+from dashanan.infrastructure.entity_memory_repository import EntityMemoryRepository
+from dashanan.infrastructure.settings import PostgresSettings
 from dashanan.infrastructure.sql_provenance_repository import SqlProvenanceRepository
 from tests.test_smoke_episodic import RecordingConnection
+
+_PLACEHOLDER_CONTEXT_HASH = hashlib.sha256(b"<PII_EXAMPLE_REDACTED>").hexdigest()
 
 _VALID_SIGNING_KEY = b"\x01" * 32
 _VALID_SIGNING_KEY_HEX = _VALID_SIGNING_KEY.hex()
@@ -265,3 +280,145 @@ class TestBuildEpisodicRepository:
         build_episodic_repository(connection, fixed_clock, verify_privileges=False)
 
         assert connection.cursor_obj.executed == []
+
+
+class TestBuildConflictAwareSemanticRepository:
+    """DASH-STORY-022: Zone 3's write path composed through `build_provenance_repository`."""
+
+    def test_wires_the_real_fr013_sweep_via_build_provenance_repository(
+        self, fixed_clock: FakeClock
+    ):
+        semantic_connection = RecordingConnection()
+        provenance_connection = RecordingConnection()
+
+        writer = build_conflict_aware_semantic_repository(
+            semantic_connection,
+            provenance_connection,
+            fixed_clock,
+            verify_privileges=False,
+        )
+
+        assert isinstance(writer, ConflictAwareSemanticRepository)
+        edge = SemanticEdge(
+            tenant_id="tenant-1",
+            edge_id="edge-1",
+            subject_ref="entity-a",
+            predicate="related_to",
+            object_ref="entity-b",
+        )
+        writer.insert_edge(
+            edge,
+            provenance_id="prov-1",
+            source_type=SourceType.USER_STATED,
+            retrieval_context_hash=_PLACEHOLDER_CONTEXT_HASH,
+        )
+
+        assert provenance_connection.cursor_obj.executed, (
+            "must-not-deviate item 3: this builder must route through "
+            "build_provenance_repository so the FR-013 sweep's own SELECT/"
+            "INSERT actually runs against provenance_connection"
+        )
+
+    def test_detect_conflicts_false_returns_a_writer_over_the_bare_adapter(
+        self, fixed_clock: FakeClock
+    ):
+        semantic_connection = RecordingConnection()
+        provenance_connection = RecordingConnection()
+
+        writer = build_conflict_aware_semantic_repository(
+            semantic_connection,
+            provenance_connection,
+            fixed_clock,
+            verify_privileges=False,
+            detect_conflicts=False,
+        )
+
+        assert not isinstance(writer._provenance_repository, ConflictDetectingProvenanceRepository)
+
+
+class TestBuildConflictAwareEntityMemoryRepository:
+    """DASH-STORY-022: Zone 5's write path composed through `build_provenance_repository`."""
+
+    def test_wires_the_real_fr013_sweep_via_build_provenance_repository(
+        self, fixed_clock: FakeClock, event_bus: RecordingEventBus
+    ):
+        entity_memory_repository = EntityMemoryRepository(
+            clock=fixed_clock, event_bus=event_bus
+        )
+        provenance_connection = RecordingConnection()
+
+        writer = build_conflict_aware_entity_memory_repository(
+            entity_memory_repository,
+            provenance_connection,
+            fixed_clock,
+            verify_privileges=False,
+        )
+
+        assert isinstance(writer, ConflictAwareEntityMemoryRepository)
+        writer.write_attribute(
+            "tenant-1",
+            "entity-1",
+            "display_name",
+            "<PII_EXAMPLE_REDACTED>",
+            "prov-1",
+            source_type=SourceType.USER_STATED,
+            retrieval_context_hash=_PLACEHOLDER_CONTEXT_HASH,
+        )
+
+        assert provenance_connection.cursor_obj.executed, (
+            "must-not-deviate item 3: this builder must route through "
+            "build_provenance_repository so the FR-013 sweep's own SELECT/"
+            "INSERT actually runs against provenance_connection"
+        )
+
+
+class TestBuildPostgresConnectionErrorHandling:
+    """`build_postgres_connection` wraps a connection-phase `psycopg.Error` (DSHN-76)."""
+
+    _SETTINGS = PostgresSettings(
+        host="localhost",
+        port=5432,
+        database="dashanan",
+        migration_user="migration_role",
+        migration_password="migration-secret-1",
+        app_login_user="app_role",
+        app_login_password="app-secret-1",
+    )
+
+    def test_build_should_raisePostgresConnectionError_when_connectFails(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import psycopg
+
+        from dashanan.infrastructure import composition_root as composition_root_module
+
+        underlying = psycopg.OperationalError(
+            'connection to server failed: FATAL:  password authentication '
+            f'failed for user "{self._SETTINGS.app_login_user}"'
+        )
+
+        def _raise_connect(dsn: str) -> None:
+            raise underlying
+
+        monkeypatch.setattr(composition_root_module.psycopg, "connect", _raise_connect)
+
+        with pytest.raises(PostgresConnectionError) as excinfo:
+            build_postgres_connection(self._SETTINGS)
+
+        assert self._SETTINGS.app_login_password not in str(excinfo.value)
+        assert "FATAL" not in str(excinfo.value)
+        assert excinfo.value.__cause__ is underlying
+
+    def test_build_should_returnConnection_when_connectSucceeds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from dashanan.infrastructure import composition_root as composition_root_module
+
+        sentinel_connection = object()
+        monkeypatch.setattr(
+            composition_root_module.psycopg, "connect", lambda dsn: sentinel_connection
+        )
+
+        connection = build_postgres_connection(self._SETTINGS)
+
+        assert connection is sentinel_connection

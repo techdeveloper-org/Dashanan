@@ -32,6 +32,7 @@ import pytest
 from dashanan.domain.exceptions import ZoneRepositoryError
 from dashanan.domain.semantic_memory import GeneralFact, SemanticEdge, SemanticState
 from dashanan.infrastructure.sql_semantic_repository import (
+    _DELETE_EDGES_BY_SUBJECT_SQL,
     _FIND_EDGES_BY_OBJECT_SQL,
     _FIND_EDGES_BY_SUBJECT_SQL,
     _FIND_FACT_BY_ID_SQL,
@@ -329,6 +330,89 @@ class TestForwardAndReverseTraversal:
         sql_text = _SCHEMA_SQL_PATH.read_text(encoding="utf-8")
         assert "idx_semantic_edges_subject" in sql_text
         assert "idx_semantic_edges_object" in sql_text
+
+
+class TestDeleteEdgesBySubjectDash025:
+    """DASH-STORY-025's Zone 3 DPDP erasure leg (AC-025-1): `delete_edges_by_subject`.
+
+    DSHN-70 (MEDIUM) regression guard: the affected-item evidence returned
+    to the caller must come from the `DELETE ... RETURNING edge_id`
+    statement's own result set -- never a separate `SELECT` snapshot taken
+    before the `DELETE` runs, which could desync from the rows actually
+    removed under a concurrent write between the two unlocked statements.
+    """
+
+    def test_deletes_the_matching_edges_and_returns_only_actually_deleted_ids(
+        self,
+    ) -> None:
+        connection = RecordingConnection(rows=[("edge-erase-2",), ("edge-erase-1",)])
+        repo = SqlSemanticRepository(connection)
+
+        erased = repo.delete_edges_by_subject(tenant_id="tenant-1", subject_ref="entity-a")
+
+        assert erased == ("edge-erase-1", "edge-erase-2")
+        executed = connection.cursor_obj.executed
+        assert len(executed) == 1, (
+            "must issue a single DELETE ... RETURNING statement, not a "
+            "separate SELECT before the DELETE (DSHN-70 fix)"
+        )
+        delete_sql, delete_params = executed[0]
+        assert delete_sql == _DELETE_EDGES_BY_SUBJECT_SQL
+        assert "RETURNING" in _DELETE_EDGES_BY_SUBJECT_SQL
+        assert delete_params == ("tenant-1", "entity-a")
+
+    def test_returned_evidence_is_exactly_what_the_delete_actually_removed(
+        self,
+    ) -> None:
+        """The evidence must be the DELETE's own RETURNING rows, never a
+        pre-delete SELECT snapshot -- proven here by asserting no
+        `find_edges_by_subject`-shaped SELECT is ever issued."""
+        connection = RecordingConnection(rows=[("edge-erase-1",)])
+        repo = SqlSemanticRepository(connection)
+
+        erased = repo.delete_edges_by_subject(tenant_id="tenant-1", subject_ref="entity-a")
+
+        assert erased == ("edge-erase-1",)
+        executed = connection.cursor_obj.executed
+        assert all(sql == _DELETE_EDGES_BY_SUBJECT_SQL for sql, _ in executed), (
+            "no separate SELECT may be issued before the DELETE -- the "
+            "returned evidence must be the DELETE's own RETURNING rows"
+        )
+
+    def test_no_matching_edge_is_a_clean_noop(self) -> None:
+        connection = RecordingConnection(rows=[])
+        repo = SqlSemanticRepository(connection)
+
+        erased = repo.delete_edges_by_subject(tenant_id="tenant-1", subject_ref="entity-a")
+
+        assert erased == ()
+        executed = connection.cursor_obj.executed
+        assert len(executed) == 1
+        assert executed[0][0] == _DELETE_EDGES_BY_SUBJECT_SQL
+
+    def test_rejects_blank_tenant_id_before_querying(self) -> None:
+        connection = RecordingConnection()
+        repo = SqlSemanticRepository(connection)
+
+        with pytest.raises(ValueError, match="tenant_id"):
+            repo.delete_edges_by_subject(tenant_id="", subject_ref="entity-a")
+        assert connection.cursor_obj.executed == []
+
+    def test_rejects_blank_subject_ref_before_querying(self) -> None:
+        connection = RecordingConnection()
+        repo = SqlSemanticRepository(connection)
+
+        with pytest.raises(ValueError, match="subject_ref"):
+            repo.delete_edges_by_subject(tenant_id="tenant-1", subject_ref="")
+        assert connection.cursor_obj.executed == []
+
+    def test_wraps_underlying_query_failure_as_zone_repository_error(self) -> None:
+        connection = RecordingConnection()
+        connection.cursor_obj._raise = RuntimeError("simulated DB failure")
+        repo = SqlSemanticRepository(connection)
+
+        with pytest.raises(ZoneRepositoryError):
+            repo.delete_edges_by_subject(tenant_id="tenant-1", subject_ref="entity-a")
 
 
 class TestMustNotDeviateTenantIdRequired:

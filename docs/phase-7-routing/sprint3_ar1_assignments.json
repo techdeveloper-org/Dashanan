@@ -252,7 +252,8 @@
       "assigned_agent_note": "Consult split authorized per user decision (SP3-DEC-107, 'Add a consult split'), 2026-09-20: python-backend-engineer executes the spike with ai-engineer consulted, per sprint3_ar1_assignments.json's own AR1-G5-recommended fallback option, closing the single-agent risk flagged across three consecutive routing passes.",
       "consult_agents": [
         "ai-engineer"
-      ]
+      ],
+      "score_vs_assignment_note": "Flagged by external review (2026-09-21) as an apparent inconsistency: candidate_scores shows ai-engineer scoring highest (0.825, above the 0.75 threshold) while the actual assigned_agent is python-backend-engineer (0.525, below threshold). This is NOT a scoring error -- it is a deliberate user override (SP3-DEC-107, 'Add a consult split', 2026-09-20): the user chose to have python-backend-engineer execute this spike with ai-engineer consulted, rather than the scoring model's own top pick executing solo. candidate_scores is left unedited as the original, honest scoring-model output; assigned_agent/consult_agents reflect the user's real decision on top of it."
     },
     {
       "story_id": "DASH-STORY-023",

@@ -67,6 +67,12 @@ FROM general_facts
 WHERE tenant_id = %s AND fact_id = %s
 """
 
+_DELETE_EDGES_BY_SUBJECT_SQL = """
+DELETE FROM semantic_edges
+WHERE tenant_id = %s AND subject_ref = %s
+RETURNING edge_id
+"""
+
 _INSERT_EDGE_SQL = """
 INSERT INTO semantic_edges
     (tenant_id, edge_id, subject_ref, predicate, object_ref, qualifiers, state, score_terms)
@@ -195,6 +201,51 @@ class SqlSemanticRepository:
         if not rows:
             return None
         return self._row_to_fact(rows[0])
+
+    def delete_edges_by_subject(
+        self, tenant_id: str, subject_ref: str
+    ) -> tuple[str, ...]:
+        """DASH-STORY-025's Zone 3 DPDP erasure leg: remove every edge naming `subject_ref`.
+
+        AC-025-1's own real erasure mechanism (must-not-deviate item 2 of
+        DASH-STORY-025: a plain, ordinary `DELETE` -- the same class of
+        mechanism SRS.md Section 4.1 already documents Zone 2/6 use, never
+        crypto-shredding key-management infrastructure). Issues a single
+        `DELETE ... RETURNING edge_id` statement so the affected-item
+        evidence returned to the caller is exactly what this call actually
+        deleted -- not a separate `SELECT` taken before the `DELETE` runs,
+        which would let a concurrent write between the two unlocked
+        statements desync the reported evidence from the real deleted
+        rows.
+
+        Args:
+            tenant_id: Owning tenant. Never blank.
+            subject_ref: The Zone 5 `entity_id` reference to erase every
+                edge for. Never blank.
+
+        Returns:
+            The `edge_id` of every `SemanticEdge` actually removed by this
+            call, in `edge_id ASC` order (mirroring
+            `find_edges_by_subject`'s own ordering). An empty tuple is a
+            clean no-op -- no edge existed for `subject_ref` -- not an
+            error.
+
+        Raises:
+            ValueError: If `tenant_id` or `subject_ref` is blank.
+            dashanan.domain.exceptions.ZoneRepositoryError: If the delete
+                query fails.
+        """
+        self._require_tenant(tenant_id)
+        if not subject_ref.strip():
+            raise ValueError(
+                "delete_edges_by_subject requires a non-blank subject_ref"
+            )
+        rows = self._execute_or_raise(
+            _DELETE_EDGES_BY_SUBJECT_SQL, (tenant_id, subject_ref)
+        )
+        if not rows:
+            return ()
+        return tuple(sorted(cast(str, row[0]) for row in rows))
 
     def insert_edge(self, edge: SemanticEdge) -> None:
         """Insert one `SemanticEdge`. `object_ref` is DB-CHECK-enforced non-null (AC-003-SCHEMA-1).

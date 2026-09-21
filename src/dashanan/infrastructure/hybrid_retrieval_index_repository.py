@@ -29,6 +29,17 @@ literal backslash) inside each component before joining, so the join point
 is always unambiguous regardless of what characters `tenant_id`/`item_id`
 contain; identifiers that contain neither character (the common case)
 produce byte-identical keys to the pre-fix scheme.
+
+FOLLOW-UP (DASH-STORY-011 spike, re-confirmed Sprint 3): this class is a
+Shape-A, in-memory `VectorIndexPort`/`LexicalIndexPort` composition -- it
+imports no `qdrant-client` code today. Whoever replaces or extends this
+class's `VectorIndexPort` with a real Qdrant-backed implementation (FR-015's
+Shape B, once DASH-STORY-024's live server is the actual target) must pin
+`qdrant-client` per `docs/spikes/dash-story-011-qdrant-client-compatibility-matrix.md`
+rather than picking an arbitrary or "latest" version -- that document's
+pinned-version recommendation is scoped to this repo's already-pinned
+`qdrant/qdrant:v1.11.0` server image (`docker-compose.yml`, DASH-STORY-024)
+and must be re-validated if that server image tag ever changes.
 """
 
 from __future__ import annotations

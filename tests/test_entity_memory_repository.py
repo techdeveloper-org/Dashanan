@@ -139,6 +139,128 @@ class TestAC005_1PointLookup:
             repo.get_entity("   ", "entity-1")
 
 
+class TestEraseEntityDash025:
+    """DASH-STORY-025's Zone 5 DPDP erasure leg (AC-025-2): `erase_entity`."""
+
+    def test_erases_every_attribute_and_returns_their_item_ids(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.write_attribute("tenant-1", "entity-1", "attr-b", "value-b", "prov-2")
+
+        erased = repo.erase_entity("tenant-1", "entity-1")
+
+        assert set(erased) == {"entity-1:attr-a", "entity-1:attr-b"}
+        assert repo.get_entity("tenant-1", "entity-1") is None
+
+    def test_no_attribute_ever_written_is_a_clean_noop(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        erased = repo.erase_entity("tenant-1", "never-written-entity")
+
+        assert erased == ()
+        assert repo.get_entity("tenant-1", "never-written-entity") is None
+
+    def test_erasing_one_entity_never_touches_a_different_entitys_attributes(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.write_attribute("tenant-1", "entity-2", "attr-b", "value-b", "prov-2")
+
+        repo.erase_entity("tenant-1", "entity-1")
+
+        assert repo.get_entity("tenant-1", "entity-1") is None
+        record = repo.get_entity("tenant-1", "entity-2")
+        assert record is not None
+        assert record.get_attribute("attr-b").value == "value-b"
+
+    def test_erasing_one_tenants_entity_never_touches_another_tenants_same_entity_id(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.write_attribute("tenant-2", "entity-1", "attr-a", "value-a", "prov-2")
+
+        repo.erase_entity("tenant-1", "entity-1")
+
+        assert repo.get_entity("tenant-1", "entity-1") is None
+        assert repo.get_entity("tenant-2", "entity-1") is not None
+
+    def test_a_write_after_erasure_is_stored_again_normally(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.erase_entity("tenant-1", "entity-1")
+
+        repo.write_attribute("tenant-1", "entity-1", "attr-c", "value-c", "prov-3")
+
+        record = repo.get_entity("tenant-1", "entity-1")
+        assert record is not None
+        assert record.get_attribute("attr-c").value == "value-c"
+
+    def test_rejects_blank_tenant_id(self, repo: EntityMemoryRepository) -> None:
+        with pytest.raises(ValueError, match="tenant_id must not be blank"):
+            repo.erase_entity("   ", "entity-1")
+
+    def test_rejects_blank_entity_id(self, repo: EntityMemoryRepository) -> None:
+        with pytest.raises(ValueError, match="entity_id must not be blank"):
+            repo.erase_entity("tenant-1", "   ")
+
+    def test_erasure_purges_the_entitys_aliases_from_prefix_resolution(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        """DSHN-70 (HIGH) regression guard: `erase_entity` must also purge
+        `tenant_id`'s own `AliasTrie` -- without this fix, an alias
+        registered for the erased `entity_id` kept resolving via
+        `resolve_alias_prefix` after the attribute data itself was gone."""
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.register_alias("tenant-1", "entity-1", "alpha-one")
+        assert repo.resolve_alias_prefix("tenant-1", "alpha") == frozenset({"entity-1"})
+
+        repo.erase_entity("tenant-1", "entity-1")
+
+        assert repo.resolve_alias_prefix("tenant-1", "alpha") == frozenset()
+
+    def test_erasure_purges_the_entitys_aliases_from_exact_term_resolution(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        """Same DSHN-70 (HIGH) regression guard as above, via
+        `resolve_exact_term` (AC-005-4's own resolution path)."""
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.register_alias("tenant-1", "entity-1", "exact-alias")
+        assert repo.resolve_exact_term("tenant-1", "exact-alias") == frozenset(
+            {"entity-1"}
+        )
+
+        repo.erase_entity("tenant-1", "entity-1")
+
+        assert repo.resolve_exact_term("tenant-1", "exact-alias") == frozenset()
+
+    def test_erasure_leaves_a_different_entitys_alias_on_the_same_term_resolving(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        """Purging the erased entity's alias registration must not disturb a
+        different, still-live entity that shares the exact same alias term."""
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+        repo.write_attribute("tenant-1", "entity-2", "attr-a", "value-a", "prov-2")
+        repo.register_alias("tenant-1", "entity-1", "shared-alias")
+        repo.register_alias("tenant-1", "entity-2", "shared-alias")
+
+        repo.erase_entity("tenant-1", "entity-1")
+
+        assert repo.resolve_exact_term("tenant-1", "shared-alias") == frozenset(
+            {"entity-2"}
+        )
+
+    def test_erasure_of_entity_with_no_registered_alias_does_not_crash(
+        self, repo: EntityMemoryRepository
+    ) -> None:
+        repo.write_attribute("tenant-1", "entity-1", "attr-a", "value-a", "prov-1")
+
+        erased = repo.erase_entity("tenant-1", "entity-1")
+
+        assert erased == ("entity-1:attr-a",)
+
+
 class TestAC005_2SingleAttributeUpdate:
     """AC-005-2 (verbatim): "A single attribute update writes exactly one
     new provenance record for that attribute only; no sibling attribute's

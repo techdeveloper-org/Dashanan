@@ -1,0 +1,151 @@
+# Shape B deployment infrastructure (DASH-STORY-024, FR-015).
+#
+# Brings up the five backing services HLD Section 2's Shape B container/service
+# table names, each on its documented port/protocol (AC-024-1):
+#   - redis:      RESP,        Zone 1 hot store + event bus            (ADR-005)
+#   - postgres:   PostgreSQL wire, Zones 2/3/4/5/7 structured store     (ADR-006)
+#   - qdrant:     HTTP/gRPC,   Zone 6 vector index                      (ADR-007)
+#   - opensearch: HTTP,        Zone 6 lexical index (BM25/RRF)          (ADR-008)
+#   - minio:      S3 API,     Zone 8 object store (S3-compatible)      (ADR-009)
+#
+# Every credential is `${VAR}` env-interpolated from a local, gitignored `.env`
+# file (see `.env.example` for the variable names and
+# `dashanan.infrastructure.settings` for the same names read at runtime) --
+# never a literal value in this committed file (application-security-core /
+# cloud-security-core: never hardcode secrets). No port is published beyond
+# `127.0.0.1` -- local development/CI only, never `0.0.0.0` (cloud-security-core:
+# never expose a data-plane service to 0.0.0.0 for production-shaped defaults).
+#
+# Scope note (must-not-deviate item 3): this file brings the five backing
+# services up and nothing else -- no application/host image is built or run
+# here. The FR-014 host application (DASH-STORY-023) is a separate concern.
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${DASHANAN_REDIS_PASSWORD:?DASHANAN_REDIS_PASSWORD must be set}"]
+    ports:
+      - "127.0.0.1:${DASHANAN_REDIS_PORT:-6379}:6379"
+    volumes:
+      - dashanan_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${DASHANAN_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: "512m"
+    cpus: 1.0
+    networks:
+      - dashanan_shape_b
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${DASHANAN_POSTGRES_MIGRATION_USER:?DASHANAN_POSTGRES_MIGRATION_USER must be set}"
+      POSTGRES_PASSWORD: "${DASHANAN_POSTGRES_MIGRATION_PASSWORD:?DASHANAN_POSTGRES_MIGRATION_PASSWORD must be set}"
+      POSTGRES_DB: "${DASHANAN_POSTGRES_DATABASE:-dashanan}"
+    ports:
+      - "127.0.0.1:${DASHANAN_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - dashanan_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: "1g"
+    cpus: 1.0
+    networks:
+      - dashanan_shape_b
+
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: "${DASHANAN_QDRANT_API_KEY:?DASHANAN_QDRANT_API_KEY must be set}"
+    ports:
+      - "127.0.0.1:${DASHANAN_QDRANT_PORT:-6333}:6333"
+      - "127.0.0.1:${DASHANAN_QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - dashanan_qdrant_data:/qdrant/storage
+    healthcheck:
+      # The qdrant/qdrant image ships neither curl nor wget (confirmed by direct
+      # `docker exec` inspection during this story's own dev pass) -- bash's
+      # /dev/tcp pseudo-device (bash IS present in this image) checks the HTTP
+      # port actually accepts a connection, which is sufficient here since
+      # qdrant only binds its HTTP listener once it is ready to serve.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    mem_limit: "1g"
+    cpus: 1.0
+    networks:
+      - dashanan_shape_b
+
+  opensearch:
+    image: opensearchproject/opensearch:2.17.0
+    restart: unless-stopped
+    environment:
+      discovery.type: "single-node"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: "${DASHANAN_OPENSEARCH_PASSWORD:?DASHANAN_OPENSEARCH_PASSWORD must be set}"
+      # Local/CI single-node dev cluster: JVM heap kept modest deliberately
+      # (performance-optimization: right-size, do not over-allocate a
+      # throwaway single-node dev instance).
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:${DASHANAN_OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - dashanan_opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sk -u admin:${DASHANAN_OPENSEARCH_PASSWORD} https://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: "1200m"
+    cpus: 1.5
+    networks:
+      - dashanan_shape_b
+
+  minio:
+    # MinIO's own image moved off Docker Hub (docker.io/minio/minio no longer
+    # resolves for this tag) -- quay.io/minio/minio is MinIO's own current
+    # registry for this exact release, not a third-party mirror.
+    image: quay.io/minio/minio:RELEASE.2024-10-13T13-34-11Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: "${DASHANAN_S3_ACCESS_KEY:?DASHANAN_S3_ACCESS_KEY must be set}"
+      MINIO_ROOT_PASSWORD: "${DASHANAN_S3_SECRET_KEY:?DASHANAN_S3_SECRET_KEY must be set}"
+    ports:
+      - "127.0.0.1:${DASHANAN_S3_PORT:-9000}:9000"
+      - "127.0.0.1:${DASHANAN_S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - dashanan_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    mem_limit: "512m"
+    cpus: 1.0
+    networks:
+      - dashanan_shape_b
+
+volumes:
+  dashanan_redis_data:
+  dashanan_postgres_data:
+  dashanan_qdrant_data:
+  dashanan_opensearch_data:
+  dashanan_minio_data:
+
+networks:
+  dashanan_shape_b:
+    driver: bridge

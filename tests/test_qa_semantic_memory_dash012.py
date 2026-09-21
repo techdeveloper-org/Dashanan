@@ -477,7 +477,15 @@ class TestMustNotDeviateRepositoryScope:
         """State-machine transitions and score-term recomputation are the
         Rotation Engine's / Scoring Service's own write paths -- adding an
         update/delete here would be scope creep beyond this schema-only
-        story."""
+        story.
+
+        UPDATED by DASH-STORY-025 (DSHN-70, AC-025-1): `delete_edges_by_
+        subject` is the one sanctioned exception to this class's DASH-012
+        no-update/no-delete scope -- AC-025-1's own literal DPDP erasure
+        requirement authorizes exactly this one subject-keyed delete
+        method, never a generic `update`/`delete`. The bare `"update"`/
+        `"delete"` exclusion checks below remain unchanged and still pass.
+        """
         public_methods = {
             name
             for name in vars(SqlSemanticRepository)
@@ -491,6 +499,7 @@ class TestMustNotDeviateRepositoryScope:
             "find_fact_by_id",
             "insert_edge",
             "insert_general_fact",
+            "delete_edges_by_subject",
         }
 
     def test_every_public_method_validates_tenant_id_first(self) -> None:

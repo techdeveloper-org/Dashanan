@@ -125,6 +125,13 @@ class EntityMemoryRepository(ZoneRepository):
         self._tenant_locks: dict[str, threading.Lock] = {}
         self._entity_attributes: dict[tuple[str, str], dict[str, EntityAttributeRecord]] = {}
         self._alias_tries: dict[str, AliasTrie] = {}
+        self._entity_aliases: dict[tuple[str, str], set[str]] = {}
+        """Reverse index (tenant_id, entity_id) -> every alias registered for
+        that entity, updated in lockstep with `register_alias`. Exists so
+        `erase_entity` can remove exactly this entity's own aliases from
+        `_alias_tries[tenant_id]` (AC-025-2/DSHN-70) without a full trie
+        scan -- the trie itself has no entity_id -> alias reverse lookup of
+        its own."""
 
     def _lock_for_tenant(self, tenant_id: str) -> threading.Lock:
         """Return the one `Lock` serializing all access to `tenant_id`'s own state.
@@ -232,6 +239,60 @@ class EntityMemoryRepository(ZoneRepository):
 
         return WriteAccepted(write_id=provenance_id, accepted_at=when)
 
+    def erase_entity(self, tenant_id: str, entity_id: str) -> tuple[str, ...]:
+        """DASH-STORY-025's Zone 5 DPDP erasure leg: remove every attribute for `entity_id`.
+
+        AC-025-2's own real erasure mechanism (must-not-deviate item 2 of
+        DASH-STORY-025: a plain, ordinary eviction of this repository's own
+        `dict` entry -- the same class of mechanism SRS.md Section 4.1
+        already documents Zone 2/6 use, never crypto-shredding key-
+        management infrastructure). Holds `tenant_id`'s own lock for the
+        whole read-then-remove so no concurrent `write_attribute` call for
+        the same `(tenant_id, entity_id)` can race a partially-completed
+        erasure (ADR-018, mirroring this class's own per-tenant lock
+        convention).
+
+        DSHN-70 (HIGH) fix: also purges `entity_id` from `tenant_id`'s own
+        `AliasTrie` via `_entity_aliases`' reverse index, under the same
+        lock -- without this, `resolve_alias_prefix`/`resolve_exact_term`
+        kept resolving an alias to an entity_id whose attribute data had
+        already been erased.
+
+        Args:
+            tenant_id: Mandatory; enforced non-blank.
+            entity_id: The data subject's `entity_id` (Zone 5's own
+                subject-linkable key, HLD Section 3.6) to erase every
+                attribute for. Mandatory; enforced non-blank.
+
+        Returns:
+            The `item_id` (`f"{entity_id}:{attribute_name}"`, this
+            module's own existing projection-payload convention) of every
+            attribute removed. An empty tuple is a clean no-op -- no
+            attribute had ever been written for `entity_id` -- not an
+            error; a subsequent `get_entity` for the same pair returns
+            `None`, and any alias previously registered for `entity_id`
+            no longer resolves via `resolve_alias_prefix`/
+            `resolve_exact_term`.
+
+        Raises:
+            ValueError: If `tenant_id` or `entity_id` is blank.
+        """
+        self._require_non_blank("tenant_id", tenant_id)
+        self._require_non_blank("entity_id", entity_id)
+        with self._lock_for_tenant(tenant_id):
+            removed = self._entity_attributes.pop((tenant_id, entity_id), None)
+            aliases = self._entity_aliases.pop((tenant_id, entity_id), None)
+            if aliases:
+                trie = self._alias_tries.get(tenant_id)
+                if trie is not None:
+                    for alias in aliases:
+                        trie.remove(alias, entity_id)
+        if not removed:
+            return ()
+        return tuple(
+            f"{entity_id}:{attribute_name}" for attribute_name in removed
+        )
+
     def register_alias(self, tenant_id: str, entity_id: str, alias: str) -> None:
         """Index `alias` -> `entity_id` in `tenant_id`'s own `AliasTrie` (AC-005-3 support).
 
@@ -256,6 +317,7 @@ class EntityMemoryRepository(ZoneRepository):
         with self._lock_for_tenant(tenant_id):
             trie = self._trie_for_tenant_locked(tenant_id)
             trie.insert(alias, entity_id)
+            self._entity_aliases.setdefault((tenant_id, entity_id), set()).add(alias)
 
     def get_entity(self, tenant_id: str, entity_id: str) -> EntityRecord | None:
         """Point-lookup one entity's full attribute set by exact key (AC-005-1).

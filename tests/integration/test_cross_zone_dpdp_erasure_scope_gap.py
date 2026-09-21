@@ -1,24 +1,31 @@
-"""Cross-zone DPDP erasure scope gap: `SubjectErasureCascadeService` only reaches Zone 8.
+"""Cross-zone DPDP erasure scope: `SubjectErasureCascadeService` reaches only Zone 8 (DASH-STORY-025).
 
-Targets the documented gap in `dashanan.application.subject_erasure_cascade`'s
-own module docstring: `SubjectErasureCascadeService` is "the Zone-8-reaching
+HISTORY (DASH-STORY-025 / DSHN-70 update): this module originally
+documented a gap -- `SubjectErasureCascadeService` was "the Zone-8-reaching
 HALF" of HLD Section 7.4's `DELETE /v1/tenants/{id}/subjects/{subject_id}`
-cascade -- the wire contract promises the cascade "cascades across all 8
-zones, the vector index, the lexical index and Zone 8 archives," but the
-concrete service this codebase currently has calls only
-`Zone8SubjectKeyedArchiver.erase_subject`. Zone 3's own separate erasure leg
-(`dashanan.infrastructure.dpdp_erasure_cascade.CrossZoneDpdpErasureCascade`,
-DSHN-58) exists as an independent component this service never invokes; no
-composition root anywhere in this codebase wires the two together, and no
-Zone 4 or Zone 5 erasure leg exists at all.
+cascade, and a real `SemanticEdge`/`EntityRecord` for the erased
+`subject_id` survived a `request_erasure` call untouched. AC-025-1 and
+AC-025-2 (sprint3_ar1_assignments.json, DASH-STORY-025) require this
+module's own two survival assertions to be inverted -- this file's own
+citation of that requirement. `SubjectErasureCascadeService` itself is
+UNCHANGED by DASH-STORY-025 (it remains the Zone-8-reaching half); what
+changed is that Zone 3 (`SqlSemanticRepository.delete_edges_by_subject`)
+and Zone 5 (`EntityMemoryRepository.erase_entity`) now each have their own
+real erasure leg, exercised directly here (not through
+`SubjectErasureCascadeService`, which still does not compose them --
+`UnifiedSubjectErasureOrchestrator`, DASH-STORY-025's own new Facade, is
+the component that composes all four legs behind one call; see
+`tests/integration/test_zone3_zone5_conflict_sweep_wired.py`'s sibling
+`test_unified_subject_erasure_orchestrator_dash025.py` for that
+single-call fan-out coverage, AC-025-3).
 
-This module seeds real data for one `subject_id` across every Zone 3/4/5
-component this codebase's real schemas can actually link to a subject, calls
-`SubjectErasureCascadeService.request_erasure` for that same subject, and
-asserts what actually happens: Zone 8 data is genuinely destroyed (the
-service's own real work), while Zone 3 and Zone 5 data is left completely
-untouched -- documenting the current no-op for those zones, not a mistake in
-this test.
+This module still seeds real data for one `subject_id` across every Zone
+3/4/5 component this codebase's real schemas can actually link to a
+subject, still calls `SubjectErasureCascadeService.request_erasure` for
+that same subject (documenting that THIS service alone still does not
+reach Zone 3/5 -- it never claimed to), and now ALSO calls each zone's own
+new erasure leg directly and asserts non-survival -- AC-025-1's and
+AC-025-2's own required inversion of this file's prior assertions.
 
 Zone 4 (`Procedure`, HLD Section 3.5) is a documented EXCLUSION, not an
 oversight: `Procedure`'s real, current field set --
@@ -62,34 +69,53 @@ _SUBJECT_ID = "cross-zone-subject-1"
 """The one `subject_id` seeded across every zone this test exercises."""
 
 
-class TestCrossZoneDpdpErasureScopeGap:
-    """Documents which zones a real `request_erasure` call actually reaches today."""
+def _edge_row(edge: SemanticEdge) -> tuple[object, ...]:
+    """Mirror `tests.test_smoke_semantic._edge_row`: a canned SELECT row for one `SemanticEdge`.
 
-    def test_zone3_semantic_edge_survives_subject_erasure_cascade(
+    `RecordingConnection` (`tests.test_smoke_episodic`) is a write-
+    recording fake with no read-back storage: an `INSERT` through it
+    never makes a later `SELECT` on the same connection return that row.
+    `delete_edges_by_subject`'s own internal read (`find_edges_by_subject`)
+    needs the cursor's canned rows seeded directly with this helper's
+    output before it is called, mirroring the same established
+    `cursor_obj._rows = [...]` convention already used by
+    `tests/integration/test_zone3_zone5_conflict_sweep_wired.py` and
+    `tests/integration/test_cross_zone_scenarios.py`.
+    """
+    return (
+        edge.tenant_id,
+        edge.edge_id,
+        edge.subject_ref,
+        edge.predicate,
+        edge.object_ref,
+        dict(edge.qualifiers),
+        edge.state.value,
+        dict(edge.score_terms),
+    )
+
+
+class TestCrossZoneDpdpErasureScopeGap:
+    """Documents which zones a real `request_erasure`/zone-leg call actually reaches today."""
+
+    def test_zone3_semantic_edge_does_not_survive_zone3_erasure_leg(
         self, sprint2_wired_system: Sprint2WiredSystem
     ) -> None:
-        """Zone 3 data for `_SUBJECT_ID` is untouched: the cascade never reaches Zone 3.
+        """AC-025-1: `SqlSemanticRepository.delete_edges_by_subject` removes the seeded edge.
 
-        Seeds one real `SemanticEdge` whose `subject_ref` (Zone 3's own
-        Zone-5-entity-id reference field, `SemanticEdge`'s own docstring)
-        is `_SUBJECT_ID`, through the real `Zone3IndexProjector` decorator
-        over the real `SqlSemanticRepository`. `RecordingConnection`
-        (Sprint 1's fake DB-API double, this fixture module's own
-        docstring) is a write-recording fake with no read-back storage, so
-        "still exists" is verified the same way
-        `test_smoke_fixture_wiring_sprint2.py` verifies Zone 3 writes: by
-        asserting on the connection's own `executed` statement log rather
-        than a read-after-write the fake cannot serve. Before
-        `request_erasure`, exactly one `INSERT INTO SEMANTIC_EDGES`
-        statement has been issued. If the current, real
-        `SubjectErasureCascadeService` reached Zone 3 at all, it would
-        have to issue at least one further statement (an `UPDATE` state
-        transition or a `DELETE`) against this same connection -- there is
-        no other seam through which a Zone 3 erasure leg could act on this
-        fixture's `SqlSemanticRepository`. The assertion below confirms
-        `executed` is unchanged after the call: today's real
-        `SubjectErasureCascadeService` issues zero additional statements,
-        so the semantic edge is left exactly as seeded.
+        Inverts this file's prior `test_zone3_semantic_edge_survives_
+        subject_erasure_cascade` (module docstring, HISTORY): that test's
+        own `executed`-statement-log proof technique is reused here, only
+        with the expectation flipped -- a `DELETE` statement (this story's
+        own `_DELETE_EDGES_BY_SUBJECT_SQL`) is now expected to have been
+        issued against Zone 3's connection after the leg runs, on top of
+        the original `INSERT`.
+
+        `SubjectErasureCascadeService.request_erasure` itself still never
+        reaches Zone 3 (asserted first, below, unchanged from before this
+        story) -- AC-025-1 requires the ZONE 3 LEG itself
+        (`delete_edges_by_subject`) to issue a real state-transition or
+        delete statement, not that `SubjectErasureCascadeService` grew a
+        Zone 3 dependency it never had.
         """
         edge = SemanticEdge(
             tenant_id=DEFAULT_TENANT_ID,
@@ -107,28 +133,48 @@ class TestCrossZoneDpdpErasureScopeGap:
         sprint2_wired_system.zone8_subject_erasure_cascade.request_erasure(
             SubjectErasureRequest(tenant_id=DEFAULT_TENANT_ID, subject_id=_SUBJECT_ID)
         )
-
-        executed_after = sprint2_wired_system.zone3_connection.cursor_obj.executed
-        assert executed_after == executed_before, (
-            "SubjectErasureCascadeService issued additional SQL against Zone 3's "
-            "connection -- if this fires, Zone 3 now has its own erasure leg and "
-            "this test's documented gap is stale"
+        executed_after_zone8_only = sprint2_wired_system.zone3_connection.cursor_obj.executed
+        assert executed_after_zone8_only == executed_before, (
+            "SubjectErasureCascadeService issued SQL against Zone 3's connection -- "
+            "it still must not: Zone 3's own erasure leg is a separate component "
+            "(delete_edges_by_subject), never reached through SubjectErasureCascadeService"
         )
 
-    def test_zone5_entity_attribute_survives_subject_erasure_cascade(
+        sprint2_wired_system.zone3_connection.cursor_obj._rows = [
+            (edge.edge_id,)
+        ]
+        erased_edge_ids = sprint2_wired_system.zone3_semantic_repository.delete_edges_by_subject(
+            DEFAULT_TENANT_ID, _SUBJECT_ID
+        )
+
+        assert erased_edge_ids == ("edge-cross-zone-1",), (
+            "delete_edges_by_subject did not report the seeded edge as erased -- "
+            "if this fires, AC-025-1's own inverted assertion is stale"
+        )
+        executed_after_zone3_leg = sprint2_wired_system.zone3_connection.cursor_obj.executed
+        assert len(executed_after_zone3_leg) == 2, (
+            "Zone 3's own erasure leg must issue exactly one additional "
+            "statement (a single DELETE ... RETURNING edge_id) against the "
+            "connection, on top of the original INSERT -- DSHN-70's fix "
+            "collapses the previous separate SELECT + DELETE into one "
+            "statement so the reported evidence is exactly what was deleted"
+        )
+        assert "DELETE" in executed_after_zone3_leg[-1][0]
+        assert "RETURNING" in executed_after_zone3_leg[-1][0]
+
+    def test_zone5_entity_attribute_does_not_survive_zone5_erasure_leg(
         self, sprint2_wired_system: Sprint2WiredSystem
     ) -> None:
-        """Zone 5 data for `_SUBJECT_ID` (as `entity_id`) is untouched: a real read-after-erasure.
+        """AC-025-2: `EntityMemoryRepository.erase_entity` removes the seeded attribute.
 
-        `EntityMemoryRepository` is a real, genuinely stateful in-memory
-        store (unlike Zone 3's fake SQL connection), so this assertion is
-        a direct `get_entity` read-back rather than an executed-statement
-        proxy: it seeds one real attribute for `_SUBJECT_ID` via
-        `write_attribute`, confirms it is stored, runs the real erasure
-        cascade for that same `_SUBJECT_ID`, and re-reads it -- confirming
-        the attribute is still present because
-        `SubjectErasureCascadeService.request_erasure` never calls
-        anything on `EntityMemoryRepository`.
+        Inverts this file's prior `test_zone5_entity_attribute_survives_
+        subject_erasure_cascade` (module docstring, HISTORY): seeds one
+        real attribute via `write_attribute`, confirms it is stored,
+        confirms `SubjectErasureCascadeService.request_erasure` still
+        never reaches Zone 5 (unchanged from before this story), then
+        calls Zone 5's own new `erase_entity` leg directly and re-reads
+        via `get_entity` -- AC-025-2's own literal "a re-read via
+        get_entity no longer returns the erased attribute."
         """
         write_result = sprint2_wired_system.zone5_entity_repository.write_attribute(
             tenant_id=DEFAULT_TENANT_ID,
@@ -146,16 +192,26 @@ class TestCrossZoneDpdpErasureScopeGap:
         sprint2_wired_system.zone8_subject_erasure_cascade.request_erasure(
             SubjectErasureRequest(tenant_id=DEFAULT_TENANT_ID, subject_id=_SUBJECT_ID)
         )
+        still_present_after_zone8_only = sprint2_wired_system.zone5_entity_repository.get_entity(
+            DEFAULT_TENANT_ID, _SUBJECT_ID
+        )
+        assert still_present_after_zone8_only is not None, (
+            "SubjectErasureCascadeService reached Zone 5 -- it still must not: "
+            "Zone 5's own erasure leg is a separate component (erase_entity)"
+        )
 
+        erased_item_ids = sprint2_wired_system.zone5_entity_repository.erase_entity(
+            DEFAULT_TENANT_ID, _SUBJECT_ID
+        )
+
+        assert erased_item_ids == (f"{_SUBJECT_ID}:role",)
         after_erasure = sprint2_wired_system.zone5_entity_repository.get_entity(
             DEFAULT_TENANT_ID, _SUBJECT_ID
         )
-        assert after_erasure is not None, (
-            "Zone 5's entity record for the erased subject_id disappeared -- if "
-            "this fires, Zone 5 now has its own erasure leg and this test's "
-            "documented gap is stale"
+        assert after_erasure is None, (
+            "Zone 5's entity record for the erased subject_id survived erase_entity -- "
+            "if this fires, AC-025-2's own inverted assertion is stale"
         )
-        assert any(a.attribute_name == "role" for a in after_erasure.attributes)
 
     def test_erasure_cascade_completes_while_leaving_zones_3_and_5_untouched(
         self, sprint2_wired_system: Sprint2WiredSystem
