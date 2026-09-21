@@ -1,0 +1,355 @@
+{
+  "document_id": "AR1-ASSIGNMENTS-SPRINT4-20260921-01",
+  "version": "1.0.0",
+  "author": "product-manager-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.1 story-to-agent assignment, Sprint 4)",
+  "date": "2026-09-21",
+  "correlation_id": "DASH-PH7-AR1-SPRINT4-20260921",
+  "depends_on": [
+    "docs/phase-7-routing/sprint4_ar0_routing_index.json v1.0.0 (single candidate item SPRINT4-CAND-001, agent-existence verification, reduced 2-signal fit scoring at threshold 0.70, advisory_review_roster)",
+    "docs/phase-1.5-api/fr013-predicate-schema-design.md v7 (score 9.8/10, status IMPLEMENTATION-READY -- pending user review, no implementation files modified) -- Section 4.1 file list, Section 4.2 steps 0-7 routing logic, Section 5's 14-case test matrix",
+    "GitHub issue #23 (techdeveloper-org/Dashanan, open, label 'not-implemented') -- successor to #20, api-security-auditor's 2026-09-21 re-verification that the conflict-detection sweep is correctly implemented but unreachable through the live API",
+    "docs/phase-7-routing/sprint3_ar1_assignments.json v1.0.0 (assignment record structure this file mirrors: assignments[] shape, invest/acceptance_criteria per story, must_not_deviate/advisory_review/p1_reviewer blocks, dependency_integrity_check, routing_gaps, summary.open_user_decisions)"
+  ],
+  "structural_note": "Sprint 4 differs from Sprint 1-3's assignments[] shape in one deliberate way, per explicit task instruction: rather than one implementer per story, this file breaks the single candidate item (SPRINT4-CAND-001) into ONE INVEST-shaped story (DASH-STORY-026) carrying three labeled sub-tasks -- Dev, QA, Review -- each scoped to a concrete deliverable and each with its own assigned agent, score, and acceptance criteria, mirroring sprint4_ar0_routing_index.json's own sub_tasks[] split (SPRINT4-CAND-001-A implementer, SPRINT4-CAND-001-B test-author) plus its separate advisory_review_roster (api-security-auditor, solution-architect, consensus-agent), now folded into this one story's Review sub-task rather than left as a parallel, disconnected roster. The invest/acceptance_criteria fields are populated directly from the design doc's own text (Sections 3, 4.1, 4.2, 5) and GitHub #23's body, never fabricated -- the same discipline sprint3_ar1_assignments.json's own structural_note committed to.",
+  "methodology_reuse_note": "Assignment threshold and force-assignment policy are reused verbatim from sprint2_ar1_assignments.json/sprint3_ar1_assignments.json: assignment_threshold = 0.75. Every sub-task candidate score below is lifted directly from sprint4_ar0_routing_index.json's own reduced 2-signal model (score = 0.5*domain_match + 0.5*skill_coverage, threshold 0.70 there) where that file already computed it; this file re-applies the Sprint 1-3 0.75 threshold for the ASSIGNMENT decision itself (not the AR.0 scoring pass), consistent with sprint3_ar1_assignments.json's own methodology_reuse_note. No score was re-derived from scratch.",
+  "agent_existence_verification": {
+    "method": "Every agent named below was already verified to exist at claude-global-library/agents/{name}/agent.md by sprint4_ar0_routing_index.json's own fresh directory listing (2026-09-21, via `ls -d` after a recursive Glob timed out twice -- see that file's source_of_truth.agent_registry). No new agent name is introduced in this file that sprint4_ar0_routing_index.json did not already verify.",
+    "rule": "No agent name appears in this file unless its agents/{name}/agent.md was confirmed to exist by sprint4_ar0_routing_index.json's own verification pass, cited here rather than re-globbed from zero trust.",
+    "verified_candidates_used": [
+      "python-backend-engineer",
+      "integration-testing-engineer",
+      "qa-testing-agent",
+      "api-security-auditor",
+      "solution-architect",
+      "consensus-agent"
+    ]
+  },
+  "assignment_rule": {
+    "threshold": 0.75,
+    "policy": "Highest-scoring candidate at or above 0.75 wins each sub-task. A sub-task with no candidate at or above 0.75 is recorded as a routing gap and left flagged -- never force-assigned. Identical to sprint2_ar1_assignments.json/sprint3_ar1_assignments.json's rule.",
+    "agent_existence_rule": "Every agent named here was verified to exist at claude-global-library/agents/{name}/agent.md by sprint4_ar0_routing_index.json's own verification pass, cited above."
+  },
+  "p1_security_override": {
+    "trigger_criteria": [
+      "Story touches Zone 7 (Provenance/Audit)",
+      "Story touches the storage-adapter (ZoneRepository port) interface",
+      "Story touches cross-tenant isolation"
+    ],
+    "effect": "A mandatory security review gate is attached to the story. The reviewing agent is distinct from the implementing agent (Maker-Checker). The story cannot close on the implementing agent's report alone.",
+    "criteria_source": "Reused verbatim from ar1_assignments.json.p1_security_override / sprint2_ar1_assignments.json.p1_security_override / sprint3_ar1_assignments.json.p1_security_override -- not redefined for Sprint 4.",
+    "applied_after_criteria_evaluation": [],
+    "considered_and_not_triggered": [
+      {
+        "story": "DASH-STORY-026 (FR-013 predicate/subject_scope/retrieval_context_hash schema wiring into POST /memory/write)",
+        "reason_considered": "This story is the wire-boundary counterpart to Sprint 3's DASH-STORY-022 (which wired the already-built conflict-detection sweep into Zone 3/5's write paths). GitHub #23's own body -- api-security-auditor's 2026-09-21 re-verification of the same underlying mechanism -- and the design doc's Section 4.2 step 5's provenance/conflict wiring both touch data that ultimately lands in Zone 7 (ProvenanceRecord), a plausible Zone-7-adjacent trigger.",
+        "reason_not_triggered": "Applying the three literal criteria: the story does not touch Zone 7's OWN storage (it calls the already-existing, already-tested ConflictAwareSemanticRepository.insert_edge/insert_general_fact and ConflictAwareEntityMemoryRepository.write_attribute, which already run the FR-013 sweep and already write Zone 7 provenance internally -- this story adds no new Zone 7 write path); it does not modify the ZoneRepository PORT interface (SqlSemanticRepository/EntityMemoryRepository's own method signatures are unchanged; the design doc's Section 4.2 explicitly reuses the existing composition-root-built repositories, never redefining their contract); and it carries no cross-tenant-isolation claim (CandidateFact requires tenant_id as its first field with no default, per entity_ownership_specification.py:121, and the design doc's step 2 sources it from caller.tenant_id, already the existing pattern). Literal application of the stated criteria does not fire here, the identical posture sprint3_ar1_assignments.json applied to DASH-STORY-022.",
+        "advisory_action": "See DASH-STORY-026's Review sub-task below -- a non-blocking advisory review is attached anyway, mirroring the non-blocking (not P1) treatment sprint3_ar1_assignments.json gave DASH-STORY-022, and reusing the exact reviewer (api-security-auditor) GitHub #23's own body already names as the persona that re-verified this mechanism."
+      }
+    ]
+  },
+  "assignments": [
+    {
+      "story_id": "DASH-STORY-026",
+      "jira_key": null,
+      "jira_key_note": "No story-level Jira key exists; GitHub issue #23 (techdeveloper-org/Dashanan, open, label 'not-implemented') is the tracked issue this story closes. A Jira key, if minted, is created at Phase B dispatch, referencing #23.",
+      "title": "Wire FR-013 predicate/subject_scope/retrieval_context_hash schema into POST /memory/write, so Zone 3 (Semantic) / Zone 5 (Entity) are reachable for real",
+      "traces_to_fr": "FR-013",
+      "traces_to_github_issue": 23,
+      "story_points": 8,
+      "invest": {
+        "independent": "The design doc (v7, IMPLEMENTATION-READY) and every domain collaborator it reuses -- CandidateFact/classify() (entity_ownership_specification.py), ConflictAwareSemanticRepository/ConflictAwareEntityMemoryRepository (conflict_aware_zone_writes.py), the existing _WIRE_TO_DOMAIN_ZONE map and assemble_context's 400-on-ValueError precedent (app.py) -- already exist and are independently tested, per the design doc's own Section 2/4.2 citations. This story only needs the design doc's own file list (Section 4.1) touched; it does not require any other Sprint 4 story first, since Sprint 4 has exactly one candidate item (sprint4_ar0_routing_index.json's own planning_status.status).",
+        "negotiable": "Does not reopen the HLD-locked routing truth table (HLD.md Section 3.4, Section 2 of the design doc) or the conflict-detection sweep's own algorithm (domain/conflict_detection.py, already locked and out of this story's scope per the design doc's own Section 6) -- only the wire schema (Section 3), the _do_write routing logic (Section 4.2 steps 0-7), and the response contract (400/422/207/503) are in scope, exactly as the design doc specifies.",
+        "valuable": "Closes GitHub #23 directly: api-security-auditor's own 2026-09-21 re-verification (cited in the issue body) found the conflict-detection sweep correctly implemented and securely composed but UNREACHABLE through the live API (severity downgraded HIGH->MEDIUM, no bypass path, the write surface simply doesn't exist yet). This story is exactly the fix the issue's own 'Fix' section names: a predicate field, _do_write branches, and an HTTP-level integration test.",
+        "estimable": "8 story points: three files touched per an already-complete, review-scored-9.8/10 design (openapi.yaml schema + response-contract widening, schemas.py Pydantic model changes, app.py's _do_write routing logic across 8 numbered sub-steps) plus one new/extended real-Postgres integration test covering a 14-case matrix -- comparable in shape to Sprint 3's DASH-STORY-023 (FR-014 wire/API layer, also 8 SP, also implementing an already-designed contract).",
+        "small": "Scoped to exactly the design doc's own Section 4.1 file list and Section 4.2's routing logic for the Zone 3/5 write path -- does not touch Zone 4 (explicitly excluded, per Section 4.2 step 3's truth-table condition and must_not_deviate below), does not fix GitHub #25 (the separate, pre-existing zone_hint bare-string-comparison bug for Zone 2/4, explicitly disclosed but NOT fixed by this design per its own Revision note and Section 4.2 step 0's 'Separate, pre-existing defect... NOT fixed by this design' callout), and does not build cross-zone atomicity (explicitly out of scope per Section 6, tracked under the existing AR1-S3-G3 limitation).",
+        "testable": "Concrete and behavioral, per the design doc's own Section 5: 14 real HTTP-level integration test cases (case 0's routing-gate regression guard through case 13's malformed-retrieval_context_hash-format case), each with a stated expected status code and body shape (202/400/422/207/503), mirroring tests/integration/test_api_real_postgres_e2e_dash3.py's real-Postgres/real-TestClient style."
+      },
+      "gap_confirmed": "CONFIRMED by the design doc's own Section 1 (Problem Statement, unchanged from v1 through v7) and GitHub #23's own body (read in full by sprint4_ar0_routing_index.json this session): `_do_write` (api/app.py:383-390) unconditionally rejects any write where `content.entity_refs` is non-empty with `422 ZONE_3_5_PREDICATE_UNRESOLVABLE`, because `WriteMemoryRequest.content` has no `predicate` field and no `subject_scope` field. The underlying Zone 3/5 write mechanisms and the FR-013 conflict-detection sweep are real, tested code (per sprint3_ar1_assignments.json's DASH-STORY-022, already landed) -- this story closes the remaining wire-schema gap that keeps them unreachable from POST /memory/write.",
+      "sub_tasks": [
+        {
+          "sub_task_id": "DASH-STORY-026-DEV",
+          "label": "Dev",
+          "title": "Implement the schema/routing/response-contract change per the design doc's Section 4.2 steps 0-7",
+          "deliverable": "openapi.yaml + schemas.py + app.py's _do_write routing logic, implementing Section 4.2's eight numbered steps (0: routing gate with _WIRE_TO_DOMAIN_ZONE normalization; 1: entity_refs role-partitioning into subjects/objects; 2: CandidateFact construction with tenant_id; 3: Zone 5 write when |subjects|==1; 4: Zone 3 write via classify(); 5/5b: provenance/conflict wiring with per-edge provenance_id and the 400-on-ValueError precedent; 6: the exact 202/207/503 response contract with WriteReceipt.status widened to include \"partial\"; 7: event-publishing parity confirmed not applicable) exactly as designed -- no new algorithm, no new routing model, reusing only already-existing domain collaborators.",
+          "files": [
+            "docs/phase-1.5-api/openapi.yaml",
+            "src/dashanan/api/schemas.py",
+            "src/dashanan/api/app.py"
+          ],
+          "candidates": [
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.90, "skill_coverage": 0.90},
+              "score": 0.900,
+              "above_threshold": true,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json SPRINT4-CAND-001-A. Direct continuity with every prior sprint's routing files: this agent authored composition_root.py's secure builders, the existing _do_write/assemble_context precedents this design doc's step 5b explicitly reuses (400 on ValueError, mirroring assemble_context verbatim), and every ZoneRepository adapter FR-013's own Zone 3/5 write paths call into. Its mandatory skills (fastapi-core for Pydantic v2 models and OpenAPI generation, api-design-core for the 400/422/207 contract, error-handling-patterns for the fail-fast-plus-honest-partial-reporting contract in Section 4.2 step 6, testing-core, application-security-core) cover the full file list with no material gap."
+            }
+          ],
+          "assigned_agent": "python-backend-engineer",
+          "model": "sonnet",
+          "score": 0.900,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Single viable implementer candidate, re-confirmed here -- this is application/API-layer wiring over already-built domain primitives (CandidateFact, classify(), the conflict-aware repositories), the same profile of work sprint3_ar1_assignments.json's DASH-STORY-022/023 both scored as single-candidate items for the same agent.",
+          "hld_ownership_crosscheck": "MATCH - HLD.md Section 3.4 (routing truth table for CandidateFact/classify()); Section 3.8 (Zone 7 conflict-detection sweep, OAQ-14, FR-013's origin).",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-026-DEV-1",
+              "text": "Given the design doc's Section 3 wire schema (predicate/subject_scope on WriteMemoryRequest.content, retrieval_context_hash with pattern ^[0-9a-f]{64}$ on WriteMemoryRequest.provenance), When openapi.yaml and schemas.py are updated, Then WriteReceipt.status widens to Literal[\"accepted\",\"partial\"] and gains zone5_written/zone3_edges_written/zone3_edges_failed fields, all optional/default-empty so existing Zone 1/2/4 receipts are byte-for-byte unaffected.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 3 and Section 4.2 step 6 (this session's own read, verbatim schema)."
+            },
+            {
+              "ac_id": "AC-026-DEV-2",
+              "text": "Given the design doc's Section 4.2 step 0 routing gate, When an ordinary Zone 1/2/4 write (entity_refs empty, zone_hint in {working, episodic, procedural} or absent) is submitted, Then it does NOT enter CandidateFact/classify() at all and behaves identically before and after this change -- the routing gate uses the existing _WIRE_TO_DOMAIN_ZONE map (app.py:71-80) against ZoneId.SEMANTIC, never a bare zone_hint == \"semantic\" string comparison.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 4.2 step 0 (this session's own read)."
+            },
+            {
+              "ac_id": "AC-026-DEV-3",
+              "text": "Given Section 4.2 step 6's exact response contract, When Zone 5 succeeds but one or more Zone 3 edge writes fail partway through step 4's loop, Then the response is 207 Multi-Status with status=\"partial\", zone5_written=True, and zone3_edges_failed populated with the failing item_ids; when Zone 5 itself fails, the response is 503 WRITE_REJECTED_NOT_DURABLE with no Zone 3 attempt made.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 4.2 step 6 (this session's own read, verbatim contract)."
+            }
+          ],
+          "must_not_deviate": [
+            "Does not reopen the HLD-locked routing truth table (HLD.md Section 3.4) or CandidateFact/classify()'s own algorithm -- both are locked, tested collaborators; this sub-task only adds call sites and wire-schema fields that route into them, per the design doc's own Section 2",
+            "Does not add a Zone 4 leg -- the design doc's own truth table has no Zone 4 row; Zone 4's Procedure entity carries no subject_scope/predicate shape this routing operates on",
+            "Does not fix GitHub #25 (the pre-existing zone_hint == \"procedural\"/\"episodic\" bare-string-comparison bug) -- explicitly disclosed but out of scope, per the design doc's Section 4.2 step 0 callout and its own Revision note",
+            "Does not attempt cross-zone atomicity (2-phase-commit/saga) for the Zone 5 + Zone 3 write pair -- explicitly out of scope per Section 6, tracked under the existing AR1-S3-G3 limitation; the fail-fast-plus-honest-partial-reporting contract (step 6) is the deliberate substitute, not a placeholder"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S4-026-DEV."
+        },
+        {
+          "sub_task_id": "DASH-STORY-026-QA",
+          "label": "QA",
+          "title": "Write the real HTTP-level integration test covering the design doc's Section 5, 14-case matrix",
+          "deliverable": "A new or extended file under tests/integration/, mirroring tests/integration/test_api_real_postgres_e2e_dash3.py's real-Postgres/real-TestClient style, implementing all 14 cases from Section 5: case 0 (routing-gate regression guard), cases 1-6 (the truth-table routing combinations: GeneralFact, Zone-5-only, Zone-5-only-with-unused-objects, Zone-5-plus-Zone-3-edge, multi-subject cross-product, empty cross-product), case 7-8 (missing predicate/subject_scope -> 400), case 9 (object-only entity_refs collapse), case 10-11 (partial-failure 207 and Zone-5-failure 503), case 12-13 (missing/malformed retrieval_context_hash -> 400/422).",
+          "files": [
+            "A new or extended file under tests/integration/, mirroring tests/integration/test_api_real_postgres_e2e_dash3.py's real-Postgres/real-TestClient style per the design doc's own Section 5 wording"
+          ],
+          "candidates": [
+            {
+              "agent": "integration-testing-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.85, "skill_coverage": 0.80},
+              "score": 0.825,
+              "above_threshold": true,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json SPRINT4-CAND-001-B. Its own agent.md names exactly this shape of work as a core responsibility: 'Database integration testing,' 'REST/gRPC API testing: Test request/response serialization, error codes,' matching Section 5's matrix (400/422/207/503 status codes, WriteReceipt.status widening, real Postgres via TestClient). Mandatory skills integration-testing-core and contract-testing-core cover the API-contract-verification half of the work."
+            },
+            {
+              "agent": "qa-testing-agent",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.70, "skill_coverage": 0.75},
+              "score": 0.725,
+              "above_threshold": false,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json SPRINT4-CAND-001-B. Below this file's 0.75 assignment threshold (though above AR.0's own 0.70 scoring threshold) -- retained as a genuine consult/secondary candidate per sprint4_ar0_routing_index.json's own qa_persona_search.disposition, not dropped, since its mandatory python-core/api-design-core/json-core skills also cover pytest authoring and API-contract assertions for this matrix."
+            }
+          ],
+          "assigned_agent": "integration-testing-engineer",
+          "model": "sonnet",
+          "score": 0.825,
+          "runner_up": {
+            "agent": "qa-testing-agent",
+            "score": 0.725
+          },
+          "margin": 0.100,
+          "consult_agents": ["qa-testing-agent"],
+          "rationale": "integration-testing-engineer clears the 0.75 assignment threshold; qa-testing-agent's AR.0 score (0.725) does not clear it, so it is recorded as a consult/secondary resource rather than co-executor, consistent with this file's assignment_rule (only the highest-scoring above-threshold candidate is the assigned agent). Both personas were disclosed and scored rather than one being silently picked, per sprint4_ar0_routing_index.json's own qa_persona_search finding.",
+          "hld_ownership_crosscheck": "MATCH - design doc Section 5 (test matrix); HLD.md Section 3.4 (routing truth table the matrix exercises).",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-026-QA-1",
+              "text": "Given the design doc's Section 5 case 0, When an ordinary Zone 1/2/4 write is submitted after this change lands, Then it behaves identically to before the change -- it must NOT enter CandidateFact/classify() at all, and must NOT 422/400 on a missing subject_scope it was never asked to supply. This is the single most important regression guard the matrix specifies.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 5, case 0 (verbatim, this session's own read)."
+            },
+            {
+              "ac_id": "AC-026-QA-2",
+              "text": "Given the design doc's Section 5 cases 1-9, When each truth-table combination of |subjects|/|objects|/index_reverse/predicate/subject_scope is submitted, Then the resulting Zone 3/Zone 5 write pattern matches HLD Section 3.4's routing truth table exactly for that combination (including the case-4-vs-case-3 index_reverse distinction and case 6's documented empty-cross-product non-error).",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 5, cases 1-9 (verbatim, this session's own read), cross-referenced with Section 2's routing truth table."
+            },
+            {
+              "ac_id": "AC-026-QA-3",
+              "text": "Given the design doc's Section 5 cases 10-13, When a Zone 5-then-Zone-3 write sequence partially fails, Zone 5 alone fails, retrieval_context_hash is missing, or retrieval_context_hash is malformed (wrong length/case/non-hex), Then the test asserts the exact status code and body shape Section 4.2 step 6 and step 5b specify (207/status=\"partial\"/zone3_edges_failed non-empty; 503 WRITE_REJECTED_NOT_DURABLE with both zone3 lists empty; 400 INVALID_REQUEST; 422 from Pydantic's own Field(pattern=...) validation respectively) -- not silently reported as full success.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 5, cases 10-13 (verbatim, this session's own read)."
+            }
+          ],
+          "must_not_deviate": [
+            "Test style must mirror tests/integration/test_api_real_postgres_e2e_dash3.py -- real Postgres, real TestClient, not mocks, per the design doc's own Section 5 wording",
+            "Does not shrink the matrix below the design doc's own 14 cases, and does not silently drop case 0's routing-gate regression guard, which the design doc itself calls the single most important guard this change introduces",
+            "Does not assert crypto-shredding or cross-zone-atomicity behavior -- both are explicitly out of scope per the design doc's Section 6; the matrix tests the fail-fast-plus-honest-partial-reporting contract only"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S4-026-QA. Depends on DASH-STORY-026-DEV landing first (the test exercises the real _do_write routing logic, not a mock)."
+        },
+        {
+          "sub_task_id": "DASH-STORY-026-REVIEW",
+          "label": "Review",
+          "title": "Re-verify the implementation against the design doc's own decisions, especially the routing gate and the 400/422/207 contract",
+          "deliverable": "A gate review confirming the shipped Dev sub-task matches the design doc's own locked decisions: (1) the Section 4.2 step 0 routing gate normalizes zone_hint via _WIRE_TO_DOMAIN_ZONE and does not repeat GitHub #25's bare-string-comparison defect; (2) the Section 4.2 step 5b / step 6 status-code contract is exactly 400 INVALID_REQUEST for domain-constructor ValueErrors, 422 for Pydantic's own request-schema validation (including the retrieval_context_hash pattern), 207 Multi-Status for a partial Zone 3 failure after a successful Zone 5 write, and 503 WRITE_REJECTED_NOT_DURABLE for a Zone 5 failure; (3) the HLD Section 3.4 routing truth table is not silently diverged from; (4) the fail-fast-plus-honest-partial-reporting failure mode (no rollback, per-edge provenance_id, no shared provenance_id across edges) has a defined, disclosed failure path and no silently-dropped rollback assumption.",
+          "files": [
+            "Review output only -- no source files modified by this sub-task"
+          ],
+          "candidates": [
+            {
+              "agent": "api-security-auditor",
+              "model": "sonnet",
+              "role": "Primary reviewer -- re-check the 400/422/207/503 status-code contract and the Zone 3/5 write path's authorization/PII handling",
+              "signals": {"domain_match": 0.85, "skill_coverage": 0.75},
+              "score": 0.800,
+              "above_threshold": true,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json's advisory_review_roster. Directly confirmed by GitHub #23's own body text: this is the exact persona that performed the 2026-09-21 re-verification which produced #23 itself. Mandatory api-testing-core covers HTTP-contract/status-code audit; application-security-core covers input-validation review of the new predicate/subject_scope/retrieval_context_hash fields (including the ^[0-9a-f]{64}$ pattern's fail-fast placement at the wire boundary). Its own agent.md: 'The agent does not remediate API vulnerabilities or modify API code. It audits, reproduces, and reports' -- a re-check role, matching this sub-task exactly."
+            },
+            {
+              "agent": "solution-architect",
+              "model": "opus",
+              "role": "Gate reviewer -- confirms the implemented change matches HLD Section 3.4's routing truth table and does not silently diverge from the locked CandidateFact/classify() contract",
+              "signals": {"domain_match": 0.75, "skill_coverage": 0.70},
+              "score": 0.725,
+              "above_threshold": false,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json's advisory_review_roster. Below this file's 0.75 assignment threshold (though above AR.0's own 0.70 scoring threshold); retained as a non-blocking secondary reviewer for the architecture-conformance slice specifically, not the primary reviewer of record."
+            },
+            {
+              "agent": "consensus-agent",
+              "model": "sonnet",
+              "role": "Gate reviewer -- validates the fail-fast-plus-honest-partial-reporting contract has a defined failure mode and no silently-dropped rollback assumption",
+              "signals": {"domain_match": 0.75, "skill_coverage": 0.70},
+              "score": 0.725,
+              "above_threshold": false,
+              "evidence": "Score carried forward unchanged from sprint4_ar0_routing_index.json's advisory_review_roster. Below this file's 0.75 assignment threshold; retained as a non-blocking secondary reviewer for the failure-mode/rollback-scope slice specifically, per its own agent.md ('check that every agent step has a defined failure mode, retry policy, rollback scope, and escalation path'), matching Section 4.2 step 6's own explicit 'no rollback mechanism exists' disclosure."
+            }
+          ],
+          "assigned_agent": "api-security-auditor",
+          "model": "sonnet",
+          "score": 0.800,
+          "runner_up": {
+            "agent": "solution-architect",
+            "score": 0.725
+          },
+          "margin": 0.075,
+          "consult_agents": ["solution-architect", "consensus-agent"],
+          "rationale": "api-security-auditor clears the 0.75 assignment threshold and is confirmed by GitHub #23's own body as the persona already used for this exact re-verification. solution-architect and consensus-agent both score 0.725, below this file's 0.75 assignment threshold, so both are recorded as non-blocking consult reviewers for their respective narrower slices (architecture conformance; failure-mode/rollback disclosure) rather than co-primary reviewers, mirroring sprint4_ar0_routing_index.json's own advisory_review_roster disposition for both.",
+          "hld_ownership_crosscheck": "MATCH - HLD.md Section 3.4 (routing truth table); design doc Section 4.2 steps 5b/6 (status-code contract); design doc Section 6 (explicitly out-of-scope items api-security-auditor must confirm are not silently claimed as done).",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-026-REVIEW-1",
+              "text": "Given the shipped Dev sub-task, When api-security-auditor re-checks the routing gate, Then it confirms zone_hint is compared only via _WIRE_TO_DOMAIN_ZONE against ZoneId.SEMANTIC (never a bare string), and that GitHub #25's separate, pre-existing zone_hint bare-string-comparison defect for Zone 2/4 was NOT silently fixed as an out-of-scope side effect nor silently left broken in a way this story's own routing gate now depends on.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 4.2 step 0 (this session's own read)."
+            },
+            {
+              "ac_id": "AC-026-REVIEW-2",
+              "text": "Given the shipped Dev sub-task and the QA sub-task's 14-case matrix results, When api-security-auditor re-verifies the 400/422/207/503 response contract, Then every case's actual status code and body shape (including WriteReceipt.status=\"partial\" and the zone5_written/zone3_edges_written/zone3_edges_failed fields) matches Section 4.2 step 6's decided contract exactly, with no case silently reporting partial success as full success (202) or vice versa.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 4.2 step 6 (this session's own read, verbatim contract)."
+            },
+            {
+              "ac_id": "AC-026-REVIEW-3",
+              "text": "Given Section 6's disclosed permanent out-of-scope item (true cross-zone atomicity for the Zone 5 + Zone 3 write pair), When the review completes, Then it confirms the shipped code and its documentation do not claim atomicity coverage it does not have, and that the fail-fast-plus-honest-partial-reporting contract's 'no rollback mechanism exists' disclosure remains accurate against the actual shipped behavior.",
+              "source": "docs/phase-1.5-api/fr013-predicate-schema-design.md Section 4.2 step 6 and Section 6 (this session's own read)."
+            }
+          ],
+          "must_not_deviate": [
+            "Does not remediate or modify API code -- per api-security-auditor's own agent.md, this sub-task audits, reproduces, and reports; any defect found is raised as a new finding, not silently patched inside the review",
+            "Does not re-open the conflict-detection sweep's own algorithm (domain/conflict_detection.py) or the crypto-shredding mechanism gap (AC-013) -- both are out of this story's scope per the design doc's own Section 6 and sprint3_ar1_assignments.json's DASH-STORY-025 disposition, and must not be conflated with this story's narrower wire-schema scope",
+            "Must not present this story as closing GitHub #23 until the review has actually run and reported, per this block's own acceptance_criteria"
+          ],
+          "p1_security_review": false,
+          "p1_trigger_evaluation": "Considered and NOT triggered under the literal three criteria -- see p1_security_override.considered_and_not_triggered above. This Review sub-task is the non-blocking advisory action that section recommends in place of a P1 gate.",
+          "logging_note": "Cite as AR1-S4-026-REVIEW. Depends on DASH-STORY-026-DEV and DASH-STORY-026-QA both landing first -- this is a post-implementation re-check, not a pre-implementation design review (the design doc itself already went through six review rounds pre-implementation, per its own Change Log)."
+        }
+      ],
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S4-026. Closes GitHub #23. Depends on nothing else in Sprint 4 -- this is Sprint 4's only candidate item (sprint4_ar0_routing_index.json's own planning_status.status)."
+    }
+  ],
+  "dependency_integrity_check": {
+    "method": "error-handling-patterns - traverse backlog_draft.json's combined dependency_graph (Sprints 1-3) plus this file's own Sprint 4 edges for cycles and assignment-induced deadlocks before any agent is dispatched. Same method sprint2_ar1_assignments.json/sprint3_ar1_assignments.json used.",
+    "sprint_4_edges": {
+      "DASH-STORY-026-DEV": [],
+      "DASH-STORY-026-QA": ["DASH-STORY-026-DEV"],
+      "DASH-STORY-026-REVIEW": ["DASH-STORY-026-DEV", "DASH-STORY-026-QA"]
+    },
+    "cycle_detection": "PASS - a strict linear chain (Dev -> QA -> Review) within a single story, no cross-story edges since Sprint 4 has exactly one candidate item. No Sprint 4 sub-task is referenced by any Sprint 1-3 story's own depends_on array.",
+    "sequencing_note_non_blocking": "None -- unlike Sprint 3's DASH-STORY-023/024 (which had a functional-but-not-DAG dependency), Sprint 4's three sub-tasks have a real, DAG-level sequencing dependency (QA needs Dev's real routing logic to test against; Review needs both Dev's shipped code and QA's matrix results to re-check against), recorded as explicit edges above rather than a soft note.",
+    "assignment_induced_deadlock": "NONE. python-backend-engineer (Dev), integration-testing-engineer (QA), and api-security-auditor (Review) are three distinct agents with a strict linear handoff -- no two sub-tasks mutually block each other's assigned agent.",
+    "unresolvable_dependency": "NONE.",
+    "serialization_warning": "python-backend-engineer holds the Dev sub-task, continuing the concentration pattern flagged across all three prior sprints (Sprint 1: 64%, Sprint 2: 89%, Sprint 3: 56.25% post-rebalance, per sprint3_ar1_assignments.json's own agent_load_note) and restated in sprint4_ar0_routing_index.json's AR0-S4-F2 as now the fourth consecutive routing pass. Unlike Sprint 3, Sprint 4 has only one story and no alternative Python-backend persona exists in the library for a single-Python-3.12 codebase (HLD NFR-001), so rebalancing is not possible here -- this file restates rather than re-litigates the finding, per sprint4_ar0_routing_index.json's own SP4-DEC-002 disposition."
+  },
+  "routing_gaps": [
+    {
+      "id": "AR1-S4-G1",
+      "severity": "LOW",
+      "story": "DASH-STORY-026-QA",
+      "gap": "qa-testing-agent (0.725) is a real, above-AR.0-threshold candidate but does not clear this file's 0.75 assignment threshold, so it is recorded as a consult/secondary resource rather than co-executor.",
+      "why_not_force_assigned": "N/A - integration-testing-engineer (0.825) clears threshold and is assigned as primary; qa-testing-agent is retained as a named consult, not force-assigned as co-executor.",
+      "recommended_action": "See sprint4_ar0_routing_index.json's own open_questions_for_user SP4-DEC-001: if the team later standardizes on one generalist QA owner across sprints instead of per-item testing-technique specialists, qa-testing-agent would become the default primary for future integration-test sub-tasks."
+    },
+    {
+      "id": "AR1-S4-G2",
+      "severity": "LOW",
+      "story": "DASH-STORY-026-REVIEW",
+      "gap": "solution-architect (0.725) and consensus-agent (0.725) are both real, above-AR.0-threshold candidates but neither clears this file's 0.75 assignment threshold, so both are recorded as non-blocking consult reviewers rather than co-primary reviewers alongside api-security-auditor.",
+      "why_not_force_assigned": "N/A - api-security-auditor (0.800) clears threshold and is assigned as primary reviewer; solution-architect and consensus-agent are retained as named consults for their narrower slices (architecture conformance; failure-mode/rollback disclosure), not force-assigned as co-primary.",
+      "recommended_action": "None required for this story to proceed -- api-security-auditor's review scope (Section 4.2 step 5b/6's contract, the routing gate) already subsumes the practical substance of both consult reviewers' narrower concerns; the consults remain available if the user wants an independent second opinion on architecture conformance or failure-mode disclosure specifically."
+    }
+  ],
+  "summary": {
+    "stories_total": 1,
+    "sub_tasks_total": 3,
+    "sub_tasks_assigned": 3,
+    "sub_tasks_unassigned": 0,
+    "below_threshold_assignments": 0,
+    "distinct_implementing_agents": 3,
+    "agent_load": {
+      "python-backend-engineer": {
+        "sub_tasks": 1,
+        "story_points_share": "not sub-allocated -- story_points (8) tracked at the story level, not split per sub-task, since Dev/QA/Review are sequential phases of one story, not independently estimated stories",
+        "sub_task_ids": ["DASH-STORY-026-DEV"]
+      },
+      "integration-testing-engineer": {
+        "sub_tasks": 1,
+        "sub_task_ids": ["DASH-STORY-026-QA"],
+        "consult_role_from": ["qa-testing-agent"]
+      },
+      "api-security-auditor": {
+        "sub_tasks": 1,
+        "sub_task_ids": ["DASH-STORY-026-REVIEW"],
+        "consult_role_from": ["solution-architect", "consensus-agent"]
+      }
+    },
+    "cross_sprint_agent_load_note": "Combined with Sprints 1-3 (7 + 8 + 6 = 21 stories), python-backend-engineer now holds the Dev sub-task of Sprint 4's one story, continuing (not newly establishing) the concentration pattern sprint4_ar0_routing_index.json's own AR0-S4-F2 already restated as the fourth consecutive routing pass to find the same thing -- see that file's own SP4-DEC-002 for the still-open deferral.",
+    "p1_flagged_stories": [],
+    "p1_reviewers": {},
+    "p1_considered_not_triggered": [
+      "DASH-STORY-026 (FR-013 predicate schema wiring) - see p1_security_override.considered_and_not_triggered; advisory review (Review sub-task, api-security-auditor) attached instead"
+    ],
+    "blocking_math_delegations": [],
+    "advisory_math_delegations": [],
+    "score_range": {
+      "min": 0.800,
+      "max": 0.900,
+      "mean": 0.842
+    },
+    "fr016_minting_confirmation": "Not applicable to Sprint 4 -- this file's sole story traces to FR-013 (an existing, already-numbered FR), not a candidate for new FR minting.",
+    "open_user_decisions": [
+      {
+        "decision_id": "SP4-DEC-201",
+        "story": "DASH-STORY-026 (FR-013 predicate schema wiring)",
+        "decision": "Authorize the non-blocking api-security-auditor advisory review attached to this story's Review sub-task, given GitHub #23's own body already names this persona as the one that performed the 2026-09-21 re-verification this story's implementation closes.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-026-REVIEW is dispatched in a future Phase B round",
+        "status": "OPEN - not yet answered by the user in this session.",
+        "acceptance_criteria": "If accepted, the review must actually run and report before this story is presented as closing GitHub #23."
+      },
+      {
+        "decision_id": "SP4-DEC-202",
+        "story": "DASH-STORY-026-QA / DASH-STORY-026-REVIEW",
+        "decision": "Restates sprint4_ar0_routing_index.json's own SP4-DEC-001: should future sprints standardize on one generalist QA owner (qa-testing-agent) across all items, or continue routing each item to the narrowest-fitting specialist (integration-testing-engineer here) as this file and Sprint 1-3's routing files have implicitly done? Also applies to the Review sub-task's solution-architect/consensus-agent consult roster.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before Phase B execution grouping for Sprint 4 begins",
+        "status": "OPEN - carried forward unanswered from sprint4_ar0_routing_index.json's own SP4-DEC-001.",
+        "acceptance_criteria": "N/A - a team-shape/consistency preference, not a coverage gate."
+      }
+    ],
+    "agent_load_note": "Sprint 4 has exactly one story split into three sequential sub-tasks (Dev -> QA -> Review), each assigned to a distinct agent at or above this file's 0.75 threshold. No rebalancing question applies the way Sprint 3's SP3-DEC-106 did, since there is no alternative Python-backend persona for the Dev sub-task and no multi-story load to redistribute."
+  }
+}
