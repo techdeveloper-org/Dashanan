@@ -2,12 +2,22 @@
 
 ## Scope note (read before the Inputs section)
 
+**UPDATE 2026-09-21 (post-user-review):** `docs/phase-7-routing/sprint4-phase-c-gate-results.md`
+now exists — a real, dispatched paired-detector run (C-1 hallucination-detector + C-2
+context-faithfulness-engineer RAGAS Faithfulness pass), matching Sprint 2/3's own methodology
+exactly. It found 2 real LOW-severity defects (both fixed) and returned an overall PASS. The
+evidentiary gap this section originally disclosed is resolved; the CONDITIONAL_PASS below is
+superseded by that file's own PASS verdict. The rest of this section is left unedited as the
+historical record of the original gap, per this project's own disclosure convention (never
+silently rewrite a prior finding out of the record).
+
 Sprint 2's and Sprint 3's RS documents (`sprint2-ar5-rs-computation.md`,
 `sprint3-ar5-rs-computation.md`) both source their `a`/`b` inputs from a dedicated,
 on-disk Phase C gate-results artifact (`sprint2-phase-c-gate-results.md`,
 `sprint3-phase-c-gate-results.md`), each itself the output of a paired-detector run
 (C-1 hallucination-detector for NLI faithfulness + FactScore, cross-checked by a C-2
-RAGAS Faithfulness pass). **No `sprint4-phase-c-gate-results.md` exists in this repo.**
+RAGAS Faithfulness pass). **No `sprint4-phase-c-gate-results.md` existed in this repo at
+the time this section was first written** (see the UPDATE note above for its current state).
 The task brief that requested this document states the bundle (`sprint4_ar0_routing_index.json`,
 `sprint4_ar1_assignments.json`, `sprint4_ar3_context_windows.json`,
 `sprint4_implementation_execution_plan.json`) is "all Phase-C-approved" — this document
@@ -130,7 +140,19 @@ session's own single-reviewer pass, with zero contradictions found.
 
 ## Verdict
 
-**CONDITIONAL_PASS, with a disclosed evidentiary gap** — RS_phase7_sprint4 = 1.00 >=
+**UPDATE 2026-09-21: PASS (unconditional)** — `sprint4-phase-c-gate-results.md` now exists,
+recording a real C-1 hallucination-detector + C-2 context-faithfulness-engineer paired-detector
+run against the full Sprint 4 bundle, matching Sprint 2/3's own methodology exactly. Result: 2 real
+LOW-severity defects found (a wrong file path and a wrong line-range citation in
+`sprint4_ar3_context_windows.json`), both fixed in place; one non-blocking design-doc-level
+inaccuracy also found and fixed at its source. Overall verdict PASS, no HIGH/MEDIUM findings. The
+evidentiary gap below (originally CONDITIONAL_PASS) is resolved — Sprint 4 now carries the same
+evidentiary standard as Sprint 2/3. `SP4-DEC-201`/`SP4-DEC-202` were also separately resolved by
+user decision (2026-09-21): SP4-DEC-201 AUTHORIZED, SP4-DEC-202 answered KEEP NARROWEST-FITTING
+SPECIALIST — see `sprint4_ar1_assignments.json`'s `open_user_decisions` for the resolution record.
+
+**Original verdict (superseded above, left for the historical record):**
+CONDITIONAL_PASS, with a disclosed evidentiary gap — RS_phase7_sprint4 = 1.00 >=
 0.95 threshold, on the two components measurable at this phase, computed from this
 session's own direct read of the four Sprint 4 routing artifacts (not Sprint 4
 implementation code, which does not yet exist — the IEP is explicit that Phase B is

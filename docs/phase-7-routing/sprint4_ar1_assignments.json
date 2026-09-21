@@ -337,7 +337,7 @@
         "decision": "Authorize the non-blocking api-security-auditor advisory review attached to this story's Review sub-task, given GitHub #23's own body already names this persona as the one that performed the 2026-09-21 re-verification this story's implementation closes.",
         "owner": "user (Piyush Makhija)",
         "due_date": "before DASH-STORY-026-REVIEW is dispatched in a future Phase B round",
-        "status": "OPEN - not yet answered by the user in this session.",
+        "status": "RESOLVED 2026-09-21 - user answered AUTHORIZED (\"Yes, authorize\") via AskUserQuestion.",
         "acceptance_criteria": "If accepted, the review must actually run and report before this story is presented as closing GitHub #23."
       },
       {
@@ -346,7 +346,7 @@
         "decision": "Restates sprint4_ar0_routing_index.json's own SP4-DEC-001: should future sprints standardize on one generalist QA owner (qa-testing-agent) across all items, or continue routing each item to the narrowest-fitting specialist (integration-testing-engineer here) as this file and Sprint 1-3's routing files have implicitly done? Also applies to the Review sub-task's solution-architect/consensus-agent consult roster.",
         "owner": "user (Piyush Makhija)",
         "due_date": "before Phase B execution grouping for Sprint 4 begins",
-        "status": "OPEN - carried forward unanswered from sprint4_ar0_routing_index.json's own SP4-DEC-001.",
+        "status": "RESOLVED 2026-09-21 - user answered KEEP NARROWEST-FITTING SPECIALIST via AskUserQuestion (not deferred; a real decision, not a punt). DASH-STORY-026-QA stays assigned to integration-testing-engineer; no standardization on a generalist qa-testing-agent persona.",
         "acceptance_criteria": "N/A - a team-shape/consistency preference, not a coverage gate."
       }
     ],
