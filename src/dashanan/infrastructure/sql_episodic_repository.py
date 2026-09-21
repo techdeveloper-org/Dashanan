@@ -341,7 +341,24 @@ class SqlEpisodicRepository:
         """
         self._require_tenant(episode.tenant_id)
         try:
-            self._execute(
+            # _APPEND_SQL is a plain INSERT with no RETURNING clause, so
+            # (unlike this class's SELECT-issuing methods) it must not go
+            # through the shared _execute() helper -- that helper's
+            # cursor.fetchall() call raises psycopg.ProgrammingError
+            # against a real driver when there is no result set to fetch.
+            # The connection is opened with autocommit=False
+            # (composition_root.build_postgres_connection), so the write
+            # is explicitly committed here, mirroring
+            # SqlManifestRepository.insert_batch's own commit-after-insert
+            # precedent. This module's own `SqlConnection` Protocol
+            # (unlike SqlManifestRepository's) does not declare `commit`,
+            # and several existing tests pass a minimal double that
+            # implements only `cursor()` -- `commit` is called only when
+            # the connection actually exposes it, so a real driver
+            # connection is durably committed while those doubles are
+            # unaffected.
+            cursor = self._connection.cursor()
+            cursor.execute(
                 _APPEND_SQL,
                 (
                     episode.tenant_id,
@@ -357,6 +374,9 @@ class SqlEpisodicRepository:
                     json.dumps(dict(episode.score_terms)),
                 ),
             )
+            commit = getattr(self._connection, "commit", None)
+            if commit is not None:
+                commit()
         except Exception as exc:  # noqa: BLE001 -- converted to typed domain error below
             raise ZoneRepositoryError(
                 zone=ZoneId.EPISODIC.value, reason=str(exc)
