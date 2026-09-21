@@ -10,29 +10,33 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 >
 > Full rationale: [`docs/orchestration/01-vision-and-prd.md`](docs/orchestration/01-vision-and-prd.md).
 
-> ⚠️ **Status (updated 2026-09-19):** Phases 0 through 8 of the architecture/planning pipeline are complete and approved — PRD, HLD (19 ADRs), OpenAPI 3.1.0 contract, [`SRS.md`](SRS.md), 7 UML/Draw.io diagrams, a live Jira board (`DSHN` project; Sprint 1 implemented and merged, Sprint 2 planned — see below), agent-task routing, and pre-implementation alignment are all done and reviewed for all 11 Sprint 1 stories — the original 10 (`ir5_alignment_verdict.json`) plus DASH-STORY-011's own genuine supplemental review (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`); see `docs/` for the full trail). **STOP 8 reached: IMPLEMENTATION READY.** **Phase B started 2026-09-19** — all 11 Sprint 1 stories are now implemented: DASH-STORY-001 landed first (`cba559f`); DASH-STORY-002 through 010 landed via a dependency-gated `Workflow`-tool run (`d888536`), including a full adversarial P1 security remediation round for DASH-STORY-004/005/006/007 (see Local development below). Future-sprint FR-003/004/005/008 (Zones 3/4/5/8): **Sprint 2 planning complete** (2026-09-19) —
-9 real INVEST stories (`DSHN-61`..`DSHN-69`, Jira Sprint 2 `sprint_id 201`) went through real
-Phase 6 (Sprint Planning) → Phase 7 (Agent-Task Routing) → Phase 8 (Alignment); **no Sprint 2 code
-has been written yet** — see `docs/phase-7-routing/sprint2_ar1_assignments.json` for the routing
-detail. **All 5 Sprint 2 routing decisions are now resolved** (2026-09-20, `SP2-DEC-001..005`):
-DSHN-69's two advisory reviews (crypto-security-specialist + cloud-security-architect) are
-**authorized but not yet executed**; the 89% `python-backend-engineer` workload concentration is
-**deferred to a future execution-grouping pass**, with an explicit re-evaluation trigger (real
-observed bottleneck data), not silently dropped; DSHN-67's P1 security gate is **confirmed
-mandatory**. **Sprint 3 candidate scoped** (2026-09-20, backlog stub only, no Phase 6 pass yet):
-`FR-014` (wire/API layer implementing the existing `openapi.yaml` contract, the concrete path to
-closing the DSHN-60 security-wiring gap below) and `FR-015` (Shape B deployment infra — Postgres/
-Redis/Qdrant/OpenSearch/S3 — where the production DB-role-wiring gap closes for real), combined
-into a single future sprint wave — see `docs/phase-6-sprint-planning/backlog_draft.json`'s
-`future_sprints_backlog`. The **Harness Gate (Phase A.6/A.6.1)** was activated 2026-09-19, retroactively — see `docs/phase-A6-harness/`; Phase H (eval/regression gate) remains deferred. The **Phase F.1-F.6 Security Audit** ran 2026-09-19: F.1-F.5 findings resolved across 3 bounded remediation rounds (a real signing-key forgery collision closed, a write-rate-limiter added, key-rotation support, an SBOM, a `pip-audit` CI gate), but **F.6's binary gate is still REJECTED** after exhausting the 3-attempt cap — accepted as a disclosed architectural gap (see the security-wiring gap bullet above, and `FR-014` above for its closure path), tracked open at `DSHN-60`/[GitHub #20](https://github.com/techdeveloper-org/Dashanan/issues/20), not silently closed.
-
-> **Implementation Ready — with these documented pre-implementation decisions pending** (added 2026-09-18, per a repo-wide consistency audit). "Implementation Ready" above means the planning pipeline's own gates all passed; it does not mean every underlying architecture question is closed. The following items in [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md)'s Open Architecture Questions table are genuinely still open and should be resolved (or explicitly accepted as-is) before or early in Phase B:
-> - **OAQ-10** — DPDP erasure via crypto-shredding of an append-only audit store. Status: Proposed. Whether key destruction constitutes erasure under DPDP Act 2023 requires legal confirmation, not an architect's judgment.
-> - **OAQ-13** — All NFR-004 capacity/latency numbers (2,000 read QPS / 5,000 write QPS / 99.9% availability, Profile C) are `[ASSUMED]`, not measured. Must be confirmed before further scaling decisions build on them.
-> - **OAQ-18** — Regulated-identifier detection at the write gate (ADR-017). Status: Partially resolved — the identifier set (Aadhaar/PAN/payment card) has a citation-backed recommendation, but counsel ratification and the formal fail-open/fail-closed choice remain open.
-> - **OAQ-20** — Per-zone Frequency `f_cap` defaults (§12G). Status: Partially resolved — `[ASSUMED]` starting defaults only (Zone 1: 20, Zone 2: 100), not validated against real access-count telemetry.
-> - **OAQ-22** — `context.assemble` RPC transport shape at large token budgets (ADR-019). Status: Partially resolved — unary transport is adopted, but the specific streaming-mandatory token-count threshold stays open pending a benchmarking pass.
-> - **Security-wiring gap (added 2026-09-19, from the Phase F.1-F.6 Security Audit, `DSHN-60`/[GitHub #20](https://github.com/techdeveloper-org/Dashanan/issues/20), left intentionally open)** — `src/dashanan/infrastructure/composition_root.py` builds `MemoryOrchestrator`/`ProvenanceWriteGate`/the FR-013 conflict-detection sweep with secure-by-construction defaults (a required `tenant_credential_signing_key`, no silent insecure fallback, `verify_privileges` required with no default). Nothing in this repo actually calls it: there is no `api/`/`app`/server module or any host application anywhere in `src/` yet (`pyproject.toml` has zero runtime dependencies), so the secure wiring, and HLD Threat S-1's authentication control and Threat T-1's conflict-detection sweep, exist as correctly-built components with **no live call path exercising them**. Currently non-exploitable (there is no deployment surface to exploit), but a real architectural gap, not a resolved one — must be closed when the wire/API layer story lands, by having that story's composition root call `composition_root.py`'s builders rather than constructing these classes with insecure/no-op test-only values directly.
+> ⚠️ **Status (updated 2026-09-21, v0.3.0 — see [`CHANGELOG.md`](CHANGELOG.md) for the full version
+> history):** Three sprints are implemented and merged. **Sprint 1** (Working/Episodic/
+> Retrieval-Index/Provenance zones, Memory Score, rotation state machine, WAL/outbox gate) landed
+> 2026-09-19. **Sprint 2** (Semantic/Procedural/Entity/Consolidation zones — Zones 3/4/5/8) landed
+> 2026-09-20. **Sprint 3** landed 2026-09-21: a real FastAPI wire/API host
+> (`src/dashanan/api/`, 32 endpoints, JWT bearer auth, closes the security-wiring gap this README
+> used to flag as open — see `DSHN-60`/[GitHub #20](https://github.com/techdeveloper-org/Dashanan/issues/20),
+> now closed), Shape B deployment infrastructure (`docker-compose.yml` — Postgres/Redis/Qdrant/
+> OpenSearch/S3, a real migration runner with per-zone least-privilege DB roles), the FR-013
+> conflict-detection sweep wired into the application-layer write path, and the first real
+> end-to-end integration suite wiring the live API host to a real, live Postgres connection.
+>
+> **What's next — FR-013 API-layer reachability (GitHub [#23](https://github.com/techdeveloper-org/Dashanan/issues/23)):**
+> Zone 3/5 writes are wired at the application layer (above) but still unreachable through the
+> public API — `POST /memory/write` has no wire field for the `predicate`/`subject_scope`/
+> `retrieval_context_hash` a Zone 3/5 write needs. The schema fix is fully designed and
+> **IMPLEMENTATION-READY** (`docs/phase-1.5-api/fr013-predicate-schema-design.md`, v7, 9.8/10,
+> 7 independent review rounds), and a real Sprint 4 planning pass (AR.0→AR.1→AR.3→execution-plan→
+> Phase C gate→AR.5→IR.1, mirroring Sprint 1-3's own pipeline) is in progress before implementation
+> starts — see `docs/phase-7-routing/sprint4_*` once complete.
+>
+> **Known, disclosed gaps** (see [`CHANGELOG.md`](CHANGELOG.md)'s `[UNRELEASED]` section for the
+> current, authoritative list — do not treat this README bullet as more current than that file):
+> `_do_write`'s `zone_hint` comparisons don't match their own OpenAPI wire enum
+> ([GitHub #25](https://github.com/techdeveloper-org/Dashanan/issues/25), pre-existing, disclosed
+> not silently fixed); `AR1-S3-G3` — the API host shares one `psycopg.Connection` across zones,
+> not safe for concurrent writes without real pooling (FR-015 follow-up, not started).
 
 ## What problem does this solve?
 
@@ -64,69 +68,80 @@ A central **Memory Score** formula (`MemoryScore = w1·Recency + w2·Frequency +
 
 ## Getting started
 
-Sprint 1's Phase B implementation is complete (see the Status callout above and Local development
-below) — this is now a real, installable, tested Python library, not a pre-implementation
-planning repo. Sprint 2 (Zones 3/4/5/8) is planned but not yet implemented.
+Sprints 1-3 are implemented (see the Status callout above and Local development below) — this is
+a real, installable, tested Python library with a real FastAPI wire host and Shape B deployment
+infrastructure, not a pre-implementation planning repo. FR-013's remaining API-layer wiring
+(GitHub #23) is designed and implementation-ready, not yet implemented.
 
 Recommended reading order for someone new to the project:
 1. **This README** — problem statement, the 8-zone model, goals.
-2. [`SRS.md`](SRS.md) — the canonical requirements specification (13 FRs, 15 NFRs, 23 ACs): what the system is required to do.
+2. [`SRS.md`](SRS.md) — the canonical requirements specification (15 FRs, 15 NFRs, 23 ACs): what the system is required to do.
 3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 19 ADRs covering every major technology and mechanism choice.
 4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
 5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
 
 ## Local development
 
-Phase B is complete for Sprint 1 (2026-09-19). All 11 stories are implemented under
-`src/dashanan/`, Shape A (embedded library, in-process, no network) per HLD Section 2:
-DASH-STORY-001 (Memory Orchestrator facade, FR-009), DASH-STORY-002/003 (Zone 1/Zone 2),
-DASH-STORY-004 (Zone 2 cap/MaxAge backstop, with real cross-zone DPDP erasure cascade),
-DASH-STORY-005 (Zone 7 Provenance, append-only enforced by DB role ownership), DASH-STORY-006
-(WAL/outbox write-path gate), DASH-STORY-007 (Zone 6 hybrid retrieval, tenant-partitioned),
-DASH-STORY-008 (MemoryScore engine), DASH-STORY-009/010 (rotation state machine +
-deadline-invalidation wiring). DASH-STORY-011 (Qdrant spike) is a research/Jira artifact, not
-code, by design. Any zone request for a genuinely unregistered zone still degrades gracefully
-with `zones_unavailable` populated (AC-009-SUPP-1).
+**Sprint 1** (2026-09-19): 11 stories under `src/dashanan/`, Shape A (embedded library, in-process,
+no network) per HLD Section 2 — Memory Orchestrator facade, Zones 1/2/6/7, MemoryScore engine,
+rotation state machine, WAL/outbox write-path gate. DASH-STORY-004/005/006/007 initially failed a
+real adversarial P1 security review (a live-reproduced cross-tenant data leak, a forgeable
+write-path attestation, an unenforced append-only DB guarantee, a non-functional DPDP erasure
+claim) and were remediated and re-verified before merging — `docs/phase-A6-harness/` for the
+harness policy, Jira `DSHN-55`..`DSHN-58` for the trail.
 
-DASH-STORY-004/005/006/007 initially failed a real adversarial P1 security review (a
-live-reproduced cross-tenant data leak, a forgeable write-path attestation, an unenforced
-append-only DB guarantee, and a non-functional DPDP erasure claim) and were remediated and
-re-verified against the same adversarial reviewers before merging — see
-`docs/phase-A6-harness/` for the harness policy now governing this kind of work, and Jira
-`DSHN-55`..`DSHN-58` for the remediation trail.
+**Sprint 2** (2026-09-20): Zones 3/4/5/8 (Semantic/Procedural/Entity/Consolidation) with
+`EntityOwnershipSpecification` ownership/classification gates, object-store archival, and DPDP
+erasure-cascade extension.
+
+**Sprint 3** (2026-09-21): a real FastAPI wire host (`src/dashanan/api/` — JWT bearer auth,
+tenant-scope enforcement, 32 endpoints), Shape B deployment infra (`docker-compose.yml`, a real
+migration runner binding per-zone least-privilege DB roles to real env-sourced LOGIN credentials),
+the FR-013 conflict-detection sweep wired into the application-layer write path, and the repo's
+first real end-to-end suite (`tests/integration/test_api_real_postgres_e2e_dash3.py`) wiring the
+live API host to a real, live Postgres connection via `docker compose`.
 
 ```bash
 # Requires Python 3.12+ (NFR-001)
 pip install -e ".[dev]"
 python -m pytest -v
+
+# Real Postgres/Redis/Qdrant/OpenSearch/S3 stack (Shape B) for the full integration suite,
+# including tests/integration/test_api_real_postgres_e2e_dash3.py:
+docker compose up -d
 ```
 
-1004 tests pass as of the Phase F.1-F.6 security audit round (2026-09-19), including an AST-based
-architecture-fitness test enforcing HLD 3.0 invariant 1 (no `dashanan/domain/**` module may import
-`dashanan/infrastructure/**`) and a real Docker Postgres 16 regression test for DASH-STORY-005's
-append-only privilege fix. Run `python -m pytest -v` yourself to reconfirm the current count —
-this number is updated manually and can drift; do not treat it as more authoritative than a fresh
-test run.
+1719 tests pass as of Sprint 3 (2026-09-21), including an AST-based architecture-fitness test
+enforcing HLD 3.0 invariant 1 (no `dashanan/domain/**` module may import
+`dashanan/infrastructure/**`) and real Docker-Postgres regression tests for the DB-role-wiring
+fixes (GitHub #22/#24). Run `python -m pytest -v` yourself to reconfirm the current count — this
+number is updated manually and can drift; do not treat it as more authoritative than a fresh test
+run.
 
 ## Repository layout
 
 ```
 Dashanan/
 ├── README.md                    <- this file
-├── SRS.md                       <- Software Requirements Specification (13 FRs, 15 NFRs, 23 ACs)
+├── SRS.md                       <- Software Requirements Specification (15 FRs, 15 NFRs, 23 ACs)
+├── VERSION                      <- single-line semver, source of truth for the current release
+├── CHANGELOG.md                 <- Keep a Changelog format, full version history
+├── docker-compose.yml            <- Shape B stack: Postgres/Redis/Qdrant/OpenSearch/S3
 ├── docs/
 │   ├── orchestration_prompt.md  <- index into the 3-file orchestration bundle
 │   ├── orchestration/           <- 01-vision-and-prd.md, 02-architecture-workflow.md, 03-agent-registry.md
 │   ├── phase-1-architecture/    <- HLD.md, context-delivery-plan.md
-│   ├── phase-1.5-api/           <- openapi.yaml + test/review artifacts
+│   ├── phase-1.5-api/           <- openapi.yaml, FR-013 predicate schema design, + test/review artifacts
 │   ├── phase-2-validation/      <- joint BA/PM/SA blueprint validation
 │   ├── phase-6-sprint-planning/ <- backlog_draft.json, sprint_plan.json, jira_setup_report.json
-│   ├── phase-7-routing/         <- AR.0-AR.5 agent-task routing + 30 CoT implementation prompts
+│   ├── phase-7-routing/         <- AR.0-AR.5 agent-task routing (Sprints 1-4) + implementation prompts
 │   └── phase-8-alignment/       <- pre-implementation self-review + consensus gate records
-├── uml/                          <- 7 Mermaid diagrams (context, component, deployment, class, state, data-flow, sequence)
-├── drawio/                       <- same 7 diagrams as editable .drawio XML
-├── src/dashanan/                 <- Sprint 1 implementation (Shape A, embedded library): domain/, application/, infrastructure/
-├── tests/                        <- 1004 tests, including tests/integration/ (real cross-zone composition + adversarial suite)
+├── uml/                          <- Mermaid diagrams (context, component, deployment, class, state, data-flow, sequence)
+├── drawio/                       <- same diagrams as editable .drawio XML
+├── src/dashanan/
+│   ├── api/                      <- Sprint 3: real FastAPI wire host (JWT auth, 32 endpoints)
+│   ├── domain/, application/, infrastructure/  <- Sprints 1-3: all 8 zones, orchestrator, DB layer
+├── tests/                        <- 1719 tests, including tests/integration/ (real Postgres e2e, cross-zone, adversarial suites)
 └── pyproject.toml                <- pip install -e ".[dev]" — see Local development below
 ```
 
