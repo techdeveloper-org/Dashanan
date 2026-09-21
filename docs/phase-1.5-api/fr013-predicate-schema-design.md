@@ -1,22 +1,25 @@
 # FR-013 Predicate Schema Design — POST /memory/write Zone 3/5 Routing (GitHub #23)
 
 Status: IMPLEMENTATION-READY — pending user review. No implementation files have been modified.
-All three remaining open decisions from the v5 review round are now resolved with evidence from
-this codebase's own existing, established precedents (Section 4.2, steps 5/5b/7) — none were
-invented in the abstract.
+Every open decision raised across six review rounds is resolved with evidence from this
+codebase's own existing, established precedents — none were invented in the abstract.
 Related: GitHub issue #23, GitHub issue #25 (separate, pre-existing `zone_hint` comparison bug,
 disclosed during v5's review round, NOT fixed by this design), `docs/phase-1.5-api/openapi.yaml`,
 `src/dashanan/api/schemas.py`, `src/dashanan/api/app.py`,
-`src/dashanan/domain/entity_ownership_specification.py`, `src/dashanan/domain/write_gate.py`
+`src/dashanan/domain/entity_ownership_specification.py`, `src/dashanan/domain/write_gate.py`,
+`src/dashanan/infrastructure/provenance_schema.sql`
 
-**Revision note (v6):** v1 through v5 progressively fixed the routing model, `CandidateFact`/
-`classify()` usage, provenance/atomicity semantics, `zone_hint` wire-value normalization, and the
-OpenAPI contract's own documentation of itself (score progression 4 -> 8.5 -> 8.8 -> 9 -> 9.5/10 —
-full history in the Change Log at the bottom). v5 left three items explicitly open:
-`retrieval_context_hash` sourcing, the 400-vs-422 status code for predicate/subject_scope
-validation, and Zone 3/5 event-publishing parity. This revision (v6) closes all three, each with
-evidence from this codebase's own existing code, not an invented answer — see Section 4.2 steps
-5/5b/7.
+**Revision note (v7):** v1 through v6 progressively fixed the routing model, `CandidateFact`/
+`classify()` usage, provenance/atomicity semantics, `zone_hint` wire-value normalization, the
+OpenAPI contract's own documentation of itself, `retrieval_context_hash` sourcing, the 400-vs-422
+status decision, and event-publishing parity (score progression 4 -> 8.5 -> 8.8 -> 9 -> 9.5 ->
+9.8/10 — full history in the Change Log at the bottom). v6's one remaining micro-gap: it declared
+`retrieval_context_hash` as a caller-supplied string with no explicit format constraint or
+conditional-requiredness wording, even though this codebase's own database layer
+(`provenance_schema.sql:93`) already enforces `^[0-9a-f]{64}$` for this exact field. This revision
+(v7) closes that gap by declaring the identical pattern at the OpenAPI/Pydantic layer too, and
+makes the conditional-requiredness (Zone 3/5 required, Zone 1/2/4 optional/unread) explicit
+alongside `predicate`/`subject_scope`'s own existing wording.
 
 ---
 
@@ -99,13 +102,24 @@ subject_scope:
 # On WriteMemoryRequest.provenance (ProvenanceWriteBlock):
 retrieval_context_hash:
   type: string
+  pattern: '^[0-9a-f]{64}$'
   description: >-
     SHA-256 hex of the query/task this write was made under, pre-hashed by
     the caller -- this host never receives raw retrieval-context text
     (matches domain.write_gate.WriteRequest.retrieval_context_hash's own,
-    already-established semantics exactly; see Section 4.2 step 5).
+    already-established semantics exactly; see Section 4.2 step 5). The
+    ^[0-9a-f]{64}$ pattern is not a new convention invented for this field --
+    it is the exact format this codebase's own database layer already
+    enforces for this same field (provenance_schema.sql:93,
+    CHECK (retrieval_context_hash ~ '^[0-9a-f]{64}$'), and identically for
+    write_journal_schema.sql:93 and zone8_consolidation_schema.sql's
+    blob_id). Declaring it here lets a malformed value fail fast at the
+    wire boundary (400) instead of only at the database CHECK constraint.
     Required whenever a Zone 3/5 write is intended (entity_refs non-empty,
-    or zone_hint normalizes to Zone 3); not read for Zone 1/2/4 writes.
+    or zone_hint normalizes to Zone 3); optional and unread for Zone 1/2/4
+    writes -- existing callers that never populate it are unaffected
+    (matches predicate/subject_scope's own backward-compatibility
+    guarantee in Section 3 above).
 ```
 
 `entity_refs` and `index_reverse` are unchanged — they already carry exactly `CandidateFact.subjects`
@@ -127,7 +141,7 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
 | File | Change |
 |---|---|
 | `docs/phase-1.5-api/openapi.yaml` | (a) Add `predicate` and `subject_scope` to `WriteMemoryRequest.content.properties`, and `retrieval_context_hash` to `WriteMemoryRequest.provenance`'s schema, per Section 3 above. (b) Widen `WriteReceipt.status` to include `"partial"` and add `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` to the `WriteReceipt` schema, mirroring Section 4.2 step 6's contract exactly — the OpenAPI contract is the source of truth every client generates against; a Pydantic-only change would silently diverge from it. (c) Document the new `207` response explicitly on the `POST /memory/write` (`writeMemory`) operation's `responses` block, alongside the existing `202`/`503`/`400`/`422` entries. |
-| `src/dashanan/api/schemas.py` | Add `predicate: str \| None` and `subject_scope: str \| None` to the Pydantic model backing `WriteMemoryRequest.content`. Add `retrieval_context_hash: str \| None` to `ProvenanceWriteBlock` (`schemas.py:33-40`). Widen `WriteReceipt.status` (currently `Literal["accepted"]`, `schemas.py:68`) to `Literal["accepted", "partial"]` and add the three new optional fields from Section 4.2 step 6, matching the OpenAPI change in (b) above field-for-field. |
+| `src/dashanan/api/schemas.py` | Add `predicate: str \| None` and `subject_scope: str \| None` to the Pydantic model backing `WriteMemoryRequest.content`. Add `retrieval_context_hash: str \| None = Field(default=None, pattern=r"^[0-9a-f]{64}$")` to `ProvenanceWriteBlock` (`schemas.py:33-40`) -- the same `^[0-9a-f]{64}$` format this codebase's own DB layer already enforces (`provenance_schema.sql:93`), so a malformed value is rejected by FastAPI's own request validation before `_do_write` even runs, not only by the eventual DB `CHECK` constraint. Widen `WriteReceipt.status` (currently `Literal["accepted"]`, `schemas.py:68`) to `Literal["accepted", "partial"]` and add the three new optional fields from Section 4.2 step 6, matching the OpenAPI change in (b) above field-for-field. |
 | `src/dashanan/api/app.py` | Replace the unconditional `if body.content.entity_refs: return 422` (`_do_write`, lines 383-390) with the routing logic in 4.2 below. |
 | A new/extended real HTTP-level integration test | Full matrix in Section 5. |
 
@@ -228,12 +242,21 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
    be **caller-supplied** (option a), never server-derived (option b) — a server cannot reconstruct
    a hash of retrieval-context text it was explicitly designed never to receive (the same PII
    constraint `write_gate.py`'s own module docstring states at lines 26-31). **Decision: add
-   `retrieval_context_hash: str` as a new required field on `WriteMemoryRequest.provenance`**
+   `retrieval_context_hash: str | None` as a new field on `WriteMemoryRequest.provenance`**
    (`ProvenanceWriteBlock` in `src/dashanan/api/schemas.py:33-40`, which today has only
    `source_type`/`purpose` — read in full, confirmed no existing field covers this), matching
    `write_gate.py`'s own field name and semantics exactly rather than inventing a new convention.
-   This is now a concrete schema change alongside `predicate`/`subject_scope`, not an open
-   question — added to Section 3's schema and Section 4.1's file list below.
+   **Conditionally required, exactly like `predicate`/`subject_scope` (Section 3): required
+   (server-side, via step 0's routing gate — not a JSON-Schema-level `required` on `provenance`
+   itself, which would break every existing Zone 1/2/4 caller) whenever a Zone 3/5 write is
+   intended; optional and unread for Zone 1/2/4 writes, which never populate it and remain
+   byte-for-byte unaffected.** **Format:** `^[0-9a-f]{64}$`, matching the exact format this
+   codebase's own database layer already enforces for this same field
+   (`provenance_schema.sql:93`) — declared at the OpenAPI/Pydantic layer too (Section 3, Section
+   4.1's `schemas.py` row) so a malformed value fails fast at the wire boundary instead of only at
+   the DB `CHECK` constraint. This is now a concrete schema change alongside `predicate`/
+   `subject_scope`, not an open question — added to Section 3's schema and Section 4.1's file list
+   below.
 6. **Atomicity — recommended decision (review Finding #5, second round: a decision was requested,
    not just a flag):** step 3 and step 4 can each independently succeed or fail (e.g. the Zone 5
    write in step 3 succeeds, a Zone 3 edge write in step 4's loop then fails). No 2-phase-commit or
@@ -309,7 +332,7 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
 
 ---
 
-## 5. Test matrix (review Finding #5, first round; expanded again this round — 13 cases)
+## 5. Test matrix (review Finding #5, first round; expanded again this round — 14 cases)
 
 All as real HTTP-level integration tests, mirroring
 `tests/integration/test_api_real_postgres_e2e_dash3.py`'s Scenario style (real Postgres, real
@@ -347,8 +370,15 @@ All as real HTTP-level integration tests, mirroring
     `zone3_edges_failed` both empty, not merely absent from the body).
 12. Missing/blank `retrieval_context_hash` when a Zone 3/5 write is intended (`entity_refs`
     non-empty or `zone_hint` normalizes to Zone 3) → `400 INVALID_REQUEST` (Section 4.2 step 5b's
-    same precedent applies), no partial write. (New this round, alongside the resolution of
-    review blocker #1.)
+    same precedent applies), no partial write.
+13. Malformed `retrieval_context_hash` (wrong length, uppercase hex, non-hex characters) when a
+    Zone 3/5 write is intended → rejected by FastAPI's own request validation (the `^[0-9a-f]{64}$`
+    `Field(pattern=...)` from Section 4.2 step 5) before `_do_write` even runs — a `422` from
+    Pydantic's own schema validation, distinct from the `400`s above which come from domain-object
+    construction after the request already parsed successfully. Also confirms a well-formed but
+    syntactically-valid-looking value (64 lowercase hex chars) that doesn't match the DB's own
+    `provenance_schema.sql:93` `CHECK` is impossible by construction, since both layers share the
+    identical pattern.
 
 ---
 
@@ -386,4 +416,5 @@ the deliberate, infrastructure-free substitute for it, not a placeholder pending
 | 2026-09-21 | v3: Fixed all five v2 review findings (`tenant_id`, `classify()` factory args, per-edge provenance, an atomicity decision, the "8-case" heading typo). Reviewed, scored 8.8/10 -- the routing gate for ordinary Zone 1/2/4 writes was missing entirely (every write would have incorrectly entered classification and failed on a missing `subject_scope`), v3 falsely claimed `entity_refs` role-partitioning "already exists" in `_do_write` when it does not, and v3 understated `retrieval_context_hash` as blocking "one step" when it actually blocks the entire persistence path. |
 | 2026-09-21 | v4: Added the missing routing gate (Section 4.2 step 0) so ordinary Zone 1/2/4 writes provably never enter the classification path. Corrected the false "already exists" claim about `entity_refs` partitioning -- it is new code this implementation must write. Corrected the `retrieval_context_hash` framing to state it blocks the whole persistence path, not one isolated step. Committed to the exact partial-failure response contract the second round asked for: `207 Multi-Status`, a widened `WriteReceipt.status: Literal["accepted","partial"]`, and new `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields. Expanded the test matrix from 10 to 12 cases. Reviewed, scored 9/10 -- the routing gate compared `zone_hint` against a bare `"semantic"` string instead of the real wire enum value `"3-semantic"` (`openapi.yaml`'s `ZoneId` enum), and Section 4.1's file list never mentioned the OpenAPI-side changes (`WriteReceipt` schema widening, the new `207` response) that Section 4.2 step 6 already specified in prose. |
 | 2026-09-21 | v5: Fixed the routing gate to normalize `zone_hint` via the existing `_WIRE_TO_DOMAIN_ZONE` map (`app.py:71-80`) against `ZoneId.SEMANTIC`, never a bare string. Disclosed, as a separate GitHub issue (#25) rather than silently fixing in-scope, a genuinely separate pre-existing bug this review surfaced: `_do_write`'s existing `zone_hint == "procedural"`/`"episodic"` comparisons don't match their own OpenAPI-contract wire values either, and don't use `_WIRE_TO_DOMAIN_ZONE`. Added the missing OpenAPI-side file changes to Section 4.1. Status line now explicitly reads "DESIGN COMPLETE, NOT IMPLEMENTATION-READY" pending the `retrieval_context_hash` decision. Reviewed, scored 9.5/10 -- three items still explicitly open: `retrieval_context_hash` sourcing, the 400-vs-422 status code decision, and Zone 3/5 event-publishing parity verification. |
-| 2026-09-21 | v6 (this revision): Closed all three remaining open items, each with evidence from this codebase's own existing code, not invented. `retrieval_context_hash`: resolved as caller-supplied (new required field on `WriteMemoryRequest.provenance`), matching `domain.write_gate.WriteRequest.retrieval_context_hash`'s own already-established semantics exactly (`write_gate.py:346-348`). 400 vs 422: resolved as `400 INVALID_REQUEST`, matching the existing `assemble_context` handler's own precedent (`app.py:192-193`) for a domain-constructor `ValueError`. Event-publishing parity: resolved as not applicable -- `AppContext.event_bus` is unconditionally `NoOpEventBus()` everywhere in this codebase today (`composition.py:177`), and the conflict-aware repositories don't accept an `event_bus` parameter at all. Added `retrieval_context_hash` to Section 3's schema and Section 4.1's file list. Added a new step 5b and test case 12 for the validation-status decision. Expanded the test matrix from 12 to 13 cases. Status line now reads "IMPLEMENTATION-READY." |
+| 2026-09-21 | v6: Closed all three remaining open items, each with evidence from this codebase's own existing code, not invented. `retrieval_context_hash`: resolved as caller-supplied (new field on `WriteMemoryRequest.provenance`), matching `domain.write_gate.WriteRequest.retrieval_context_hash`'s own already-established semantics exactly (`write_gate.py:346-348`). 400 vs 422: resolved as `400 INVALID_REQUEST`, matching the existing `assemble_context` handler's own precedent (`app.py:192-193`) for a domain-constructor `ValueError`. Event-publishing parity: resolved as not applicable -- `AppContext.event_bus` is unconditionally `NoOpEventBus()` everywhere in this codebase today (`composition.py:177`), and the conflict-aware repositories don't accept an `event_bus` parameter at all. Added `retrieval_context_hash` to Section 3's schema and Section 4.1's file list. Added a new step 5b and test case 12. Expanded the test matrix from 12 to 13 cases. Status line now reads "IMPLEMENTATION-READY." Reviewed, scored 9.8/10 -- one micro-gap: `retrieval_context_hash` had no explicit format constraint or conditional-requiredness wording, even though `provenance_schema.sql:93` already enforces `^[0-9a-f]{64}$` for this exact field at the DB layer. |
+| 2026-09-21 | v7 (this revision): Declared the identical `^[0-9a-f]{64}$` pattern at the OpenAPI (`pattern:`) and Pydantic (`Field(pattern=...)`) layers for `retrieval_context_hash`, reusing this codebase's own already-established DB-layer format rather than inventing a new one -- so a malformed value fails fast at the wire boundary (Pydantic `422`) instead of only at the eventual DB `CHECK` constraint. Made the conditional-requiredness (Zone 3/5 required via the routing gate, Zone 1/2/4 optional/unread, existing callers unaffected) explicit in Section 3's schema block and Section 4.2 step 5's prose, matching `predicate`/`subject_scope`'s own existing wording. Added test case 13 for the malformed-format scenario. Expanded the test matrix from 13 to 14 cases. |
