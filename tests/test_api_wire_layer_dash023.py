@@ -415,10 +415,18 @@ def test_write_without_resolvable_source_type_rejected_422_fr010(client: TestCli
     assert response.status_code == 422
 
 
-def test_zone3_5_entity_refs_write_flags_the_predicate_gap_honestly_422(
+def test_zone3_5_entity_refs_write_without_retrieval_context_hash_rejected_400(
     client: TestClient,
 ) -> None:
-    """The endpoint declines rather than fabricating a SemanticEdge predicate."""
+    """DASH-STORY-026 (FR-013, GitHub #23): Zone 3/5 writes are reachable now, gated by
+    a required provenance.retrieval_context_hash rather than unconditionally rejected.
+
+    Prior to DASH-STORY-026, any entity_refs-bearing write was unconditionally rejected
+    with 422 ZONE_3_5_PREDICATE_UNRESOLVABLE (that response code no longer exists in
+    app.py). This exact payload is missing provenance.retrieval_context_hash, so it is
+    now correctly rejected 400 INVALID_REQUEST for that reason -- a real, more specific
+    validation failure than the old blanket rejection, not merely a status-code rename.
+    """
     response = client.post(
         "/memory/write",
         json={
@@ -428,8 +436,8 @@ def test_zone3_5_entity_refs_write_flags_the_predicate_gap_honestly_422(
         },
         headers={**_auth("memory:write"), "Idempotency-Key": str(uuid.uuid4())},
     )
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "ZONE_3_5_PREDICATE_UNRESOLVABLE"
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
 
 
 def test_tenant_scope_mismatch_rejected_403_never_404(client: TestClient) -> None:

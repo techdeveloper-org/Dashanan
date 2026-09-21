@@ -332,6 +332,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WriteReceipt'
+        '207':
+          description: >-
+            FR-013 design Section 4.2 step 6 -- Zone 5 (Entity) write
+            succeeded but one or more Zone 3 (Semantic) edge writes failed
+            partway through. `WriteReceipt.status` is "partial",
+            `zone5_written` is true, and `zone3_edges_failed` names the
+            edges that did not commit. No rollback of the already-durable
+            Zone 5 write or any already-committed Zone 3 edges is
+            attempted (fail-fast-plus-honest-partial-reporting; true
+            cross-zone atomicity is explicitly out of scope, AR1-S3-G3).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteReceipt'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1414,6 +1428,19 @@ components:
         importance: { type: number, minimum: 0, maximum: 1, nullable: true }
         purpose: { type: string, description: DPDP purpose-limitation tag (DPDP-1) }
         subject_id: { type: string, nullable: true, description: Data-subject identifier for the DPDP erasure/export index (ADR-006) }
+        retrieval_context_hash:
+          type: string
+          nullable: true
+          pattern: '^[0-9a-f]{64}$'
+          description: >-
+            SHA-256 hex of the query/task this write was made under,
+            pre-hashed by the caller (this host never receives raw
+            retrieval-context text; matches domain.write_gate.WriteRequest.
+            retrieval_context_hash's own established semantics, FR-013
+            design Section 3/4.2 step 5). Required whenever a Zone 3/5
+            write is intended (content.entity_refs non-empty, or
+            content.zone_hint normalizes to Zone 3); optional and unread
+            for Zone 1/2/4 writes, which are unaffected.
 
     WriteMemoryRequest:
       type: object
@@ -1446,6 +1473,26 @@ components:
                 Section 3.4: when a single-subject, single-object fact should
                 ALSO get a Zone 3 SemanticEdge for reverse traversal, on top of
                 its mandatory Zone 5 attribute write. Default false.
+            predicate:
+              type: string
+              nullable: true
+              description: >-
+                CandidateFact.predicate (HLD 3.4). A single fact-level
+                relation/attribute name applying to the whole write,
+                regardless of how many subject/object pairs classify()
+                expands it into. Required whenever entity_refs contains at
+                least one subject-role entry (FR-013 design Section 4.2
+                step 5b: 400 INVALID_REQUEST if missing). Ignored when
+                entity_refs has no subject-role entry.
+            subject_scope:
+              type: string
+              nullable: true
+              description: >-
+                CandidateFact.subject_scope / GeneralFact.subject_scope
+                (HLD 3.4, the no-subject-entity_refs branch only).
+                Required whenever entity_refs is empty AND the caller
+                intends a GeneralFact write (FR-013 design Section 4.2 step
+                5b: 400 INVALID_REQUEST if missing/blank in that case).
         provenance: { $ref: '#/components/schemas/ProvenanceWriteBlock' }
 
     WriteReceipt:
@@ -1453,8 +1500,22 @@ components:
       required: [write_id, status, accepted_at]
       properties:
         write_id: { type: string, format: uuid }
-        status: { type: string, enum: [accepted] }
+        status: { type: string, enum: [accepted, partial] }
         accepted_at: { type: string, format: date-time }
+        zone5_written:
+          type: boolean
+          default: false
+          description: FR-013 design Section 4.2 step 6 -- true when this write's Zone 5 (Entity) attribute write committed.
+        zone3_edges_written:
+          type: array
+          items: { type: string }
+          default: []
+          description: item_ids (subject:predicate:object) of Zone 3 SemanticEdges that committed.
+        zone3_edges_failed:
+          type: array
+          items: { type: string }
+          default: []
+          description: item_ids of Zone 3 SemanticEdges that were attempted and failed (207 Multi-Status case).
 
     BatchWriteReceiptItem:
       type: object

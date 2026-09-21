@@ -39,6 +39,7 @@ class ProvenanceWriteBlock(BaseModel):
     importance: float | None = None
     purpose: str
     subject_id: str | None = None
+    retrieval_context_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class EntityRef(BaseModel):
@@ -55,6 +56,8 @@ class WriteMemoryContent(BaseModel):
     task_signature_hash: str | None = None
     entity_refs: list[EntityRef] = Field(default_factory=list)
     index_reverse: bool = False
+    predicate: str | None = None
+    subject_scope: str | None = None
 
 
 class WriteMemoryRequest(BaseModel):
@@ -65,8 +68,11 @@ class WriteMemoryRequest(BaseModel):
 
 class WriteReceipt(BaseModel):
     write_id: str
-    status: Literal["accepted"] = "accepted"
+    status: Literal["accepted", "partial"] = "accepted"
     accepted_at: datetime
+    zone5_written: bool = False
+    zone3_edges_written: list[str] = Field(default_factory=list)
+    zone3_edges_failed: list[str] = Field(default_factory=list)
 
 
 class BatchWriteReceiptItem(BaseModel):

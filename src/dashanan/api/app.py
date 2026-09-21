@@ -23,17 +23,18 @@ DASH-STORY-025/DSHN-70 fan-out) -- so this endpoint does NOT present
 itself as closing HLD Section 7.4's full "cascades across all 8 zones"
 promise (must-not-deviate item 3) until DASH-STORY-025 lands.
 
-Zone 3/5 write-path gap (flagged, never fabricated): openapi.yaml's own
-`WriteMemoryRequest.content` shape (locked; must-not-deviate item 2)
-carries `entity_refs` but no `predicate` field, while
-`domain.semantic_memory.SemanticEdge`/`GeneralFact` both require one
-(HLD Section 3.4's `EntityOwnershipSpecification` classification gate).
-This handler cannot fabricate a predicate value, so an `entity_refs`
--bearing write is rejected `422 UNPROCESSABLE_ENTITY` with an explicit
-`ZONE_3_5_PREDICATE_UNRESOLVABLE` error code -- the operationId still
-resolves to a real, callable handler (AC-023-1); it correctly declines a
-request its own wire contract cannot faithfully route, exactly the class
-of response openapi.yaml's own `422 UnprocessableEntity` documents.
+Zone 3/5 write path (DASH-STORY-026, traces to FR-013, closes GitHub
+#23): `WriteMemoryRequest.content` now carries `predicate`/
+`subject_scope`, and `WriteMemoryRequest.provenance` carries
+`retrieval_context_hash` (docs/phase-1.5-api/fr013-predicate-schema-
+design.md v7, Section 3). `_do_write`'s routing gate (step 0 below)
+sends any write with a non-empty `content.entity_refs`, or a
+`content.zone_hint` that normalizes to Zone 3 (Semantic), through
+`entity_ownership_specification.classify()` and the FR-013-swept Zone
+3/5 repositories (`AppContext.semantic_repository`/
+`conflict_aware_entity_repository`) -- every other write (the ordinary
+Zone 1/2/4 case) falls through to the unchanged branch below, unaffected
+by this story (AC-026-DEV-2).
 """
 
 import logging
@@ -41,7 +42,7 @@ import uuid
 from dataclasses import asdict as _dataclass_asdict
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse
@@ -57,7 +58,15 @@ from dashanan.api.security import (
     verify_bearer_token,
 )
 from dashanan.application.context_assembly_request import ContextAssemblyRequest
+from dashanan.application.conflict_aware_zone_writes import _zone3_edge_item_id
+from dashanan.domain.entity_ownership_specification import (
+    CandidateFact,
+    GeneralFactRouting,
+    SemanticEdgeRouting,
+    classify,
+)
 from dashanan.domain.exceptions import ZoneRepositoryError
+from dashanan.domain.provenance_record import SourceType
 from dashanan.domain.subject_erasure import SubjectErasureRequest
 from dashanan.domain.zone import ZoneId
 from dashanan.infrastructure.composition_root import (
@@ -373,21 +382,160 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
     def _resolve_source_type(body: sc.WriteMemoryRequest) -> str | None:
         return body.provenance.source_type
 
+    def _zone3_5_routing_gate_triggered(body: sc.WriteMemoryRequest) -> bool:
+        """FR-013 design Section 4.2 step 0's normalization rule.
+
+        Never compares `content.zone_hint` against a bare string -- uses
+        the existing `_WIRE_TO_DOMAIN_ZONE` map against `ZoneId.SEMANTIC`,
+        exactly as GitHub #25's disclosed, pre-existing `zone_hint ==
+        "procedural"`/`"episodic"` bare-string comparisons must NOT be
+        repeated (design doc Section 4.2 step 0, "Separate, pre-existing
+        defect... NOT fixed by this design").
+        """
+        if body.content.entity_refs:
+            return True
+        return _WIRE_TO_DOMAIN_ZONE.get(body.content.zone_hint) is ZoneId.SEMANTIC
+
+    def _do_write_zone3_5(
+        caller: AuthenticatedCaller, body: sc.WriteMemoryRequest, source_type: SourceType
+    ) -> tuple[Response, str | None]:
+        """FR-013 design Section 4.2 steps 1-6: Zone 5 / Zone 3 routing and writes.
+
+        Cite FR-013 verbatim (SRS.md, FR-013 row): "On every write
+        targeting Zone 3 (Semantic) or Zone 5 (Entity), the system SHALL
+        check the candidate against existing records for the same
+        (entity, predicate) or (subject, predicate, object). On
+        contradiction, neither record SHALL be overwritten; both SHALL be
+        marked conflict_status=disputed and both confidences reduced,
+        until resolved by re-confirmation, explicit user correction, or
+        majority-source consensus."
+        """
+        retrieval_context_hash = body.provenance.retrieval_context_hash
+        if not retrieval_context_hash or not retrieval_context_hash.strip():
+            return _error(
+                400, "INVALID_REQUEST",
+                "provenance.retrieval_context_hash is required for a Zone 3/5 write (FR-013)",
+            ), None
+
+        if not ctx.postgres_available or ctx.semantic_repository is None or ctx.conflict_aware_entity_repository is None:
+            logger.error(
+                "Zone 3/5 write attempted with no live Postgres backend",
+                extra={"tenant_id": caller.tenant_id},
+            )
+            return _error(
+                503, "WRITE_REJECTED_NOT_DURABLE",
+                "zone '3-semantic'/'5-entity' is temporarily unavailable",
+            ), None
+
+        subjects = tuple(ref.entity_id for ref in body.content.entity_refs if ref.role == "subject")
+        objects = tuple(ref.entity_id for ref in body.content.entity_refs if ref.role == "object")
+
+        zone5_written = False
+        zone3_edges_written: list[str] = []
+        zone3_edges_failed: list[str] = []
+
+        try:
+            candidate_fact = CandidateFact(
+                tenant_id=caller.tenant_id,
+                subjects=subjects,
+                objects=objects,
+                predicate=body.content.predicate or "",
+                statement=body.content.text or "",
+                subject_scope=body.content.subject_scope or "",
+                index_reverse=body.content.index_reverse,
+            )
+
+            if len(subjects) == 1:
+                ctx.conflict_aware_entity_repository.write_attribute(
+                    caller.tenant_id,
+                    subjects[0],
+                    candidate_fact.predicate,
+                    candidate_fact.statement,
+                    str(uuid.uuid4()),
+                    source_type=source_type,
+                    retrieval_context_hash=retrieval_context_hash,
+                )
+                zone5_written = True
+
+            routing = classify(
+                candidate_fact,
+                edge_id_factory=lambda: str(uuid.uuid4()),
+                fact_id_factory=lambda: str(uuid.uuid4()),
+            )
+        except ValueError as exc:
+            return _error(400, "INVALID_REQUEST", str(exc)), None
+        except ZoneRepositoryError:
+            logger.error(
+                "Zone 5 (Entity) write failed",
+                extra={"tenant_id": caller.tenant_id},
+                exc_info=True,
+            )
+            return _error(
+                503, "WRITE_REJECTED_NOT_DURABLE",
+                "zone '5-entity' is temporarily unavailable",
+            ), None
+
+        if isinstance(routing, SemanticEdgeRouting):
+            for edge in routing.edges:
+                item_id = _zone3_edge_item_id(edge.subject_ref, edge.predicate, edge.object_ref)
+                try:
+                    ctx.semantic_repository.insert_edge(
+                        edge,
+                        provenance_id=str(uuid.uuid4()),
+                        source_type=source_type,
+                        retrieval_context_hash=retrieval_context_hash,
+                    )
+                    zone3_edges_written.append(item_id)
+                except ZoneRepositoryError:
+                    logger.error(
+                        "Zone 3 (Semantic) edge write failed",
+                        extra={"tenant_id": caller.tenant_id, "item_id": item_id},
+                        exc_info=True,
+                    )
+                    zone3_edges_failed.append(item_id)
+        elif isinstance(routing, GeneralFactRouting):
+            try:
+                ctx.semantic_repository.insert_general_fact(
+                    routing.fact,
+                    provenance_id=str(uuid.uuid4()),
+                    source_type=source_type,
+                    retrieval_context_hash=retrieval_context_hash,
+                )
+            except ZoneRepositoryError:
+                logger.error(
+                    "Zone 3 (Semantic) general fact write failed",
+                    extra={"tenant_id": caller.tenant_id},
+                    exc_info=True,
+                )
+                return _error(
+                    503, "WRITE_REJECTED_NOT_DURABLE",
+                    "zone '3-semantic' is temporarily unavailable",
+                ), None
+
+        write_id = str(uuid.uuid4())
+        status: Literal["accepted", "partial"] = "partial" if zone3_edges_failed else "accepted"
+        receipt = sc.WriteReceipt(
+            write_id=write_id,
+            status=status,
+            accepted_at=ctx.clock.now(),
+            zone5_written=zone5_written,
+            zone3_edges_written=zone3_edges_written,
+            zone3_edges_failed=zone3_edges_failed,
+        )
+        write_status_store.record(st.WriteStatusEntry(write_id=write_id, status="accepted", item_id=None))
+        status_code = 207 if zone3_edges_failed else 202
+        return JSONResponse(status_code=status_code, content=receipt.model_dump(mode="json")), write_id
+
     def _do_write(caller: AuthenticatedCaller, body: sc.WriteMemoryRequest) -> tuple[Response, str | None]:
-        if _resolve_source_type(body) is None:
+        resolved_source_type_raw = _resolve_source_type(body)
+        if resolved_source_type_raw is None:
             return _error(
                 422, "INVALID_SOURCE_TYPE",
                 "writeMemory requires a resolvable provenance.source_type (FR-010)",
             ), None
 
-        if body.content.entity_refs:
-            return _error(
-                422, "ZONE_3_5_PREDICATE_UNRESOLVABLE",
-                "openapi.yaml WriteMemoryRequest.content carries no 'predicate' field; "
-                "this host cannot construct a real SemanticEdge/GeneralFact for an "
-                "entity_refs-bearing write without fabricating one (flagged gap, "
-                "see api.app module docstring)",
-            ), None
+        if _zone3_5_routing_gate_triggered(body):
+            return _do_write_zone3_5(caller, body, SourceType(resolved_source_type_raw))
 
         write_id = str(uuid.uuid4())
         text = body.content.text or ""
