@@ -270,7 +270,7 @@ class SqlSemanticRepository:
             edge.state.value,
             json.dumps(dict(edge.score_terms)),
         )
-        self._execute_or_raise(_INSERT_EDGE_SQL, params)
+        self._execute_insert_or_raise(_INSERT_EDGE_SQL, params)
 
     def insert_general_fact(self, fact: GeneralFact) -> None:
         """Insert one `GeneralFact` (AC-003-GF-1: the `|subjects|==0` routing target).
@@ -288,7 +288,7 @@ class SqlSemanticRepository:
             fact.state.value,
             json.dumps(dict(fact.score_terms)),
         )
-        self._execute_or_raise(_INSERT_FACT_SQL, params)
+        self._execute_insert_or_raise(_INSERT_FACT_SQL, params)
 
     def _require_tenant(self, tenant_id: str) -> None:
         """Guard every query with a mandatory tenant_id (HLD 3.0 invariant 2)."""
@@ -306,6 +306,46 @@ class SqlSemanticRepository:
         except Exception as exc:  # noqa: BLE001 -- converted to typed domain error below
             logger.warning(
                 "Zone 3 (Semantic) query failed",
+                extra={
+                    "zone": ZoneId.SEMANTIC.value,
+                    "error_type": type(exc).__name__,
+                    "reason": str(exc),
+                },
+            )
+            raise ZoneRepositoryError(
+                zone=ZoneId.SEMANTIC.value, reason=str(exc)
+            ) from exc
+
+    def _execute_insert_or_raise(
+        self, sql: str, params: Sequence[object]
+    ) -> None:
+        """Run one no-RETURNING INSERT and commit it, converting failure to a domain error.
+
+        GitHub #26: `_INSERT_EDGE_SQL`/`_INSERT_FACT_SQL` are plain INSERTs
+        with no RETURNING clause, so (unlike this class's SELECT-issuing
+        methods) they must not go through `_execute_or_raise()` -- that
+        helper's `cursor.fetchall()` call raises `psycopg.ProgrammingError`
+        against a real driver when there is no result set to fetch. The
+        connection is opened with autocommit=False
+        (composition_root.build_postgres_connection), so the write is
+        explicitly committed here, mirroring
+        `SqlEpisodicRepository.append()`'s and
+        `SqlProvenanceRepository.append()`'s own identical fix. This
+        class's own SqlConnection Protocol does not declare `commit`, and
+        several existing tests pass a minimal double that implements only
+        `cursor()` -- `commit` is called only when the connection actually
+        exposes it, so a real driver connection is durably committed while
+        those doubles are unaffected.
+        """
+        try:
+            cursor = self._connection.cursor()
+            cursor.execute(sql, params)
+            commit = getattr(self._connection, "commit", None)
+            if commit is not None:
+                commit()
+        except Exception as exc:  # noqa: BLE001 -- converted to typed domain error below
+            logger.warning(
+                "Zone 3 (Semantic) insert failed",
                 extra={
                     "zone": ZoneId.SEMANTIC.value,
                     "error_type": type(exc).__name__,

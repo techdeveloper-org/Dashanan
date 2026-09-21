@@ -230,7 +230,31 @@ class SqlProvenanceRepository:
             record.prev_hash,
             record.record_hash,
         )
-        self._execute_or_raise(_APPEND_SQL, params)
+        try:
+            # GitHub #26: _APPEND_SQL is a plain INSERT with no RETURNING
+            # clause, so (unlike this class's SELECT-issuing methods) it
+            # must not go through the shared _execute_or_raise() helper --
+            # that helper's cursor.fetchall() call raises
+            # psycopg.ProgrammingError against a real driver when there is
+            # no result set to fetch. The connection is opened with
+            # autocommit=False (composition_root.build_postgres_connection),
+            # so the write is explicitly committed here, mirroring
+            # SqlEpisodicRepository.append()'s own identical fix. This
+            # class's own SqlConnection Protocol does not declare `commit`,
+            # and several existing tests pass a minimal double that
+            # implements only `cursor()` -- `commit` is called only when
+            # the connection actually exposes it, so a real driver
+            # connection is durably committed while those doubles are
+            # unaffected.
+            cursor = self._connection.cursor()
+            cursor.execute(_APPEND_SQL, params)
+            commit = getattr(self._connection, "commit", None)
+            if commit is not None:
+                commit()
+        except Exception as exc:  # noqa: BLE001 -- converted to typed domain error below
+            raise ZoneRepositoryError(
+                zone=ZoneId.PROVENANCE.value, reason=str(exc)
+            ) from exc
 
     def _require_tenant(self, tenant_id: str) -> None:
         """Guard every query with a mandatory tenant_id (HLD 3.0 invariant 2)."""

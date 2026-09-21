@@ -522,21 +522,24 @@ class TestScenario3bZone8AppLoginRoleGrant:
 
 
 class TestScenario4Zone3And5GapUnderLivePostgres:
-    def test_entity_refs_write_still_rejected_422_under_live_postgres(
+    def test_entity_refs_write_without_retrieval_context_hash_rejected_400_under_live_postgres(
         self, client: TestClient
     ) -> None:
-        """Confirms/discloses the Zone 3/5 gap under a REAL Postgres-backed host.
+        """DASH-STORY-026 (FR-013, GitHub #23) closed this gap under a REAL Postgres host.
 
-        `test_api_wire_layer_dash023.py::test_zone3_5_entity_refs_write_
-        flags_the_predicate_gap_honestly_422` already proves this against
-        the DEGRADED (no-Postgres) branch. This test proves the identical
-        `422 ZONE_3_5_PREDICATE_UNRESOLVABLE` outcome recurs when
-        `ConflictAwareSemanticRepository`/`ConflictAwareEntityMemoryRepository`
-        ARE really wired to a live Postgres connection -- confirming the
-        gap is a genuine `WriteMemoryRequest.content` schema limitation
-        (no `predicate` field to carry), not an artifact of the degraded
-        test path. See this module's final report for the schema-design
-        question this confirms is out of scope to decide here.
+        Prior to DASH-STORY-026, this exact payload was unconditionally
+        rejected with 422 ZONE_3_5_PREDICATE_UNRESOLVABLE (that response
+        code no longer exists in app.py) -- `WriteMemoryRequest.content`
+        had no `predicate` field to carry, so Zone 3/5 writes were
+        entirely unreachable. `test_api_wire_layer_dash023.py`'s sibling
+        test (updated in the same story) proves the identical corrected
+        behavior against the DEGRADED (no-Postgres) branch; this test
+        proves it recurs identically when `ConflictAwareSemanticRepository`/
+        `ConflictAwareEntityMemoryRepository` ARE really wired to a live
+        Postgres connection -- this exact payload is missing
+        `provenance.retrieval_context_hash`, so it is now correctly
+        rejected 400 INVALID_REQUEST for that specific, more precise
+        reason, not the old blanket rejection.
         """
         response = client.post(
             "/memory/write",
@@ -550,8 +553,8 @@ class TestScenario4Zone3And5GapUnderLivePostgres:
             },
             headers={**_auth("memory:write"), "Idempotency-Key": str(uuid.uuid4())},
         )
-        assert response.status_code == 422, response.text
-        assert response.json()["error"]["code"] == "ZONE_3_5_PREDICATE_UNRESOLVABLE"
+        assert response.status_code == 400, response.text
+        assert response.json()["error"]["code"] == "INVALID_REQUEST"
 
 
 # ---------------------------------------------------------------------------
