@@ -72,6 +72,7 @@ from fastapi.testclient import TestClient
 from dashanan.api import app as app_module
 from dashanan.api.composition import AppContext, build_app_context
 from dashanan.application.subject_erasure_cascade import SubjectErasureJobStatus
+from dashanan.domain.consolidated_blob import ArchiveBatchItem
 from dashanan.domain.zone import ZoneId
 from dashanan.infrastructure.composition_root import build_postgres_connection
 from dashanan.infrastructure.migration_runner import SCHEMA_FILES, run_migrations
@@ -460,6 +461,58 @@ class TestScenario3RealPostgresBackedErasure:
         source = inspect.getsource(app_module)
         assert "import UnifiedSubjectErasureOrchestrator" not in source
         assert "ctx.subject_erasure_service.request_erasure(" in source
+
+
+# ---------------------------------------------------------------------------
+# Scenario 3b: GitHub #22 regression guard -- the real APP LOGIN connection
+# (not the migration-role workaround Scenario 3's seed step above documents
+# and uses) can now archive into zone8_manifest through the real,
+# unmodified Zone8SubjectKeyedArchiver.archive_for_subject path.
+# ---------------------------------------------------------------------------
+
+
+class TestScenario3bZone8AppLoginRoleGrant:
+    def test_archive_for_subject_succeeds_on_the_real_app_login_connection(
+        self, real_postgres_app_context: AppContext,
+    ) -> None:
+        """GitHub #22 regression guard.
+
+        Before the fix, this exact call -- through the real, unmodified
+        `Zone8SubjectKeyedArchiver.archive_for_subject`, on the real
+        app-login-connected `AppContext` every live HTTP request actually
+        uses -- failed with `psycopg.errors.InsufficientPrivilege:
+        permission denied for table zone8_manifest`, because
+        `zone8_consolidation_schema.sql` granted no privilege on that
+        table to any login-capable role, and
+        `migration_runner._PER_ZONE_LOGIN_MEMBER_ROLES` never named the
+        new `dashanan_zone8_role`. Scenario 3 above works around this by
+        seeding through the migration-role connection instead -- this
+        test proves the real app-login path itself now works, without
+        that workaround.
+        """
+        subject_id = f"subj-{uuid.uuid4().hex[:10]}"
+        item_id = f"item-{uuid.uuid4().hex[:10]}"
+
+        archiver = real_postgres_app_context.subject_erasure_service._archiver  # type: ignore[union-attr]
+        item = ArchiveBatchItem(
+            tenant_id=_TENANT_ID,
+            item_id=item_id,
+            source_zone=ZoneId.EPISODIC,
+            payload=b"real app-login-role zone8 write, GitHub #22 regression guard",
+            subject_id=None,
+        )
+
+        try:
+            result = archiver.archive_for_subject(item, subject_id)
+        except Exception as exc:  # noqa: BLE001 -- re-raised below with full context
+            pytest.fail(
+                "archive_for_subject on the real app-login connection raised "
+                f"{type(exc).__name__}: {exc} -- if this is InsufficientPrivilege, "
+                "GitHub #22's fix (dashanan_zone8_role GRANT + "
+                "_PER_ZONE_LOGIN_MEMBER_ROLES membership) has regressed."
+            )
+
+        assert any(written.item_id == item_id for written in result.written)
 
 
 # ---------------------------------------------------------------------------

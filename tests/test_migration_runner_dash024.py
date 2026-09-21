@@ -187,7 +187,11 @@ class TestBindAppLoginRole:
         create_calls = [call for call in executed if "CREATE ROLE" in call[0]]
         assert create_calls == []
 
-    def test_bind_should_grantBothPerZoneRoles_toTheAppLoginRole(self) -> None:
+    def test_bind_should_grantAllPerZoneRoles_toTheAppLoginRole(self) -> None:
+        """GitHub #22 / #24: dashanan_zone8_role and dashanan_semantic_role
+        both pre-existed in their own schema files but were never added to
+        _PER_ZONE_LOGIN_MEMBER_ROLES, so the real app login role had no
+        grant path to either -- this asserts all four are now granted."""
         connection = FakeConnection(fetchone_results=[None])
 
         bind_app_login_role(connection, _SETTINGS)  # type: ignore[arg-type]
@@ -195,9 +199,11 @@ class TestBindAppLoginRole:
         grant_calls = [
             call[0] for call in connection.cursor_obj.executed if "GRANT" in call[0]
         ]
-        assert len(grant_calls) == 2
+        assert len(grant_calls) == 4
         assert any("dashanan_provenance_role" in call for call in grant_calls)
         assert any("dashanan_episodic_role" in call for call in grant_calls)
+        assert any("dashanan_semantic_role" in call for call in grant_calls)
+        assert any("dashanan_zone8_role" in call for call in grant_calls)
 
     def test_bind_should_neverGrant_dashananSchemaOwner_toAPersistentLoginRole(
         self,

@@ -69,3 +69,25 @@ CREATE TABLE zone8_manifest (
 -- ownership-reassignment ceremony provenance_schema.sql's ownership
 -- history required.
 REVOKE UPDATE, DELETE ON zone8_manifest FROM PUBLIC;
+
+-- GitHub #22: this table originally had no per-zone LOGIN-member role and
+-- no SELECT/INSERT grant to anything, so the real app login connection
+-- (dashanan.infrastructure.composition_root.build_postgres_connection,
+-- the same connection api.composition.build_app_context wires into every
+-- real AppContext) got InsufficientPrivilege on every INSERT -- only the
+-- migration/table-owner role could write here. Mirrors
+-- episodic_schema.sql's dashanan_episodic_role pattern exactly, minus the
+-- ownership-reassignment ceremony: that ceremony exists in
+-- episodic_schema.sql/provenance_schema.sql only to close a table-owner
+-- trigger-disable bypass, and this table has no trigger to protect (see
+-- the comment above), so there is nothing that ceremony would close here.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dashanan_zone8_role') THEN
+        CREATE ROLE dashanan_zone8_role NOLOGIN;
+    END IF;
+END
+$$;
+
+REVOKE ALL ON zone8_manifest FROM PUBLIC;
+GRANT SELECT, INSERT ON zone8_manifest TO dashanan_zone8_role;

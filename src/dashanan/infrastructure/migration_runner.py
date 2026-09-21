@@ -3,23 +3,25 @@
 Applies every zone-owned schema `.sql` file in this package against a real
 PostgreSQL instance, in dependency order, then closes AC-024-2's production
 DB-role-wiring gap for real: `dashanan_provenance_role`, `dashanan_episodic_role`,
-and `dashanan_schema_owner` -- defined in `provenance_schema.sql` /
-`episodic_schema.sql` since DSHN-55/DSHN-60 (backlog_draft.json's own FR-015
-note calls the pre-split pair `dashanan_app_role`, which does not appear
-anywhere in the current schema SQL) -- get bound to real, non-default LOGIN
-credentials sourced from env config (`dashanan.infrastructure.settings`),
-never hardcoded in a committed file.
+`dashanan_semantic_role`, `dashanan_zone8_role`, and `dashanan_schema_owner` --
+defined in `provenance_schema.sql` / `episodic_schema.sql` /
+`semantic_schema.sql` / `zone8_consolidation_schema.sql` since
+DSHN-55/DSHN-60/GitHub#22/GitHub#24 (backlog_draft.json's own FR-015 note calls
+the pre-split pair `dashanan_app_role`, which does not appear anywhere in the
+current schema SQL) -- get bound to real, non-default LOGIN credentials sourced
+from env config (`dashanan.infrastructure.settings`), never hardcoded in a
+committed file.
 
-How each of the three named roles is actually bound to a real login credential
+How each of the five named roles is actually bound to a real login credential
 (read this before changing `bind_app_login_role`):
 
-  - `dashanan_provenance_role` / `dashanan_episodic_role`: NOLOGIN by design
-    (each schema file's own long comment explains why -- the application is
-    expected to connect as its own LOGIN role and be GRANTed membership, never
-    to log in as the zone role directly). `bind_app_login_role` creates (or
-    updates) exactly one real LOGIN role from `PostgresSettings.app_login_user`
-    / `.app_login_password` -- sourced entirely from env config -- and GRANTs
-    it membership in both.
+  - `dashanan_provenance_role` / `dashanan_episodic_role` / `dashanan_semantic_role`
+    / `dashanan_zone8_role`: NOLOGIN by design (each schema file's own long
+    comment explains why -- the application is expected to connect as its own
+    LOGIN role and be GRANTed membership, never to log in as the zone role
+    directly). `bind_app_login_role` creates (or updates) exactly one real
+    LOGIN role from `PostgresSettings.app_login_user` / `.app_login_password`
+    -- sourced entirely from env config -- and GRANTs it membership in all four.
   - `dashanan_schema_owner`: also NOLOGIN by design, and explicitly
     "never-granted-out" per `provenance_schema.sql`'s own long comment --
     inventing a second persistent LOGIN role granted membership in it here
@@ -80,8 +82,12 @@ _SCHEMA_DIR = Path(__file__).resolve().parent
 #     and dashanan_provenance_role as already-established precedent for its own
 #     dashanan_semantic_role -- no executable dependency, but run after both
 #     for that documented precedent to be literally true at run time too.
-#   - write_journal_schema.sql / zone8_consolidation_schema.sql: independent
-#     (REVOKE-only, no per-zone role or ownership reassignment).
+#   - write_journal_schema.sql: independent (REVOKE-only, no per-zone role or
+#     ownership reassignment).
+#   - zone8_consolidation_schema.sql: independent (REVOKE-only, no ownership
+#     reassignment -- no trigger to protect -- but does create its own
+#     dashanan_zone8_role, GitHub #22, following the same pattern as
+#     episodic_schema.sql/semantic_schema.sql).
 #   - zone8_manifest_subject_index_migration.sql: an ADD COLUMN / CREATE INDEX
 #     migration against zone8_consolidation_schema.sql's own zone8_manifest
 #     table (its own header comment) -- MUST run after that file.
@@ -94,13 +100,19 @@ SCHEMA_FILES: Sequence[str] = (
     "zone8_manifest_subject_index_migration.sql",
 )
 
-# The three roles AC-024-2 names explicitly; both are NOLOGIN and are the
-# membership targets `bind_app_login_role` grants the real app login role
-# into. `dashanan_schema_owner` is deliberately excluded here -- see this
-# module's own docstring for why it is bound differently.
+# The four roles this module knows about; all NOLOGIN and the membership
+# targets `bind_app_login_role` grants the real app login role into.
+# `dashanan_schema_owner` is deliberately excluded here -- see this module's
+# own docstring for why it is bound differently.
+#
+# `dashanan_semantic_role` (GitHub #24) and `dashanan_zone8_role` (GitHub #22)
+# were both created by their own schema files from day one but never added
+# here -- the real app login role had no grant path to either until now.
 _PER_ZONE_LOGIN_MEMBER_ROLES: Sequence[str] = (
     "dashanan_provenance_role",
     "dashanan_episodic_role",
+    "dashanan_semantic_role",
+    "dashanan_zone8_role",
 )
 
 
