@@ -4,13 +4,14 @@ Status: DESIGN ONLY — pending user review. No implementation files have been m
 Related: GitHub issue #23, `docs/phase-1.5-api/openapi.yaml`, `src/dashanan/api/schemas.py`,
 `src/dashanan/api/app.py`, `src/dashanan/domain/entity_ownership_specification.py`
 
-**Revision note (v3):** v1 (score 4/10) proposed a routing model that contradicted the locked HLD
-truth table and did not discover `src/dashanan/domain/entity_ownership_specification.py`'s
-existing `CandidateFact`/`classify()` pair before designing routing from scratch. v2 (score 8.5/10)
-fixed the routing model by reusing that existing code, but its own use of that code had two real
-bugs (a missing `tenant_id` on `CandidateFact`, a `classify()` call missing its required factory
-arguments) plus undefined multi-edge provenance semantics and an unresolved atomicity decision.
-This revision (v3) fixes all of those. See the Change Log at the bottom for the full history.
+**Revision note (v4):** v1 (4/10) proposed a routing model contradicting the locked HLD truth
+table. v2 (8.5/10) fixed routing by reusing the existing `CandidateFact`/`classify()` domain
+primitives, but had a missing `tenant_id`, an incomplete `classify()` call, and undefined
+provenance/atomicity semantics. v3 (8.8/10) fixed those, but was missing the routing gate that
+keeps ordinary Zone 1/2/4 writes out of the classification path entirely, falsely claimed
+`entity_refs` partitioning already exists, and understated how much of the persistence path
+`retrieval_context_hash` actually blocks. This revision (v4) fixes all three. See the Change Log
+at the bottom for the full history.
 
 ---
 
@@ -113,9 +114,22 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
 
 ### 4.2 `_do_write` routing logic (reusing existing domain code, not reinventing it)
 
-1. Partition `body.content.entity_refs` into `subjects: tuple[str, ...]` / `objects: tuple[str,
-   ...]` by `role` (existing logic already does this partitioning today for the 422 check; keep
-   it).
+0. **Routing gate (review Finding #1, third round — was missing entirely; without it, every
+   ordinary Zone 1/2/4 write would incorrectly enter the classification path below and fail on a
+   missing `subject_scope`):** this whole procedure (steps 1-6) applies ONLY when
+   `body.content.entity_refs` is non-empty, OR `body.content.zone_hint == "semantic"` (a caller
+   explicitly requesting a `GeneralFact`-only write with `entity_refs` empty — the `\|subjects\|==0`
+   branch of the truth table in Section 2). In every other case (`entity_refs` empty and
+   `zone_hint` is anything else, e.g. `working`/`episodic`/`procedural`/absent), skip steps 1-6
+   entirely and fall through unchanged to today's existing Zone 1/2/4 branch logic
+   (`_do_write` lines 397-435, untouched by this design). This is a hard gate, evaluated before
+   step 1, not an implicit consequence of `subjects` happening to end up empty.
+1. **Correction of a factual error from v3 (review Finding #2, third round):** `body.content.entity_refs`
+   is NOT currently partitioned by `role` anywhere in `_do_write` — the only existing logic
+   touching it today is the single `if body.content.entity_refs:` unconditional-422 check at line
+   383. v3 incorrectly stated this partitioning "already exists." It does not; it is new code this
+   implementation pass must write: partition `body.content.entity_refs` into
+   `subjects: tuple[str, ...]` / `objects: tuple[str, ...]` by each entry's `role` field.
 2. Build `entity_ownership_specification.CandidateFact(tenant_id=caller.tenant_id,
    subjects=subjects, objects=objects, predicate=body.content.predicate or "",
    statement=body.content.text or "", subject_scope=body.content.subject_scope or "",
@@ -170,9 +184,15 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
    existing source anywhere in the current request schema or `_do_write`** — this remains a
    genuinely open question, not resolved here: either (a) add a `retrieval_context_hash` field to
    the wire contract (a schema change scoped separately from `predicate`/`subject_scope` above), or
-   (b) derive/hash something already present in the request server-side. This decision needs the
-   user/maintainer to pick before implementation of this specific step can start; every other step
-   in this plan is implementation-ready independent of it.
+   (b) derive/hash something already present in the request server-side. **Correction of an
+   overclaim from v3 (review Finding #3, third round):** this is not merely "one step blocked
+   while every other step is implementation-ready" — `retrieval_context_hash` is a mandatory
+   parameter on every one of `insert_edge`/`insert_general_fact`/`write_attribute`, so it blocks
+   the entire Zone 3/5 persistence path (steps 3-6 all call into one of these three methods).
+   Steps 0-2 and 4's `classify()` call are genuinely implementable and testable independent of it
+   (routing/classification produces domain objects without touching a repository), but no actual
+   Zone 3/5 write can be committed until this is decided. This decision is a hard prerequisite for
+   the persistence half of this implementation, not a parallel/independent track.
 6. **Atomicity — recommended decision (review Finding #5, second round: a decision was requested,
    not just a flag):** step 3 and step 4 can each independently succeed or fail (e.g. the Zone 5
    write in step 3 succeeds, a Zone 3 edge write in step 4's loop then fails). No 2-phase-commit or
@@ -185,25 +205,60 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
    ZoneRepositoryError` handling at `_do_write` lines 436-445. If Zone 5 succeeds but a later Zone 3
    edge write fails partway through the loop, do NOT attempt to roll back the already-persisted
    Zone 5 write or any already-persisted Zone 3 edges from earlier loop iterations (no rollback
-   mechanism exists to do this safely); instead return a distinct, honestly-labeled response (e.g.
-   `207` or a `5xx` body carrying `zone5_written: true`, `zone3_edges_written: [...]`,
-   `zone3_edges_failed: [...]`) so the caller can see exactly what state actually landed, mirroring
-   the existing Zone 1 durability-mirror pattern's own choice (`_do_write` lines 450-456: log and
-   continue rather than silently claim full success). This is a fail-fast-plus-honest-reporting
-   contract, not true atomicity — genuine cross-zone atomicity remains explicitly out of scope and
-   tracked under the existing `AR1-S3-G3` limitation, not newly invented or silently promised here.
+   mechanism exists to do this safely); instead return a distinct, honestly-labeled response so the
+   caller can see exactly what state actually landed, mirroring the existing Zone 1
+   durability-mirror pattern's own choice (`_do_write` lines 450-456: log and continue rather than
+   silently claim full success). This is a fail-fast-plus-honest-reporting contract, not true
+   atomicity — genuine cross-zone atomicity remains explicitly out of scope and tracked under the
+   existing `AR1-S3-G3` limitation, not newly invented or silently promised here.
+
+   **Exact response contract (decided, per review request — not left as an "either/or"):**
+   - Zone 5 write fails (step 3): `503 WRITE_REJECTED_NOT_DURABLE`, identical to the existing
+     `except ZoneRepositoryError` response shape at `_do_write` lines 442-445. No Zone 3 attempt is
+     made; nothing new to report beyond what that existing response already carries.
+   - Zone 5 succeeds and all Zone 3 writes (if any) succeed: the existing `202` + `WriteReceipt`
+     shape, unchanged, with the three new fields below populated to reflect full success (so a
+     caller inspecting the body doesn't need to special-case "old" vs "new" receipts).
+   - Zone 5 succeeds but one or more Zone 3 writes fail partway through step 4's loop: `207
+     Multi-Status`. Chosen over reusing `202` with a body flag because this is a materially
+     different, actually-partial outcome — a caller that only checks the status code (a common,
+     reasonable integration pattern) must not be able to mistake this for full success, which a
+     `2xx` status shared with the success case would risk. `207` is already meaningful HTTP
+     semantics for "the operation as a whole is not a single pass/fail," and does not require
+     inventing a new non-standard status code.
+   - **`WriteReceipt` schema addition** (`src/dashanan/api/schemas.py:66-69`, read in full):
+     `WriteReceipt.status` today is `Literal["accepted"] = "accepted"` — this must widen to
+     `Literal["accepted", "partial"] = "accepted"` so a `207` response's body is distinguishable
+     from a `202` body by its `status` field too, not only by the HTTP status code (defense against
+     a caller that logs/stores the body without also checking the status code). Three further new
+     fields, all optional/default-empty so existing Zone 1/2/4 receipts (which never populate them)
+     are unaffected:
+     ```
+     zone5_written: bool = False
+     zone3_edges_written: list[str] = []   # item_ids of edges that committed
+     zone3_edges_failed: list[str] = []    # item_ids of edges that were attempted and failed
+     ```
+     `zone3_edges_written`/`zone3_edges_failed` use the same `_zone3_edge_item_id` values step 5
+     already computes per edge, so the caller can identify exactly which `(subject, predicate,
+     object)` triples landed versus which need a retry.
 7. **Event publishing:** confirm during implementation whether Zone 1/2/4 writes in `_do_write`
    publish any event today (not verified in this design pass) and, if so, whether Zone 3/5 writes
    need parity — flagged as an implementation-time check, not assumed either way here.
 
 ---
 
-## 5. Test matrix (review Finding #5 — full 10-case matrix, up from v1's 4 cases)
+## 5. Test matrix (review Finding #5, first round; expanded again this round — 12 cases)
 
 All as real HTTP-level integration tests, mirroring
 `tests/integration/test_api_real_postgres_e2e_dash3.py`'s Scenario style (real Postgres, real
 `TestClient`, not mocks):
 
+0. **Routing-gate regression guard (new this round, Section 4.2 step 0):** an ordinary Zone 1/2/4
+   write (`entity_refs` empty, `zone_hint` in `{working, episodic, procedural}` or absent) behaves
+   identically before and after this change — it must NOT enter `CandidateFact`/`classify()` at
+   all, and must NOT 422/400 on a missing `subject_scope` it was never asked to supply. This is
+   the single most important regression guard this change introduces, since a routing-gate bug
+   here breaks every existing write, not just new Zone 3/5 traffic.
 1. `\|subjects\|==0`, `subject_scope` populated → `GeneralFact` written to Zone 3, no Zone 5 write.
 2. `\|subjects\|==1`, `\|objects\|==0` → Zone 5 `EntityAttributeRecord` written, no Zone 3 write.
 3. `\|subjects\|==1`, `\|objects\|>=1`, `index_reverse=False` (default) → Zone 5 write only, no
@@ -221,25 +276,32 @@ All as real HTTP-level integration tests, mirroring
    to the `\|subjects\|==0` GeneralFact branch per the truth table (objects are only meaningful
    paired with a subject), not silently dropped.
 10. Repository failure mid-write (e.g. `insert_edge` raises after the Zone 5 write already
-    succeeded in case 4) → assert the response reflects the real partial-failure state per Section
-    4.2 step 6 (not silently reported as full success), and that provenance/conflict state is
-    consistent with what actually got persisted.
+    succeeded in case 4) → assert `207` with `status="partial"`, `zone5_written=True`, and
+    `zone3_edges_failed` non-empty per Section 4.2 step 6's exact response contract — not silently
+    reported as `202`/`"accepted"` full success.
+11. Zone 5 write itself fails (step 3, before any Zone 3 attempt) → assert `503
+    WRITE_REJECTED_NOT_DURABLE`, identical shape to the existing `except ZoneRepositoryError`
+    response, and that no Zone 3 write was attempted (`zone3_edges_written` and
+    `zone3_edges_failed` both empty, not merely absent from the body).
 
 ---
 
 ## 6. What this revision does NOT resolve (explicitly, not silently)
 
-- `retrieval_context_hash` sourcing (Section 4.2 step 5) — needs a maintainer decision; every other
-  implementation step is independent of this one and does not need to wait on it.
+- `retrieval_context_hash` sourcing (Section 4.2 step 5) — needs a maintainer decision. This blocks
+  the entire persistence path (steps 3-6, every call into `insert_edge`/`insert_general_fact`/
+  `write_attribute`), not just one isolated step — corrected from v3's understated framing.
 - Exact HTTP status code for predicate/subject_scope validation failures (400 vs 422) — should
   match whatever convention `SemanticEdge.__post_init__`/`GeneralFact.__post_init__` errors
   already use elsewhere in this handler once that's confirmed during implementation.
-- True cross-zone atomicity (2-phase-commit/saga) for Zone 5 + Zone 3 writes — Section 4.2 step 6
-  gives a concrete fail-fast-plus-honest-partial-failure-reporting contract that needs no new
-  infrastructure, but genuine atomicity remains explicitly out of scope, tracked under the
-  existing `AR1-S3-G3` limitation.
 - Event-publishing parity for the new write paths (Section 4.2 step 7) — unverified, flagged for
   implementation-time confirmation.
+
+Resolved this round (previously open): the routing gate for ordinary Zone 1/2/4 writes (Section
+4.2 step 0), and the exact partial-failure response contract — `207`, widened `WriteReceipt.status`,
+and the `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields (Section 4.2 step 6).
+True cross-zone atomicity (2PC/saga) remains explicitly out of scope under `AR1-S3-G3`, by design,
+not as an oversight.
 
 ---
 
@@ -249,4 +311,5 @@ All as real HTTP-level integration tests, mirroring
 |---|---|
 | 2026-09-21 | v1: Initial design (3 competing schema options). Reviewed, scored 4/10 -- routing model contradicted the locked HLD 3.4 truth table, predicate placement was ambiguous, implementation plan and test matrix were incomplete. |
 | 2026-09-21 | v2: Replaced the routing model by reusing the existing, locked `CandidateFact`/`classify()` domain primitives instead of reinventing routing. Corrected predicate to a single fact-level field. Added `subject_scope`. Expanded the implementation plan to cover provenance/conflict wiring, atomicity, and event-publishing parity. Expanded the test matrix from 4 to 10 cases. Reviewed, scored 8.5/10 -- CandidateFact construction omitted the required `tenant_id`, the `classify()` call omitted its required `edge_id_factory`/`fact_id_factory` keyword args, multi-edge provenance-per-edge semantics were undefined, and atomicity was flagged but no concrete failure contract was proposed; the "8-case" heading also didn't match the actual 10-case matrix. |
-| 2026-09-21 | v3 (this revision): Fixed all five v2 review findings. `CandidateFact` construction now passes `tenant_id=caller.tenant_id`. `classify()` call now passes both required factories. Multi-edge provenance is now explicitly one fresh `provenance_id` per edge, never shared, justified by `_zone3_edge_item_id`'s per-triple keying and the Zone 7 hash-chain's one-`provenance_id`-per-`item_id` invariant. Atomicity now has a concrete, infrastructure-free recommended decision: fail-fast on a Zone 5 failure, honest partial-failure reporting (not silent full-success) if Zone 3 fails after Zone 5 succeeds -- true cross-zone atomicity stays explicitly out of scope under `AR1-S3-G3`. Fixed the "8-case" heading to "10-case". `retrieval_context_hash` remains the one genuinely open question, unchanged from v2 -- every other implementation step is independent of it. Still DESIGN ONLY -- no implementation performed. |
+| 2026-09-21 | v3: Fixed all five v2 review findings (`tenant_id`, `classify()` factory args, per-edge provenance, an atomicity decision, the "8-case" heading typo). Reviewed, scored 8.8/10 -- the routing gate for ordinary Zone 1/2/4 writes was missing entirely (every write would have incorrectly entered classification and failed on a missing `subject_scope`), v3 falsely claimed `entity_refs` role-partitioning "already exists" in `_do_write` when it does not, and v3 understated `retrieval_context_hash` as blocking "one step" when it actually blocks the entire persistence path. |
+| 2026-09-21 | v4 (this revision): Added the missing routing gate (Section 4.2 step 0) so ordinary Zone 1/2/4 writes provably never enter the classification path. Corrected the false "already exists" claim about `entity_refs` partitioning -- it is new code this implementation must write. Corrected the `retrieval_context_hash` framing to state it blocks the whole persistence path, not one isolated step. Committed to the exact partial-failure response contract the second round asked for: `207 Multi-Status`, a widened `WriteReceipt.status: Literal["accepted","partial"]`, and new `zone5_written`/`zone3_edges_written`/`zone3_edges_failed` fields. Expanded the test matrix from 10 to 12 cases (the new routing-gate regression guard, plus a case for the now-concrete 503-vs-207 response contract). Still DESIGN ONLY -- no implementation performed. |
