@@ -67,7 +67,7 @@
     {
       "story_id": "DASH-STORY-011",
       "title": "SPIKE: Qdrant client library version/compatibility pinning validation (re-confirmed Sprint 3, still genuinely blocked)",
-      "assigned_agent": "python-backend-engineer (execute) + ai-engineer (consult)",
+      "assigned_agent": "python-backend-engineer",
       "context_budget_tokens": 3500,
       "sources": [
         "HLD_ADR-007_VectorIndexTechnology_HNSW_hnswlib_Qdrant_PerTenantCollections_NoClientVersionPinnedInADRText",
@@ -80,7 +80,10 @@
       ],
       "pii_exclusion_applied": false,
       "pii_note": "This spike is documentation/dependency research only (Qdrant client-version x server-version x Python-3.12+ compatibility matrix) - it touches no zone, no zone adapter, and no zone content at all, the same posture ar3_context_windows.json and sprint2_ar3_context_windows.json gave to non-ceiling, non-zone-touching stories (e.g. Sprint 2's DASH-STORY-015/016). No redaction was required or applicable.",
-      "assigned_agent_note": "Synced 2026-09-20 per SP3-DEC-107: consult split authorized, python-backend-engineer executes with ai-engineer consulted. Previously unsynced -- flagged and fixed after external review."
+      "assigned_agent_note": "Synced 2026-09-20 per SP3-DEC-107: consult split authorized, python-backend-engineer executes with ai-engineer consulted. Previously unsynced -- flagged and fixed after external review.",
+      "consult_agents": [
+        "ai-engineer"
+      ]
     },
     {
       "story_id": "DASH-STORY-023",
@@ -110,7 +113,7 @@
     {
       "story_id": "DASH-STORY-024",
       "title": "Shape B deployment infrastructure: Postgres/Redis/Qdrant/OpenSearch/S3, docker-compose, env config, migration runner",
-      "assigned_agent": "devops-engineer (docker-compose/env/orchestration) + database-engineer (migration runner + DB-role-credential binding)",
+      "assigned_agent": "devops-engineer",
       "context_budget_tokens": 7000,
       "sources": [
         "HLD_Section_2_ContainerServiceTable_EventBusRedisStreams_HotStoreRedis_StructuredStorePostgreSQL_VectorIndexQdrant_LexicalIndexOpenSearch_ObjectStoreS3Compatible",
@@ -129,7 +132,10 @@
       ],
       "pii_exclusion_applied": true,
       "pii_note": "Security_surface_note (new risk class per classification_model.sprint_3_new_risk_class_note): this is the story where dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner (the real, current role names defined in provenance_schema.sql/episodic_schema.sql since the DSHN-60 P1 remediation - corrected from sprint3_ar1_assignments.json's own AC-024-2 fix of backlog_draft.json's stale 'dashanan_app_role' citation) get bound to a real, non-default login credential for the first time, and where Postgres/Redis/Qdrant/OpenSearch/S3 become real, network-reachable services for the first time - per HLD Section 10 asset (5) 'adapter credentials' and ADR-009's India Layer text ('Zone 8 holds the longest-lived PII', per-subject keys must be individually destroyable). This context window admits only the credential-binding CONTRACT (env-config sourcing, never a hardcoded value, per AC-024-2) and the five services' documented port/protocol shape (AC-024-1), never any actual generated password, connection string, or key material - none exists yet since the story has not shipped. The cloud-security-architect advisory review (SP3-DEC-104) runs in its own separate review context and is not folded into this implementer's context window.",
-      "assigned_agent_note": "Synced 2026-09-20 per SP3-DEC-103: split by sub-task. Previously unsynced -- flagged and fixed after external review."
+      "assigned_agent_note": "Synced 2026-09-20 per SP3-DEC-103: split by sub-task. Previously unsynced -- flagged and fixed after external review.",
+      "co_owner_agents": [
+        "database-engineer"
+      ]
     },
     {
       "story_id": "DASH-STORY-025",

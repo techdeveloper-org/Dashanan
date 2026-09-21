@@ -206,7 +206,7 @@
       "story_points": 3,
       "invest": "Unchanged from docs/phase-6-sprint-planning/backlog_draft.json sprint_1_stories[DASH-STORY-011]'s own INVEST block and spike_exit_criteria - this AR.1 entry does not rewrite them, only re-confirms the assignment and the still-blocked status per sprint3_ar0_routing_index.json's own direct verification.",
       "relevance_reconfirmation": "sprint3_ar0_routing_index.json's SPRINT3-CAND-003 already re-verified this spike is still not done (no compatibility-matrix document, no requirements/lockfile Qdrant client pin, no 'qdrant' string anywhere in pyproject.toml/requirements*.txt or docs/ output artifacts, checked that session) and genuinely blocked on FR-015 (Shape B infra) rather than abandoned - without a real Qdrant server/deployment target, the spike's own exit criteria (client-version x server-version x Python-3.12+ compatibility matrix) has no live server to validate against beyond documentation research. This AR.1 pass re-confirms that finding rather than re-deriving it: DASH-STORY-007 (the story this spike unblocks) remains Shape-A-only per FR-015's own backlog note, so this spike's relevance is unchanged but its actual execution should be sequenced alongside or after FR-015 (DASH-STORY-024 below), not run in isolation before a real Qdrant server exists to validate against.",
-      "assigned_agent": "python-backend-engineer (execute) + ai-engineer (consult)",
+      "assigned_agent": "python-backend-engineer",
       "model": "sonnet",
       "score": 0.825,
       "runner_up": {
@@ -249,7 +249,10 @@
       "advisory_review": null,
       "mathematical_delegation": null,
       "logging_note": "Cite as AR1-S3-011 (story ID intentionally unchanged from Sprint 1 - this is the same spike, re-confirmed relevant, not a new story).",
-      "assigned_agent_note": "Consult split authorized per user decision (SP3-DEC-107, 'Add a consult split'), 2026-09-20: python-backend-engineer executes the spike with ai-engineer consulted, per sprint3_ar1_assignments.json's own AR1-G5-recommended fallback option, closing the single-agent risk flagged across three consecutive routing passes."
+      "assigned_agent_note": "Consult split authorized per user decision (SP3-DEC-107, 'Add a consult split'), 2026-09-20: python-backend-engineer executes the spike with ai-engineer consulted, per sprint3_ar1_assignments.json's own AR1-G5-recommended fallback option, closing the single-agent risk flagged across three consecutive routing passes.",
+      "consult_agents": [
+        "ai-engineer"
+      ]
     },
     {
       "story_id": "DASH-STORY-023",
@@ -335,7 +338,7 @@
         "small": "Scoped to the five named services plus config/migration tooling - does not include the FR-014 host application itself (that is DASH-STORY-023) and does not include DASH-STORY-011's Qdrant client-version research (that stays a separate spike, sequenced alongside this story per this file's DASH-STORY-011 re-confirmation note).",
         "testable": "Concrete: `docker-compose up` brings up all five services; the migration runner applies provenance_schema.sql/episodic_schema.sql (and any other existing zone schema files) against a real Postgres instance; dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner are bound to a real, non-default credential sourced from env config, not a hardcoded value."
       },
-      "assigned_agent": "devops-engineer (docker-compose/env/orchestration) + database-engineer (migration runner + DB-role-credential binding)",
+      "assigned_agent": "devops-engineer",
       "model": "sonnet",
       "score": 0.825,
       "runner_up": {
@@ -411,7 +414,10 @@
       },
       "mathematical_delegation": null,
       "logging_note": "Cite as AR1-S3-024. No hard dependency to START, but the honest sequencing (per backlog_draft.json's own FR-014/FR-015 dependency note and this file's own DASH-STORY-011 re-confirmation) is FR-014 and FR-015 in the same sprint wave, with DASH-STORY-011's live-server validation half sequenced after this story's Qdrant service is actually reachable.",
-      "assigned_agent_note": "Split by sub-task per user decision (SP3-DEC-103, 'Split by sub-task'), 2026-09-20: devops-engineer owns docker-compose orchestration/env config/service wiring; database-engineer owns the migration-runner and DB-role-credential-binding sub-slice specifically (binding dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner to real login credentials). Both must be reflected as separate dev-prompt sub-tasks in a future execution-plan refresh before Phase B dispatch."
+      "assigned_agent_note": "Split by sub-task per user decision (SP3-DEC-103, 'Split by sub-task'), 2026-09-20: devops-engineer owns docker-compose orchestration/env config/service wiring; database-engineer owns the migration-runner and DB-role-credential-binding sub-slice specifically (binding dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner to real login credentials). Both must be reflected as separate dev-prompt sub-tasks in a future execution-plan refresh before Phase B dispatch.",
+      "co_owner_agents": [
+        "database-engineer"
+      ]
     },
     {
       "story_id": "DASH-STORY-025",
@@ -553,7 +559,8 @@
           "DASH-STORY-023",
           "DASH-STORY-025"
         ],
-        "story_points_note": "Recomputed 2026-09-20 after DASH-STORY-021 was reassigned to api-testing-engineer per SP3-DEC-106: 022(5)+023(8)+025(5)=18."
+        "story_points_note": "Recomputed 2026-09-20 after DASH-STORY-021 was reassigned to api-testing-engineer per SP3-DEC-106: 022(5)+023(8)+025(5)=18.",
+        "consult_role_on": []
       },
       "api-testing-engineer": {
         "stories": 1,
@@ -577,7 +584,10 @@
         "story_ids": [
           "DASH-STORY-024"
         ],
-        "story_points_note": "Co-owner of DASH-STORY-024 (migration runner + DB-role-credential binding sub-slice) per SP3-DEC-103; 0 shown to avoid double-counting the story's 8 points already attributed to devops-engineer above."
+        "story_points_note": "Co-owner of DASH-STORY-024 (migration runner + DB-role-credential binding sub-slice) per SP3-DEC-103; 0 shown to avoid double-counting the story's 8 points already attributed to devops-engineer above.",
+        "co_owner_role_on": [
+          "DASH-STORY-024"
+        ]
       },
       "ai-engineer": {
         "stories": 1,
@@ -585,7 +595,10 @@
         "story_ids": [
           "DASH-STORY-011"
         ],
-        "story_points_note": "Consult role (not sole executor) on DASH-STORY-011 per SP3-DEC-107; python-backend-engineer executes."
+        "story_points_note": "Consult role (not sole executor) on DASH-STORY-011 per SP3-DEC-107; python-backend-engineer executes.",
+        "consult_role_on": [
+          "DASH-STORY-011"
+        ]
       }
     },
     "cross_sprint_agent_load_note": "Combined with Sprint 1 (7 stories) and Sprint 2 (8 stories), python-backend-engineer now holds 19 of 26 stories across all three sprints (73%) - consistent with, not a departure from, the concentration pattern all three routing passes have independently recorded (AR0-F2 Sprint 1, AR0-S2-F2 Sprint 2, AR0-S3-F2 Sprint 3), and this file's own dependency_integrity_check.serialization_warning.",

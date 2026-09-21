@@ -7,7 +7,7 @@
   quoted HLD/SRS passages fully entailed by their named real sources after the two Phase C
   corrections — the `openapi.yaml` operationId count and the stale `dashanan_app_role` Postgres
   role name — were applied; 0 remaining contradictions or unsupported claims; non-sampled, full
-  6-story/16-AC/62-citation coverage).
+  6-story/16-AC/71-citation coverage, corrected 2026-09-21 from a miscount of 62 -- see Addendum).
 - b (FactScore, from C-1 hallucination-detector's own atomic-fact check this round): **1.00**
   — "FactScore (RAG atomic-fact check): 1.00 after fix" per the same source (every checked
   claim — 6 story routings, 71 context-source list entries (corrected from 62, see Addendum), 16 acceptance-criteria entries, 6
@@ -40,8 +40,9 @@ RS_phase7_sprint3 = sqrt(a x b) = sqrt(1.00 x 1.00) = 1.00
 
 **On the confidence interval:** as with the Sprint 2 computation, a delta-method/binomial
 sampling-style CI is not the correct statistical tool here, because Sprint 3's Phase C gate was
-run as a **full non-sampled census** — all 6 stories, all 16 acceptance-criteria entries, all 62
-`context_windows[].sources[]` entries, checked in full by both detectors (per
+run as a **full non-sampled census** — all 6 stories, all 16 acceptance-criteria entries, all 71
+`context_windows[].sources[]` entries (corrected 2026-09-21 from a miscount of 62 -- see
+Addendum), checked in full by both detectors (per
 `sprint3-phase-c-gate-results.md`: "Disclosed coverage: full 6/6 stories checked — no sampling
 gap to close, matching Sprint 2's own non-sampled-from-the-start posture"). There is no
 unobserved remainder of this checked population left to bound.
