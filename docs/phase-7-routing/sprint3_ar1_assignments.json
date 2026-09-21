@@ -1,0 +1,674 @@
+{
+  "document_id": "AR1-ASSIGNMENTS-SPRINT3-20260920-01",
+  "version": "1.0.0",
+  "author": "scrum-master-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.1 story-to-agent assignment, Sprint 3)",
+  "date": "2026-09-20",
+  "correlation_id": "DASH-PH7-AR1-SPRINT3-20260920",
+  "depends_on": [
+    "docs/phase-7-routing/sprint3_ar0_routing_index.json v1.0.0 (candidate items, agent-existence verification, reduced 2-signal fit scoring, srs_fr016_minting_decision - just approved by the user)",
+    "docs/phase-7-routing/sprint2_ar1_assignments.json v1.2.0 (assignment record structure this file mirrors: assignments[] shape, must_not_deviate/advisory_review/p1_reviewer blocks, dependency_integrity_check, routing_gaps, summary.open_user_decisions)",
+    "docs/phase-6-sprint-planning/backlog_draft.json v1.1.0 (future_sprints_backlog.remaining_frs FR-011/FR-013/FR-014/FR-015 stubs, sprint_1_stories[DASH-STORY-011], combined dependency_graph)",
+    "docs/phase-1-architecture/HLD.md v1.0.0 (Sections 2, 3.0, 3.8, 3.9, 3.10, 3.11, 7.4; ADR-004, ADR-006, ADR-007, ADR-009)",
+    "SRS.md (FR-011/FR-013 rows, NFR-006, AC-011/AC-013/AC-015, Section 4.1 AC-013 Implementation Scope Note)"
+  ],
+  "structural_note": "sprint2_ar1_assignments.json's own assignments[] entries do NOT themselves carry an `invest` block or an `acceptance_criteria[]` array with ac_id/text/source - that full-INVEST detail lives one layer up, in docs/phase-6-sprint-planning/backlog_draft.json's sprint_2_stories, which sprint2_ar1_assignments.json's routing pass consumed as already-written input. Sprint 3's candidate items (per sprint3_ar0_routing_index.json's own planning_status note) have NOT been detailed into INVEST stories anywhere yet - FR-011/FR-013/FR-014/FR-015 are backlog stubs and DASH-STORY-011 is an undone Sprint-1 spike. This file therefore does both jobs in one document, on explicit task instruction: it mirrors every routing field sprint2_ar1_assignments.json actually has (rationale, hld_ownership_crosscheck, must_not_deviate, p1_trigger_evaluation, p1_reviewer, advisory_review, mathematical_delegation, logging_note, candidate_scores) AND adds an `invest` block plus an `acceptance_criteria[]` array (ac_id/text/source) per story, sourced from real HLD.md/SRS.md text and this session's own source-code verification - never fabricated. Where an FR has no SRS-numbered AC yet (FR-014, FR-015 are backlog stubs, not yet promoted into the SRS FR/AC table), the acceptance_criteria entries are derived directly from HLD.md/openapi.yaml/composition_root.py citations instead of an AC ID, and each such entry's `source` field says so explicitly rather than inventing an AC number.",
+  "methodology_reuse_note": "Assignment threshold and force-assignment policy are reused verbatim from sprint2_ar1_assignments.json/ar1_assignments.json: assignment_threshold = 0.75, and a story with no candidate at or above 0.75 is a routing gap, never force-assigned. Fit scores below are lifted directly from sprint3_ar0_routing_index.json's own reduced 2-signal model (score = 0.5*domain_match + 0.5*skill_coverage, threshold 0.70 there) where that file already computed them; this file re-applies the sprint1/sprint2 0.75 threshold for the ASSIGNMENT decision itself (not the AR.0 scoring pass) since these items are now detailed into INVEST stories with real ACs, closing the gap AR0's own reduced-model disclosure flagged. No score was re-derived from scratch except where noted.",
+  "agent_existence_verification": {
+    "method": "Every agent named below was already verified to exist at claude-global-library/agents/{name}/agent.md by sprint3_ar0_routing_index.json's own fresh directory glob (2026-09-20, 528 entries) or by sprint2_ar1_assignments.json's prior verification pass. This session additionally re-confirmed by direct glob: python-backend-engineer, database-engineer, ai-engineer, devops-engineer, crypto-security-specialist, cloud-security-architect, api-security-auditor - all six resolve to a real agent.md.",
+    "rule": "No agent name appears in this file unless its agents/{name}/agent.md was read or glob-confirmed to exist in this session or a session this file cites.",
+    "domain_gaps_carried_forward": "sprint3_ar0_routing_index.json's agent_existence_verification.domain_gaps_disclosed_not_invented already recorded that no vector-database-infrastructure-specific persona and no DPDP/privacy-law specialist persona exist in the library. Both gaps are restated, not silently dropped, wherever they affect an assignment below (DASH-STORY-011, the DSHN-70 story's advisory review)."
+  },
+  "assignment_rule": {
+    "threshold": 0.75,
+    "policy": "Highest-scoring candidate at or above 0.75 wins. A story with no candidate at or above 0.75 is recorded as a routing gap and left flagged - never force-assigned. Identical to sprint2_ar1_assignments.json's rule.",
+    "agent_existence_rule": "Every agent named here was verified to exist at claude-global-library/agents/{name}/agent.md in this session or a session this file cites."
+  },
+  "p1_security_override": {
+    "trigger_criteria": [
+      "Story touches Zone 7 (Provenance/Audit)",
+      "Story touches the storage-adapter (ZoneRepository port) interface",
+      "Story touches cross-tenant isolation"
+    ],
+    "effect": "A mandatory security review gate is attached to the story. The reviewing agent is distinct from the implementing agent (Maker-Checker). The story cannot close on the implementing agent's report alone.",
+    "criteria_source": "Reused verbatim from ar1_assignments.json.p1_security_override / sprint2_ar1_assignments.json.p1_security_override - not redefined for Sprint 3.",
+    "applied_after_criteria_evaluation": [],
+    "considered_and_not_triggered": [
+      {
+        "story": "DASH-STORY-022 (FR-013 Zone 3/5 conflict-detection wiring)",
+        "reason_considered": "The story's whole point is wiring writes into Zone 7's provenance-append path via ConflictDetectingProvenanceRepository (src/dashanan/application/conflict_detection_sweep.py), and HLD Section 3.8 calls the sweep 'the single highest-leverage anti-hallucination control in the design' - a plausible Zone-7-adjacent trigger.",
+        "reason_not_triggered": "Applying the three literal criteria: the story does not touch Zone 7's OWN storage (ProvenanceRecord rows are written exactly as before, through the existing SqlProvenanceRepository/ConflictDetectingProvenanceRepository decorator chain that composition_root.py already builds); it does not modify the ZoneRepository PORT interface (SqlSemanticRepository.write / EntityMemoryRepository.write_attribute's own signatures are unchanged - the wiring is an internal call to an already-existing, already-tested collaborator, not a port change); and it carries no cross-tenant-isolation claim (conflict detection is scoped to `(tenant_id, item_id)`/`(entity, predicate)` within a single tenant, per ConflictDetectingProvenanceRepository.append's own tenant_id-scoped find_by_item_id call). Literal application of the stated criteria does not fire here, the same posture sprint2_ar1_assignments.json used for DASH-STORY-012 (implements a new adapter/wiring behind an existing frozen port is not a port-interface change).",
+        "advisory_action": "See DASH-STORY-022.advisory_review below - a non-blocking advisory review is attached anyway given HLD Section 3.8's own characterization of this mechanism's stakes, mirroring the non-blocking (not P1) treatment sprint2_ar1_assignments.json gave DASH-STORY-020."
+      },
+      {
+        "story": "DASH-STORY-023 (FR-014 wire/API layer)",
+        "reason_considered": "This story stands up the FIRST real network-facing host application this codebase has ever had, and wires composition_root.py's secure builders (which enforce HLD Threat S-1 tenant-impersonation verification and DSHN-55 privilege checks) into it for the first time - a materially new attack surface.",
+        "reason_not_triggered": "None of the three literal P1 triggers fire: FR-014 does not touch Zone 7's storage, does not modify the ZoneRepository port (it is a wire/transport layer sitting in front of the already-frozen Orchestrator/port boundary per HLD Section 3.1), and multi-tenant isolation logic is not introduced by this story - it is enforced downstream by the composition root's existing tenant_credential_signing_key verification, which FR-014 must call correctly but does not redesign.",
+        "advisory_action": "See DASH-STORY-023.advisory_review below - non-blocking advisory review by api-security-auditor given this is a new network-facing host, mirroring the crypto-security-specialist/cloud-security-architect advisory pattern sprint2_ar1_assignments.json used for DASH-STORY-020."
+      },
+      {
+        "story": "DASH-STORY-024 (FR-015 Shape B infra)",
+        "reason_considered": "This story is where dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner (defined in provenance_schema.sql/episodic_schema.sql per the DSHN-60 P1 remediation; backlog_draft.json's own FR-015 note names this pair as 'dashanan_app_role', the pre-DSHN-60 shared-role name that this session's own read of the schema SQL found does not exist there any more, corrected here rather than silently repeated) get bound to a real login credential for the first time, and stands up real network-reachable Postgres/Redis/Qdrant/OpenSearch/S3 services - a second materially new attack surface alongside FR-014's.",
+        "reason_not_triggered": "Same three-criteria check as FR-014: no Zone 7 storage touch, no ZoneRepository port-interface change (this is deployment/infrastructure config, not application code), no cross-tenant-isolation logic introduced (tenant partitioning per ADR-013/ADR-007 is an existing design, not something this story redesigns).",
+        "advisory_action": "See DASH-STORY-024.advisory_review below - non-blocking advisory review by cloud-security-architect given real DB/object-store credentials go live for the first time here."
+      }
+    ]
+  },
+  "assignments": [
+    {
+      "story_id": "DASH-STORY-021",
+      "jira_key": null,
+      "jira_key_note": "No Jira issue exists yet for this story; sprint3_ar0_routing_index.json's FR-011 candidate item (SPRINT3-CAND-001) is a backlog_draft.json stub, not a minted Jira key. A github_create_issue-equivalent Jira creation is scoped to Phase B dispatch, not this AR.1 routing pass.",
+      "title": "FR-011 zone-coverage closure: verify pluggable-storage-adapter substitutability holds across all 8 shipped zone adapters",
+      "traces_to_fr": "FR-011",
+      "story_points": 3,
+      "invest": {
+        "independent": "A verification/closure task over already-shipped adapters (Sprint 1: Zone 1/2/6/7; Sprint 2: Zone 3/4/5/8) - does not require any new zone story, only that all 8 already exist, which this session confirmed by directly globbing src/dashanan/infrastructure/*.py.",
+        "negotiable": "Scope is verification and a missing contract-test gap-fill, not a new adapter - ADR-001/005/006/007/008/009 already locked each zone's concrete technology choice; this story does not reopen any of them.",
+        "valuable": "Closes sprint3_ar0_routing_index.json's own open question about FR-011's real Sprint-3 scope (its status_note explicitly said 'this file found no evidence [remaining zones] are still missing' and that the real scope should be re-verified, not assumed) with a real, cited finding rather than leaving it open a second time.",
+        "estimable": "3 story points: a directory/contract audit plus closing any AC-011 substitutability contract-test gap found - bounded, not open-ended research.",
+        "small": "Scoped to confirming AC-011 (port-substitutability) holds for the two zones (Zone 3, Zone 5) that shipped in Sprint 2 after AC-011 was originally written against Sprint 1's four zones, and filling any missing contract-test coverage - not a rewrite of any adapter.",
+        "testable": "Concrete: a shared ZoneRepository-port contract test suite (already exercised for Zone 1/2/6/7 per ar1_assignments.json Sprint 1 QA sub-tasks) is confirmed to run against Zone 3/4/5/8's adapters too, with zero adapter-specific behavioral leakage."
+      },
+      "real_finding": "This session directly globbed src/dashanan/infrastructure/*.py and confirmed a concrete adapter already exists for every one of the 8 zones: working_memory_lru_repository.py (Zone 1), sql_episodic_repository.py (Zone 2), sql_semantic_repository.py (Zone 3), in_memory_procedural_memory_repository.py (Zone 4), entity_memory_repository.py (Zone 5), hybrid_retrieval_index_repository.py (Zone 6), sql_provenance_repository.py (Zone 7), sql_manifest_repository.py + sql_zone8_subject_index_repository.py (Zone 8). There is NO remaining zone without an adapter. sprint3_ar0_routing_index.json's own status_note for FR-011 (SPRINT3-CAND-001) already flagged this as the likely outcome without confirming it; this story confirms it and reframes FR-011's Sprint 3 scope from 'build the missing adapter' (there is none) to 'prove AC-011's cross-adapter behavioral-equivalence claim actually holds for the two zones that shipped after AC-011 was written' (Zone 3, Zone 5), which is real, unclosed verification work.",
+      "assigned_agent": "api-testing-engineer",
+      "model": "sonnet",
+      "score": 0.825,
+      "runner_up": {
+        "agent": "database-engineer",
+        "score": 0.725
+      },
+      "margin": 0.1,
+      "candidate_scores": [
+        {
+          "agent": "python-backend-engineer",
+          "signals": {
+            "domain_match": 0.85,
+            "skill_coverage": 0.8
+          },
+          "score": 0.825,
+          "above_threshold": true,
+          "evidence": "Score carried forward unchanged from sprint3_ar0_routing_index.json SPRINT3-CAND-001 (this agent implemented every ZoneRepository adapter across both prior sprints); this AR.1 pass adds no new signal since the work is a contract-test/verification task on the same port this agent already owns end-to-end."
+        },
+        {
+          "agent": "database-engineer",
+          "signals": {
+            "domain_match": 0.75,
+            "skill_coverage": 0.7
+          },
+          "score": 0.725,
+          "above_threshold": false,
+          "evidence": "Below the 0.75 assignment threshold once this story is understood as contract-test verification rather than schema work - carried forward from sprint3_ar0_routing_index.json as a documented non-winner, not re-scored."
+        }
+      ],
+      "rationale": "python-backend-engineer clears 0.75 and is the only agent with continuity across every adapter this story must verify (it implemented or co-owned all 8). database-engineer's AR.0 score (0.725) does not clear this file's 0.75 assignment threshold once the work is understood as a contract-test/verification task, not new schema design - reused, not re-derived, per this file's methodology_reuse_note.",
+      "hld_ownership_crosscheck": "MATCH - HLD Section 3.0 (ZoneRepository port); Section 3.10 Data Ownership Map (confirms each zone's OWNS line, cross-checked against the 8 adapter files this session globbed).",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-011",
+          "text": "Given a zone is configured with a different concrete storage adapter (e.g., swapping a relational adapter for a vector-store adapter), When the zone's orchestration contract (ZoneRepository port) is exercised, Then zone behavior is unchanged from the caller's perspective.",
+          "source": "SRS.md Section 4, AC-011 row (verbatim, unchanged - this story does not redefine the AC, it extends its verification coverage)."
+        },
+        {
+          "ac_id": "AC-021-1",
+          "text": "Given the shared ZoneRepository-port contract test suite already exercised against Zone 1/2/6/7's adapters in Sprint 1, When the same suite is run against Zone 3 (SqlSemanticRepository) and Zone 5 (EntityMemoryRepository)'s adapters, Then it passes with zero adapter-specific behavioral leakage (no test requires knowledge of which concrete adapter is behind the port).",
+          "source": "Derived from HLD Section 3.0's ZoneRepository port contract and this session's own confirmation that Zone 3/5's adapters (src/dashanan/infrastructure/sql_semantic_repository.py, entity_memory_repository.py) exist but have not been confirmed to run under that shared contract suite - no existing SRS AC number covers this specific cross-adapter regression check, so it is recorded as a story-local AC rather than an invented SRS AC ID."
+        }
+      ],
+      "must_not_deviate": [
+        "This story does not build a new zone adapter - all 8 already exist, confirmed by direct source-tree inspection; do not interpret FR-011's backlog title ('remaining zone coverage') as license to invent Zone 9 or duplicate an existing zone's adapter",
+        "Does not reopen ADR-001/005/006/007/008/009's locked technology choices for any zone",
+        "If the shared contract-test suite reveals real behavioral divergence for Zone 3 or Zone 5 (not just a missing test), that is a defect against AC-011, to be raised as a new Jira issue, not silently patched inside this verification story"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 write-path change, no ZoneRepository port-interface modification (this is test coverage over the existing frozen port), no cross-tenant isolation logic introduced or modified.",
+      "advisory_review": null,
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-021. Depends on nothing new - all 8 adapters it verifies already shipped in Sprint 1/2.",
+      "assigned_agent_note": "Reassigned 2026-09-20 per user decision (SP3-DEC-106, 'Rebalance now'): moved from python-backend-engineer to api-testing-engineer. Rationale: this story is a contract/substitutability verification story (proving ZoneRepository interchangeability across all 8 shipped adapters), not new feature-building, so api-testing-engineer is a genuinely better domain fit, not a forced reassignment. Verified: no other Python-flavored backend persona exists in claude-global-library/agents/ (only python-backend-engineer, confirmed by direct glob) for a single-Python-3.12-codebase (HLD NFR-001), so DASH-STORY-022/023/025 could not be genuinely rebalanced without forcing a worse-fit persona -- this is the one story where rebalancing was actually well-grounded."
+    },
+    {
+      "story_id": "DASH-STORY-022",
+      "jira_key": null,
+      "jira_key_note": "No story-level Jira key exists; Jira DSHN-53 (read via mcp__jira-api__jira_get_issue by sprint3_ar0_routing_index.json) is the EPIC this story closes, with an empty description field at read time - a story-level issue is created at Phase B dispatch, referencing DSHN-53 as its epic link.",
+      "title": "Wire the existing FR-013 conflict-detection sweep into the real Zone 3 and Zone 5 write paths",
+      "traces_to_fr": "FR-013",
+      "story_points": 5,
+      "invest": {
+        "independent": "Both collaborators this story wires together already exist and are independently tested: ConflictDetectingProvenanceRepository (src/dashanan/application/conflict_detection_sweep.py) and SqlSemanticRepository/EntityMemoryRepository (src/dashanan/infrastructure/sql_semantic_repository.py, entity_memory_repository.py). This story only needs both to already exist, not any new Sprint 3 work first.",
+        "negotiable": "Does not reopen HLD Section 3.8's conflict-detection algorithm (the `(entity, predicate)`/`(subject, predicate, object)` contradiction check, the `-0.3` disputed-confidence modifier) - that mechanism is locked and already implemented; only the write-path CALL SITE is in scope.",
+        "valuable": "Closes a real, source-verified gap: this session confirmed by grep that ConflictDetectingProvenanceRepository and composition_root.py's build_provenance_repository are imported ONLY by each other and by test files - SqlSemanticRepository and EntityMemoryRepository never import or call either. SRS.md's FR-013 row ('this is required scope, not optional, since Zone 3/5 writes cannot satisfy NFR-011 without it') is currently unmet at the integration point despite the underlying mechanism being real and tested.",
+        "estimable": "5 story points: composition-root-style dependency injection wiring two existing write paths through an existing decorator - comparable in shape to DASH-STORY-012..020's Sprint 2 adapter/composition-root wiring work, not a new-mechanism build.",
+        "small": "Scoped to the two call sites (Zone 3's write path in SqlSemanticRepository, Zone 5's write_attribute in EntityMemoryRepository) routing through ConflictDetectingProvenanceRepository/detect_conflict - it does not touch Zone 4 (excluded per FR-013's own text, which names only Zone 3 and Zone 5) or any other zone's write path.",
+        "testable": "Concrete and behavioral: seed a contradicting write for the same (entity, predicate) or (subject, predicate, object) through the real Zone 3/Zone 5 write path (not directly against ConflictDetectingProvenanceRepository, as the existing unit tests already do) and confirm both records land as conflict_status=disputed with reduced confidence, per SRS.md AC-015."
+      },
+      "gap_confirmed": "CONFIRMED by direct source-code read in this session (not assumed from DSHN-53's empty Jira description). ConflictDetectingProvenanceRepository.append (src/dashanan/application/conflict_detection_sweep.py lines 107-176) implements the full FR-013 sweep and composition_root.py's build_provenance_repository(detect_conflicts=True) (the default) wraps it. But grep for every importer of ConflictDetectingProvenanceRepository / build_provenance_repository across src/ found only composition_root.py and conflict_detection_sweep.py itself. src/dashanan/infrastructure/sql_semantic_repository.py's SqlSemanticRepository and entity_memory_repository.py's EntityMemoryRepository.write_attribute both only require a caller-supplied provenance_id string on write (entity_memory_repository.py line 165, 200-201's validation of that string); neither imports or calls build_provenance_repository or the wrapped repository's append path.",
+      "assigned_agent": "python-backend-engineer",
+      "model": "sonnet",
+      "score": 0.875,
+      "runner_up": null,
+      "margin": null,
+      "candidate_scores": [
+        {
+          "agent": "python-backend-engineer",
+          "signals": {
+            "domain_match": 0.9,
+            "skill_coverage": 0.85
+          },
+          "score": 0.875,
+          "above_threshold": true,
+          "evidence": "Score carried forward from sprint3_ar0_routing_index.json SPRINT3-CAND-002 unchanged. Application-layer composition-root-style wiring on top of an existing, tested mechanism - the same profile as DASH-STORY-012..020's Sprint 2 adapter/composition-root wiring, all owned by this agent."
+        }
+      ],
+      "rationale": "Single viable candidate, confirmed here as in AR.0: database-engineer was considered and rejected - this is a call-site wiring gap in application/infrastructure code (which write path a caller's Zone 3/5 write routes through), not a schema or index change. The Zone 3/5 schemas and the conflict-detection domain logic (domain/conflict_detection.py) already exist and are unaffected by this story.",
+      "hld_ownership_crosscheck": "MATCH - HLD Section 3.8 'Conflict-detection sweep (adopted from research brief Section 4; NEW scope - see OAQ-14)... it is the single highest-leverage anti-hallucination control in the design'; SRS.md FR-013 row.",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-015",
+          "text": "Given adversarial content is written to any zone via prompt injection, When that content is later surfaced, Then it is never interpolated into any prompt Dashanan itself issues as an instruction, and a contradicting true fact triggers the conflict-detection sweep to downgrade both records rather than silently overwriting the true fact (HLD threat T-1).",
+          "source": "SRS.md Section 4, AC-015 row (verbatim). The 'contradicting true fact triggers the conflict-detection sweep' clause is the specific text this story closes for Zone 3/Zone 5, since the sweep mechanism exists but is not currently reachable from either zone's real write path."
+        },
+        {
+          "ac_id": "AC-022-1",
+          "text": "Given a caller writes a candidate SemanticEdge or GeneralFact to Zone 3 (or an attribute to Zone 5) that contradicts an existing record for the same (entity, predicate) or (subject, predicate, object), When the write is processed through the real SqlSemanticRepository/EntityMemoryRepository write path (not a direct call to ConflictDetectingProvenanceRepository), Then ConflictDetectingProvenanceRepository.append's conflict-detection logic runs and both the disputed prior record and the incoming record are marked conflict_status=disputed with reduced confidence, exactly as conflict_detection_sweep.py's own docstring specifies.",
+          "source": "Derived from SRS.md FR-013 row text ('On every write targeting Zone 3 (Semantic) or Zone 5 (Entity)...') plus src/dashanan/application/conflict_detection_sweep.py's ConflictDetectingProvenanceRepository.append docstring (this session's own read) - no existing SRS AC ID is dedicated to FR-013 alone, so this is recorded as a story-local AC rather than an invented SRS AC number."
+        },
+        {
+          "ac_id": "AC-022-2",
+          "text": "Given no conflict is detected for an incoming Zone 3 or Zone 5 write, When the write is processed, Then it is appended unchanged with no additional latency beyond the one extra read per append that ConflictDetectingProvenanceRepository's own docstring already discloses as an accepted trade-off.",
+          "source": "src/dashanan/application/conflict_detection_sweep.py's ConflictDetectingProvenanceRepository class docstring, 'an accepted trade-off given Zone 7 write volume is already bounded by ProvenanceWriteGate's own per-tenant rate limiter (HLD Threat D-1)' (this session's own read)."
+        }
+      ],
+      "must_not_deviate": [
+        "Does not modify domain/conflict_detection.py's detect_conflict algorithm or ConflictDetectingProvenanceRepository's own append logic - both are locked, tested collaborators; this story only adds call sites that route through them",
+        "Does not add a Zone 4 leg - FR-013's own text names only Zone 3 (Semantic) and Zone 5 (Entity); Zone 4's Procedure entity has no (entity, predicate) or (subject, predicate, object) shape this sweep operates on",
+        "Must route through the wrapped repository composition_root.py already builds (build_provenance_repository(detect_conflicts=True)) rather than instantiating a second, parallel ConflictDetectingProvenanceRepository - avoiding the exact 'unwired primitive' failure mode composition_root.py's own module docstring already documents for a prior DSHN-60 remediation attempt"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "Considered and NOT triggered under the literal three criteria - see p1_security_override.considered_and_not_triggered above.",
+      "advisory_review": {
+        "status": "AUTHORIZED by user 2026-09-20 (see summary.open_user_decisions) -- must actually run and report before this story is presented as complete, per this block's own acceptance_criteria.",
+        "agent": "crypto-security-specialist",
+        "model": "sonnet",
+        "review_scope": "Adversarially confirm the wired write path cannot be bypassed (e.g., a caller constructing SqlSemanticRepository/EntityMemoryRepository directly instead of through composition_root.py's build_provenance_repository, silently skipping the sweep the way the pre-wiring gap this story closes already did once for DSHN-60), and that the conflict-detection sweep's confidence-reduction behavior matches HLD Section 3.8's documented `-0.3` disputed modifier exactly. Non-blocking - HLD Section 3.8's own 'single highest-leverage anti-hallucination control' framing is the reason for this advisory (not a P1 trigger, none fires per p1_security_override.considered_and_not_triggered).",
+        "maker_checker": false,
+        "does_not_resolve": "This review does not re-open FR-013's own algorithm (domain/conflict_detection.py), which is out of scope and already shipped/tested."
+      },
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-022. Depends on DASH-STORY-012 (Zone 3, Sprint 2, already landed) and DASH-STORY-017 (Zone 5, Sprint 2, already landed) - both completed upstream dependencies, not concurrent handoffs, same risk posture sprint2_ar1_assignments.json used for DASH-STORY-014's cross-sprint dependency on DASH-STORY-007."
+    },
+    {
+      "story_id": "DASH-STORY-011",
+      "jira_key": null,
+      "jira_key_note": "Unchanged from ar1_assignments.json's Sprint 1 record - no Jira key was minted for this spike then, and none exists now.",
+      "title": "SPIKE: Qdrant client library version/compatibility pinning validation (re-confirmed Sprint 3, still genuinely blocked)",
+      "traces_to_fr": "FR-006",
+      "story_points": 3,
+      "invest": "Unchanged from docs/phase-6-sprint-planning/backlog_draft.json sprint_1_stories[DASH-STORY-011]'s own INVEST block and spike_exit_criteria - this AR.1 entry does not rewrite them, only re-confirms the assignment and the still-blocked status per sprint3_ar0_routing_index.json's own direct verification.",
+      "relevance_reconfirmation": "sprint3_ar0_routing_index.json's SPRINT3-CAND-003 already re-verified this spike is still not done (no compatibility-matrix document, no requirements/lockfile Qdrant client pin, no 'qdrant' string anywhere in pyproject.toml/requirements*.txt or docs/ output artifacts, checked that session) and genuinely blocked on FR-015 (Shape B infra) rather than abandoned - without a real Qdrant server/deployment target, the spike's own exit criteria (client-version x server-version x Python-3.12+ compatibility matrix) has no live server to validate against beyond documentation research. This AR.1 pass re-confirms that finding rather than re-deriving it: DASH-STORY-007 (the story this spike unblocks) remains Shape-A-only per FR-015's own backlog note, so this spike's relevance is unchanged but its actual execution should be sequenced alongside or after FR-015 (DASH-STORY-024 below), not run in isolation before a real Qdrant server exists to validate against.",
+      "assigned_agent": "python-backend-engineer (execute) + ai-engineer (consult)",
+      "model": "sonnet",
+      "score": 0.825,
+      "runner_up": {
+        "agent": "python-backend-engineer",
+        "score": 0.525
+      },
+      "margin": 0.3,
+      "candidate_scores": [
+        {
+          "agent": "ai-engineer",
+          "signals": {
+            "domain_match": 0.8,
+            "skill_coverage": 0.85
+          },
+          "score": 0.825,
+          "above_threshold": true,
+          "evidence": "Reuses ar1_assignments.json's own Sprint 1 rationale verbatim, re-confirmed by sprint3_ar0_routing_index.json: this agent's mandatory vector-database-core skill and its existing ownership of DASH-STORY-007 (the Qdrant-backed Zone 6 adapter that consumes this spike's output) make it the best-placed candidate."
+        },
+        {
+          "agent": "python-backend-engineer",
+          "signals": {
+            "domain_match": 0.55,
+            "skill_coverage": 0.5
+          },
+          "score": 0.525,
+          "above_threshold": false,
+          "evidence": "Below this file's 0.75 threshold - general backend skill, no vector-database-core coverage."
+        }
+      ],
+      "rationale": "Unchanged single-agent assignment across three routing passes now (ar1_assignments.json Sprint 1, sprint3_ar0_routing_index.json, this file) - no vector-database-infrastructure-specific persona narrower than ai-engineer exists in the library (agent_existence_verification.domain_gaps_carried_forward), so ai-engineer remains the only above-threshold candidate.",
+      "hld_ownership_crosscheck": "MATCH - ADR-007 (Qdrant vendor lock, no version pinned).",
+      "acceptance_criteria": "Unchanged from backlog_draft.json's own spike_exit_criteria array (4 items: compatibility matrix, breaking-change review + pinned-version recommendation, recommendation handed to DASH-STORY-007's Dev sub-task, explicit non-reopening of the ADR-007 vendor decision) - this file does not restate them as ac_id-numbered entries since a spike's exit criteria, not a product AC, is the correct unit per backlog_draft.json's own invest.testable field for this story.",
+      "must_not_deviate": [
+        "Does NOT reopen the Qdrant vendor decision - ADR-007 is locked; scope is strictly compatibility/version validation",
+        "Explicitly out of scope per backlog_draft.json's own spike_exit_criteria: re-evaluating Qdrant against pgvector/Milvus/other vector stores",
+        "New for this re-confirmation: do not attempt the live-server half of the compatibility matrix before FR-015 (DASH-STORY-024) has stood up a real Qdrant deployment target - documentation-only research can proceed now, but the exit criteria's server-version validation genuinely needs FR-015's infrastructure first"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "No Zone 7 surface, no storage-adapter port implementation, no tenant-isolation logic - a documentation/research deliverable, unchanged from ar1_assignments.json's own evaluation.",
+      "advisory_review": null,
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-011 (story ID intentionally unchanged from Sprint 1 - this is the same spike, re-confirmed relevant, not a new story).",
+      "assigned_agent_note": "Consult split authorized per user decision (SP3-DEC-107, 'Add a consult split'), 2026-09-20: python-backend-engineer executes the spike with ai-engineer consulted, per sprint3_ar1_assignments.json's own AR1-G5-recommended fallback option, closing the single-agent risk flagged across three consecutive routing passes."
+    },
+    {
+      "story_id": "DASH-STORY-023",
+      "jira_key": null,
+      "jira_key_note": "No Jira key exists; FR-014 is a 2026-09-20 backlog_draft.json stub (wsjf_rank null), 'not yet detailed into an INVEST story' per that file's own note - created at Phase B dispatch.",
+      "title": "Wire/API layer: real FastAPI/gRPC host implementing the existing openapi.yaml contract, closing DSHN-60",
+      "traces_to_fr": "FR-014",
+      "story_points": 8,
+      "invest": {
+        "independent": "The contract (docs/phase-1.5-api/openapi.yaml, 32 operationIds this session confirmed by grep) and the secure composition root (src/dashanan/infrastructure/composition_root.py's build_memory_orchestrator/build_provenance_repository) both already exist and are independently tested - this story only needs both, not any other Sprint 3 story first.",
+        "negotiable": "Does not redesign the OpenAPI contract or the composition root's security posture - both are locked; scope is the host application (FastAPI/gRPC per HLD Section 2, ADR-004) that calls them for the first time.",
+        "valuable": "Closes the disclosed DSHN-60 security-wiring gap in its final, concrete form: composition_root.py's own module docstring (read in full this session) states plainly that 'this codebase has no api/routes module or host application anywhere that actually invokes this composition root, or any other constructor, outside its test suite - that gap is outside a security-patch pass's scope to invent.' This story is exactly that out-of-scope-for-a-patch, in-scope-for-a-feature-story work.",
+        "estimable": "8 story points: a real FastAPI/gRPC host over 32 already-designed operations, wiring two already-built secure builders - large because of surface area (32 endpoints), not because of undesigned scope. [Corrected by IR.1 2026-09-20: this field still read '29' after the sprint3-phase-c-gate-results.md fix pass, which corrected invest.independent/invest.testable/AC-023-1/AC-023-1.source but missed this occurrence; the real docs/phase-1.5-api/openapi.yaml operationId count, confirmed again by this IR.1 pass via grep -c \"operationId:\", is 32.]",
+        "small": "Scoped to implementing the existing contract and wiring the existing composition root - it does NOT stand up real backing infrastructure (Postgres/Redis/Qdrant/OpenSearch/S3 connections); that is FR-015 (DASH-STORY-024)'s explicit scope, and backlog_draft.json's own FR-014 note records this as a real, acknowledged dependency direction (FR-015 depends on FR-014, not the reverse).",
+        "testable": "Concrete: every one of the 32 operationIds in openapi.yaml resolves to a real, callable handler (not a 501/stub), and a contract test confirms the host refuses to start without a valid DASHANAN_TENANT_CREDENTIAL_SIGNING_KEY, per composition_root.py's load_tenant_credential_signing_key_from_env's own fail-closed behavior (this session's own read of that function, lines 74-119)."
+      },
+      "assigned_agent": "python-backend-engineer",
+      "model": "sonnet",
+      "score": 0.875,
+      "runner_up": null,
+      "margin": null,
+      "candidate_scores": [
+        {
+          "agent": "python-backend-engineer",
+          "signals": {
+            "domain_match": 0.9,
+            "skill_coverage": 0.85
+          },
+          "score": 0.875,
+          "above_threshold": true,
+          "evidence": "Score carried forward from sprint3_ar0_routing_index.json SPRINT3-CAND-004 unchanged. FastAPI/gRPC host implementation over an already-designed OpenAPI contract, wiring an already-built (and already owned by this agent) composition root - direct continuity of this agent's Sprint 1/2 work."
+        }
+      ],
+      "rationale": "Single viable implementer candidate, re-confirmed here: no frontend/gateway-specific persona is relevant since FR-014's scope is a backend host application over an existing contract, not a public-facing UI or API-gateway product, per sprint3_ar0_routing_index.json's own margin_note.",
+      "hld_ownership_crosscheck": "MATCH - HLD Section 2 Container Architecture (`dashanan-api` container: 'Python 3.12 + gRPC (grpclib/grpcio) + FastAPI REST gateway (ADR-004)... Terminates the wire protocol, authN/authZ, tenant binding, rate limiting, request validation. Hosts the sync read path', co-located with `dashanan-orchestrator` per ADR-011).",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-023-1",
+          "text": "Given docs/phase-1.5-api/openapi.yaml's already-designed contract (32 operationIds: assembleContext, assembleContextSimple, searchMemory, getItem, updateItem, deleteItem, getItemProvenance, explainItemScore, writeMemory, writeMemoryBatch, batchGetItems, getWriteStatus, listZones, getZoneDetail, getZoneConfig, putZoneConfig, forceZoneSweep, listZoneItems, reindexZone, getScoringConfig, putScoringConfig, getJobStatus, createTenant, listTenants, getTenant, updateTenant, deleteTenant, eraseSubject, exportSubjectData, getLiveness, getReadiness, getMetrics), When the real host application is started, Then every operationId resolves to a callable handler with no unimplemented (501/placeholder) route.",
+          "source": "docs/phase-1.5-api/openapi.yaml (this session's own grep of every `operationId:` line, 32 total including health/metrics/readiness) cross-referenced with HLD Section 7 'Interface Contracts and Endpoint Inventory (input to Phase 1.5)'."
+        },
+        {
+          "ac_id": "AC-023-2",
+          "text": "Given composition_root.py's build_memory_orchestrator and build_provenance_repository both require an explicit tenant_credential_signing_key (resolved via load_tenant_credential_signing_key_from_env, which fails closed with CompositionRootConfigurationError on a missing/malformed/short DASHANAN_TENANT_CREDENTIAL_SIGNING_KEY env var), When the real host application starts, Then it constructs every MemoryOrchestrator/SqlProvenanceRepository/SqlEpisodicRepository instance through this composition root (never a bare, unverified constructor call), so the host inherits HLD Threat S-1 verification and the DSHN-55 privilege check by construction, not by a per-call-site choice.",
+          "source": "src/dashanan/infrastructure/composition_root.py (this session's own read, lines 1-135, module docstring and load_tenant_credential_signing_key_from_env/build_memory_orchestrator) - no SRS AC ID is dedicated to FR-014 yet since FR-014 has not been promoted into the SRS FR/AC table; this is the concrete engineering contract composition_root.py's own docstring already states is the remaining open gap."
+        },
+        {
+          "ac_id": "AC-023-3",
+          "text": "Given the DELETE /v1/tenants/{id}/subjects/{subject_id} operation (eraseSubject), When it is wired to the real host, Then it invokes the currently Zone-8-only SubjectErasureCascadeService (see DASH-STORY-025's own DSHN-70 gap below) rather than a stub, so this story does not silently present a narrower erasure cascade as HLD Section 7.4's full 'cascades across all 8 zones' contract until DASH-STORY-025 closes that separate, already-disclosed gap.",
+          "source": "HLD.md Section 7.4 endpoint table ('DPDP erasure cascade. 202 + job_id; cascades across all 8 zones, the vector index, the lexical index and Zone 8 archives') cross-referenced with this session's own read of tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py, which documents the current Zone-8-only reach."
+        }
+      ],
+      "must_not_deviate": [
+        "Does not stand up real Postgres/Redis/Qdrant/OpenSearch/S3 backing infrastructure - that is FR-015 (DASH-STORY-024)'s explicit scope; this story may run against Shape A (in-process/embedded) adapters until FR-015 lands",
+        "Does not modify openapi.yaml's existing operationId contracts or composition_root.py's existing secure-builder signatures - both are locked; this story is the caller, not the designer, of both",
+        "Must not present DELETE /v1/tenants/{id}/subjects/{subject_id} as fully closing HLD Section 7.4's 'all 8 zones' erasure-cascade promise until DASH-STORY-025 (DSHN-70) also lands - wiring the endpoint to the currently-Zone-8-only SubjectErasureCascadeService is correct and required, but must not be described as DPDP-complete on its own"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "Considered and NOT triggered under the literal three criteria - see p1_security_override.considered_and_not_triggered above.",
+      "advisory_review": {
+        "status": "AUTHORIZED by user 2026-09-20 (see summary.open_user_decisions) -- must actually run and report before this story is presented as complete, per this block's own acceptance_criteria.",
+        "agent": "api-security-auditor",
+        "model": "sonnet",
+        "review_scope": "Adversarially test the new network-facing host: confirm the host genuinely refuses to start without a valid signing key (does not silently fall back to an insecure default the way the composition root's own module docstring records a prior DSHN-60 attempt already failed to prevent), confirm authN/authZ and tenant-binding enforcement at the wire boundary (mTLS + JWT with tenant_id claim per HLD Section 2's Communication Matrix) is genuinely wired and not bypassable via a malformed or missing claim, and confirm rate limiting is actually enforced, not just documented.",
+        "maker_checker": false,
+        "does_not_resolve": "Does not resolve FR-015's separate real-infrastructure gap (no real DB credentials exist until that story lands) or DSHN-70's Zone 3/4/5 erasure-cascade gap."
+      },
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-023. No dependency on any other Sprint 3 story to START (the contract and composition root both already exist), but backlog_draft.json's own FR-015 note records FR-015 as depending on FR-014 ('a wire layer with no real backing store... is still Shape-A-only underneath it'), so DASH-STORY-024 should not be presented as production-deployable until this story lands first."
+    },
+    {
+      "story_id": "DASH-STORY-024",
+      "jira_key": null,
+      "jira_key_note": "No Jira key exists; FR-015 is a 2026-09-20 backlog_draft.json stub (wsjf_rank null), same pre-Phase-6 maturity as FR-014 - created at Phase B dispatch.",
+      "title": "Shape B deployment infrastructure: Postgres/Redis/Qdrant/OpenSearch/S3, docker-compose, env config, migration runner",
+      "traces_to_fr": "FR-015",
+      "story_points": 8,
+      "invest": {
+        "independent": "Builds real infrastructure around already-designed schemas (provenance_schema.sql, episodic_schema.sql since DSHN-55) and an already-locked container/service table (HLD Section 2) - does not require FR-014 to be code-complete first, though FR-014 is the layer that makes this infrastructure actually reachable end-to-end (backlog_draft.json's own real dependency note).",
+        "negotiable": "Does not reopen HLD Section 2's locked technology choices (PostgreSQL/ADR-006, Redis/ADR-005, Qdrant/ADR-007, OpenSearch/ADR-008, S3-compatible/ADR-009) - scope is standing them up, not re-selecting them.",
+        "valuable": "Closes the concrete gap backlog_draft.json's own FR-015 note already confirmed by direct exploration (2026-09-20): no docker-compose*, no .env*, no settings/config module, no alembic anywhere in this repo. Also the story where dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner (the real, current role names defined in the schema SQL since the DSHN-60 P1 remediation - backlog_draft.json's own FR-015 note names this pair 'dashanan_app_role', the pre-DSHN-60 shared-role name, corrected here) get bound to an actual login credential for the first time - a real production-security surface per that same note.",
+        "estimable": "8 story points: five real services (Postgres/Redis/Qdrant/OpenSearch/S3) via docker-compose, env config, a migration runner, and a real DB driver dependency (pyproject.toml currently declares zero, confirmed by backlog_draft.json's own exploration) - comparable in scope to Sprint 2's largest single stories (DASH-STORY-017/018, both 8 SP).",
+        "small": "Scoped to the five named services plus config/migration tooling - does not include the FR-014 host application itself (that is DASH-STORY-023) and does not include DASH-STORY-011's Qdrant client-version research (that stays a separate spike, sequenced alongside this story per this file's DASH-STORY-011 re-confirmation note).",
+        "testable": "Concrete: `docker-compose up` brings up all five services; the migration runner applies provenance_schema.sql/episodic_schema.sql (and any other existing zone schema files) against a real Postgres instance; dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner are bound to a real, non-default credential sourced from env config, not a hardcoded value."
+      },
+      "assigned_agent": "devops-engineer (docker-compose/env/orchestration) + database-engineer (migration runner + DB-role-credential binding)",
+      "model": "sonnet",
+      "score": 0.825,
+      "runner_up": {
+        "agent": "database-engineer",
+        "score": 0.55
+      },
+      "margin": 0.275,
+      "candidate_scores": [
+        {
+          "agent": "devops-engineer",
+          "signals": {
+            "domain_match": 0.85,
+            "skill_coverage": 0.8
+          },
+          "score": 0.825,
+          "above_threshold": true,
+          "evidence": "Score carried forward from sprint3_ar0_routing_index.json SPRINT3-CAND-005 unchanged. This agent's own System Prompt names 'multi-stage Dockerfile design, image optimization, docker-compose orchestration, and container security hardening' as a first-class responsibility (docker skill, mandatory), directly matching FR-015's docker-compose/env-config/migration-runner scope."
+        },
+        {
+          "agent": "database-engineer",
+          "signals": {
+            "domain_match": 0.55,
+            "skill_coverage": 0.55
+          },
+          "score": 0.55,
+          "above_threshold": false,
+          "evidence": "Below threshold as sole owner of the full FR-015 scope, but a genuine co-owner for the migration-runner and DB-role-binding sub-slice specifically if this story is later split into sub-tasks - carried forward from AR.0, not re-scored."
+        },
+        {
+          "agent": "infrastructure-as-code-engineer",
+          "signals": {
+            "domain_match": 0.35,
+            "skill_coverage": 0.3
+          },
+          "score": 0.325,
+          "above_threshold": false,
+          "evidence": "Rejected as primary owner - its own agent.md scopes it to Terraform/Pulumi cloud-provisioned infrastructure, with docker/kubernetes as Optional skills only; FR-015 as scoped (local docker-compose, not cloud-provisioned IaC) is a mismatch. Carried forward from sprint3_ar0_routing_index.json's own domain_gaps_disclosed_not_invented entry."
+        }
+      ],
+      "rationale": "devops-engineer clears threshold and is the only candidate whose mandatory skill set (docker-compose orchestration named as a first-class System Prompt responsibility) matches FR-015's actual scope. database-engineer is a genuine sub-task co-owner for the DB-role-binding piece specifically (see summary.open_user_decisions SP3-DEC-103 for whether to split), not a below-threshold placeholder.",
+      "hld_ownership_crosscheck": "MATCH - HLD Section 2 container/service table (PostgreSQL/ADR-006, Redis/ADR-005, Qdrant/ADR-007, OpenSearch/ADR-008, S3-compatible/ADR-009).",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-024-1",
+          "text": "Given HLD Section 2's Shape B container/service table names five backing services (Redis event bus/hot store, PostgreSQL, Qdrant, OpenSearch, S3-compatible object store), When docker-compose is used to bring up this story's deliverable, Then all five services start successfully and are reachable on their documented ports/protocols (RESP for Redis, PostgreSQL wire, HTTP for Qdrant/OpenSearch, S3 API for the object store).",
+          "source": "HLD.md Section 2 Container Architecture table (this session's own read) - no SRS AC ID exists for FR-015 yet since it is not promoted into the SRS FR/AC table; this is derived directly from the HLD's own service table."
+        },
+        {
+          "ac_id": "AC-024-2",
+          "text": "Given provenance_schema.sql and episodic_schema.sql already define dashanan_provenance_role, dashanan_episodic_role, and dashanan_schema_owner (this session's own read of the schema SQL; backlog_draft.json's own FR-015 note names this pair 'dashanan_app_role', which is the pre-DSHN-60 shared-role name and does not appear anywhere in the current schema SQL - the schema SQL's own comments record that DSHN-60's P1 remediation split it into these per-zone roles, so this AC uses the real, current names rather than repeating the stale backlog citation), When this story's migration runner applies those schemas against a real Postgres instance, Then all three roles are bound to real, non-default login credentials sourced from env config (never hardcoded in a committed file), closing the production DB-role-wiring gap that backlog_draft.json's own note identifies as still open.",
+          "source": "docs/phase-6-sprint-planning/backlog_draft.json future_sprints_backlog.remaining_frs[FR-015]'s own note (this session's own read) for the gap itself, corrected against this session's own direct read of src/dashanan/infrastructure/provenance_schema.sql and episodic_schema.sql for the actual role names (dashanan_provenance_role, dashanan_episodic_role, dashanan_schema_owner) - the backlog note's own 'dashanan_app_role' name is stale, predating the DSHN-60 per-zone role split those same schema files' own comments document."
+        },
+        {
+          "ac_id": "AC-024-3",
+          "text": "Given pyproject.toml currently declares zero real DB driver dependencies (confirmed by backlog_draft.json's own 2026-09-20 exploration), When this story lands, Then a real, pinned PostgreSQL driver dependency (e.g. psycopg or asyncpg) is added and used by the migration runner and the composition root's real (non-embedded) adapters.",
+          "source": "docs/phase-6-sprint-planning/backlog_draft.json future_sprints_backlog.remaining_frs[FR-015]'s own note (this session's own read)."
+        }
+      ],
+      "must_not_deviate": [
+        "Does not reopen HLD Section 2's locked technology selections for any of the five services",
+        "Real dependency on FR-014 (DASH-STORY-023): per backlog_draft.json's own note, 'a wire layer with no real backing store is still Shape-A-only underneath it' - this story's infrastructure is necessary but not sufficient for production deployability without DASH-STORY-023",
+        "Does not include the FR-014 host application's own request-handling code - this story's scope stops at bringing the five backing services up, wiring env config, and running migrations"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "Considered and NOT triggered under the literal three criteria - see p1_security_override.considered_and_not_triggered above.",
+      "advisory_review": {
+        "status": "AUTHORIZED by user 2026-09-20 (see summary.open_user_decisions) -- must actually run and report before this story is presented as complete, per this block's own acceptance_criteria.",
+        "agent": "cloud-security-architect",
+        "model": "sonnet",
+        "review_scope": "Review the docker-compose/env-config credential-handling design for dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner and the five services' network exposure (which ports are bound to which interfaces, whether any service is reachable without auth by default) before real, non-default DB/object-store credentials go live for the first time in this codebase.",
+        "maker_checker": false,
+        "does_not_resolve": "Does not resolve FR-014's separate host-application attack surface (see DASH-STORY-023's own advisory review) or DASH-STORY-011's still-blocked Qdrant client/server compatibility validation, which this story's Qdrant deployment unblocks but does not itself perform."
+      },
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-024. No hard dependency to START, but the honest sequencing (per backlog_draft.json's own FR-014/FR-015 dependency note and this file's own DASH-STORY-011 re-confirmation) is FR-014 and FR-015 in the same sprint wave, with DASH-STORY-011's live-server validation half sequenced after this story's Qdrant service is actually reachable.",
+      "assigned_agent_note": "Split by sub-task per user decision (SP3-DEC-103, 'Split by sub-task'), 2026-09-20: devops-engineer owns docker-compose orchestration/env config/service wiring; database-engineer owns the migration-runner and DB-role-credential-binding sub-slice specifically (binding dashanan_provenance_role/dashanan_episodic_role/dashanan_schema_owner to real login credentials). Both must be reflected as separate dev-prompt sub-tasks in a future execution-plan refresh before Phase B dispatch."
+    },
+    {
+      "story_id": "DASH-STORY-025",
+      "jira_key": "DSHN-70",
+      "jira_key_note": "Jira DSHN-70 already exists as a Story (status To Do, created 2026-09-20, read in full via mcp__jira-api__jira_get_issue by sprint3_ar0_routing_index.json) - this is the implementation story for that already-filed issue, not a new issue to be created.",
+      "title": "DPDP erasure-cascade reach into Zone 3 (Semantic) and Zone 5 (Entity) data",
+      "traces_to_fr": "NFR-006 / AC-013 (no new FR minted - see fr_minting_decision below)",
+      "story_points": 5,
+      "invest": {
+        "independent": "Builds on SubjectErasureCascadeService (DASH-STORY-020, Sprint 2, already landed) and CrossZoneDpdpErasureCascade (DSHN-58, already landed) without requiring either to change - this story adds new Zone 3/Zone 5 erasure legs and, per DSHN-70's own recommendation, a single orchestrator that fans both existing services plus the two new legs out from one subject-erasure request.",
+        "negotiable": "Does not reopen AC-013's crypto-shredding erasure mechanism itself (a separate, already-disclosed gap per SRS.md Section 4.1's own AC-013 Implementation Scope Note) - this story closes the ZONE-REACH gap (which zones the cascade touches), not the MECHANISM gap (crypto-shredding vs. plain delete/eviction).",
+        "valuable": "Closes a real, test-verified gap. tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py (read in full this session) proves with real seeded data and a real erasure-cascade call that Zone 3 (SemanticEdge) and Zone 5 (EntityRecord attribute) data for an erased subject_id survives SubjectErasureCascadeService.request_erasure completely untouched, while the job still reports COMPLETED - 'the behavior that makes the Zone 3/5 no-op... easy to miss: the 202/job-completion contract looks identical whether or not Zone 3/4/5 were actually reached' (that test file's own module docstring).",
+        "estimable": "5 story points: two new erasure legs (Zone 3 by subject_ref, Zone 5 by entity_id) plus a single fan-out orchestrator wiring them alongside the two already-existing cascades - comparable in shape to DASH-STORY-020's original Zone 8 erasure-cascade story (also 5 SP).",
+        "small": "Scoped to exactly the two zones DSHN-70's own text and this session's own verification confirm are reachable: Zone 3 (SemanticEdge.subject_ref) and Zone 5 (EntityRecord attributes keyed by entity_id). Zone 4 (Procedure) is explicitly and correctly excluded, not silently dropped - see zone_4_exclusion below.",
+        "testable": "Concrete: the same tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py assertions this story is built to fix (currently asserting the NO-OP) are updated to assert the OPPOSITE - Zone 3/Zone 5 data for an erased subject_id no longer survives a real request_erasure call - which is the cleanest possible acceptance signal since the gap-documenting test already exists."
+      },
+      "gap_confirmed": "CONFIRMED by direct read of tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py in this session. Its three tests demonstrate: (1) a real SemanticEdge seeded for a subject_id survives request_erasure with zero additional SQL statements issued against Zone 3's connection; (2) a real Zone 5 EntityRecord attribute for the same subject_id survives request_erasure, confirmed by a direct read-after-erasure (not just an executed-statement proxy); (3) the erasure job itself still completes successfully and reports COMPLETED with item_ids == () even though Zones 3/5 were never touched - the module docstring's own words: 'the 202/job-completion contract looks identical whether or not Zone 3/4/5 were actually reached.'",
+      "zone_4_exclusion": "Zone 4 (Procedure, HLD Section 3.5) is a documented, correct EXCLUSION carried forward from the test file's own docstring, not an oversight this story needs to fix: Procedure's real, current field set (tenant_id, task_signature_hash, steps, success_count, failure_count, last_used_at, state, score_terms) carries no subject_id, entity_id, or any other subject-linkable reference at all (per dashanan.domain.procedure.Procedure's own docstring, which the test file cites). There is no real DPDP erasure leg to build for Zone 4 without first adding a subject-linkable field to the Procedure domain model itself, which is out of this story's scope.",
+      "fr_minting_decision": "sprint3_ar0_routing_index.json already decided (srs_fr016_minting_decision, with real text citations to SRS.md NFR-006 'any zone that stores PII' and AC-013 'across all 8 zones') that NO new FR-016 is warranted - AC-013 and NFR-006 already cover DSHN-70's gap textually and completely. This story therefore traces to NFR-006/AC-013, not a new FR, per that already-approved decision. It does not itself edit SRS.md; per that AR.0 file's own action_taken note, a Change Log row documenting DSHN-70 as further evidence against the already-open AC-013 gap is separate work for whenever AC-013 itself is actually closed.",
+      "assigned_agent": "python-backend-engineer",
+      "model": "sonnet",
+      "score": 0.8,
+      "runner_up": null,
+      "margin": null,
+      "candidate_scores": [
+        {
+          "agent": "python-backend-engineer",
+          "signals": {
+            "domain_match": 0.85,
+            "skill_coverage": 0.75
+          },
+          "score": 0.8,
+          "above_threshold": true,
+          "evidence": "Score carried forward from sprint3_ar0_routing_index.json SPRINT3-CAND-006 unchanged. Implementer for the Zone 3/Zone 5 erasure legs and the unifying orchestrator - same application-layer composition-root/service pattern as SubjectErasureCascadeService (DASH-STORY-020) and CrossZoneDpdpErasureCascade (DSHN-58), both of which this agent's lineage already built."
+        }
+      ],
+      "rationale": "Single viable implementer candidate, re-confirmed here. The crypto-security-specialist entry below is an advisory reviewer, not a competing implementer bid, mirroring how DASH-STORY-020 was scored in Sprint 2 (implementer + separate non-blocking advisory reviewer).",
+      "hld_ownership_crosscheck": "MATCH - HLD Section 7.4 (DELETE /v1/tenants/{id}/subjects/{subject_id}, 'cascades across all 8 zones'); Section 3.4 (SemanticEdge.subject_ref), Section 3.6 (EntityRecord).",
+      "acceptance_criteria": [
+        {
+          "ac_id": "AC-013",
+          "text": "Given a data subject requests erasure, When the erasure cascade executes across all 8 zones plus indices and archives, Then the subject's payload content becomes permanently unrecoverable via crypto-shredding while the Zone 7 provenance chain structure (hashes, timestamps) remains intact and verifiable.",
+          "source": "SRS.md Section 4, AC-013 row (verbatim). This story narrows AC-013's still-open gap by closing the Zone 3/5 REACH sub-problem; SRS.md Section 4.1's own AC-013 Implementation Scope Note (2026-09-19) already discloses that the crypto-shredding MECHANISM gap remains separately open regardless of this story."
+        },
+        {
+          "ac_id": "AC-025-1",
+          "text": "Given a real SemanticEdge is seeded in Zone 3 with subject_ref equal to a subject_id, When SubjectErasureCascadeService.request_erasure (or its post-this-story unifying orchestrator) is called for that subject_id, Then the Zone 3 erasure leg issues a real state-transition or delete statement against that record - the inverse of tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py's current test_zone3_semantic_edge_survives_subject_erasure_cascade assertion, which this story's own QA sub-task updates to assert non-survival.",
+          "source": "tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py (this session's own read, lines 68-116) - the specific existing test this story is built to invert."
+        },
+        {
+          "ac_id": "AC-025-2",
+          "text": "Given a real EntityRecord attribute is seeded in Zone 5 via write_attribute for a given entity_id (used as the subject_id), When request_erasure is called for that same id, Then a re-read via get_entity no longer returns the erased attribute - the inverse of test_zone5_entity_attribute_survives_subject_erasure_cascade's current assertion.",
+          "source": "tests/integration/test_cross_zone_dpdp_erasure_scope_gap.py (this session's own read, lines 118-158)."
+        },
+        {
+          "ac_id": "AC-025-3",
+          "text": "Given DSHN-70's own recommendation ('a single orchestrator that fans out to all zone-specific erasure mechanisms - Zone 2/6 via CrossZoneDpdpErasureCascade, Zone 8 via SubjectErasureCascadeService, and the new Zone 3/5 legs - so a single subject-erasure request is provably complete across the whole system'), When this story's orchestrator is invoked once for a subject_id, Then it drives all four erasure mechanisms (Zone 2/6, Zone 8, Zone 3, Zone 5) from that single call, and the job status contract (COMPLETED with item_ids reflecting real affected items) reflects the combined result rather than only Zone 8's.",
+          "source": "Jira DSHN-70 (this session's own read via mcp__jira-api__jira_get_issue, recommendation_from_jira field as captured in sprint3_ar0_routing_index.json SPRINT3-CAND-006)."
+        }
+      ],
+      "must_not_deviate": [
+        "Does not build a Zone 4 erasure leg - Procedure's real field set carries no subject-linkable reference at all, confirmed by this session's own read of the domain model; inventing one is out of this story's scope, per the test file's own documented exclusion",
+        "Does not implement AC-013's crypto-shredding mechanism for Zone 3/5 - the current shipped mechanism for the zones this story DOES touch is whatever real delete/state-transition path each zone's own schema supports (a plain, ordinary DELETE/eviction call, the same class of mechanism SRS.md Section 4.1 already documents Zone 2/6 use, not new key-management infrastructure); asserting crypto-shredding coverage for Zone 3/5 without also building that mechanism would repeat the exact SRS.md Section 4.1 docs-drift class this story exists to avoid",
+        "Must not present this story's completion as closing AC-013 in full - Zone 7's provenance-chain-remains-intact clause and the crypto-shredding mechanism itself both remain separately open per SRS.md Section 4.1, regardless of this story shipping"
+      ],
+      "p1_security_review": false,
+      "p1_trigger_evaluation": "The erasure legs this story adds write to Zone 3 and Zone 5's existing tables through their existing write/delete paths - no Zone 7 storage touch, no ZoneRepository port-interface change (this uses each zone's existing adapter methods), no cross-tenant isolation logic (erasure is scoped to a single tenant_id + subject_id, matching SubjectErasureCascadeService's existing pattern).",
+      "advisory_review": {
+        "status": "AUTHORIZED by user 2026-09-20 (see summary.open_user_decisions) -- must actually run and report before this story is presented as complete, per this block's own acceptance_criteria.",
+        "agent": "crypto-security-specialist",
+        "model": "sonnet",
+        "review_scope": "Same class of review as Sprint 2's DASH-STORY-020 advisory review (SP2-DEC-001): adversarially confirm the Zone 3/5 erasure legs genuinely make the data unrecoverable (not merely a soft-delete flag), consistent with AC-013's 'permanently unrecoverable' language, and confirm this story's own must_not_deviate item about not falsely presenting crypto-shredding coverage is actually honored in the shipped code and its documentation.",
+        "maker_checker": false,
+        "does_not_resolve": "OAQ-10's legal question (whether crypto-shredding satisfies DPDP Act 2023 erasure) - same scope limitation the Sprint 2 advisory review already carried, restated here rather than silently dropped since this story is squarely inside DPDP erasure scope."
+      },
+      "mathematical_delegation": null,
+      "logging_note": "Cite as AR1-S3-025 / DSHN-70. Depends on DASH-STORY-020 (Zone 8 erasure, Sprint 2, already landed) and DSHN-58's CrossZoneDpdpErasureCascade (already landed) - both completed upstream, not concurrent handoffs."
+    }
+  ],
+  "dependency_integrity_check": {
+    "method": "error-handling-patterns - traverse backlog_draft.json's combined dependency_graph (Sprint 1 + Sprint 2) plus this file's own Sprint 3 edges for cycles and assignment-induced deadlocks before any agent is dispatched. Same method sprint2_ar1_assignments.json used.",
+    "sprint_3_edges": {
+      "DASH-STORY-021": [],
+      "DASH-STORY-022": [
+        "DASH-STORY-012",
+        "DASH-STORY-017"
+      ],
+      "DASH-STORY-011": [],
+      "DASH-STORY-023": [],
+      "DASH-STORY-024": [],
+      "DASH-STORY-025": [
+        "DASH-STORY-020"
+      ]
+    },
+    "cycle_detection": "PASS - every Sprint 3 edge points to an already-landed Sprint 2 story (DASH-STORY-012, DASH-STORY-017, DASH-STORY-020) or has no dependency at all. No Sprint 3 story is referenced by any Sprint 1/2 story's own depends_on array (confirmed by inspection of the unchanged combined dependency_graph in backlog_draft.json and sprint2_ar1_assignments.json). No cycle across the combined 25-story graph.",
+    "sequencing_note_non_blocking": "DASH-STORY-023 (FR-014) and DASH-STORY-024 (FR-015) have no hard dependency edge on each other for either to START, but backlog_draft.json's own FR-015 note records a real functional dependency ('a wire layer with no real backing store is still Shape-A-only underneath it') - both are recorded here as sequenced in the same sprint wave per the same file's 'User-directed scoping (2026-09-20): candidate for the same future sprint wave as FR-014/FR-015' note, not a blocking dependency edge in the DAG sense.",
+    "assignment_induced_deadlock": "NONE. python-backend-engineer holds 4 of 6 Sprint 3 stories (021, 022, 023, 025) on a consistent order (021 and 023 are roots; 022 depends only on already-landed Sprint 2 work; 025 depends only on already-landed DASH-STORY-020) - no two stories mutually block each other's assigned agent. devops-engineer's one story (024) and ai-engineer's one story (011) introduce no new edges back into the python-backend-engineer chain.",
+    "unresolvable_dependency": "NONE.",
+    "serialization_warning": "python-backend-engineer holds 4 of 6 Sprint 3 stories (21 of 32 story points, 65.6%) [Corrected by IR.1 2026-09-20: previously recorded as '24 of 32 story points, 75%', an arithmetic error carried over from summary.agent_load's own now-corrected story_points field - see that field's story_points_note] - a concentration pattern related to, but numerically distinct from, the story-count-based concentration finding sprint3_ar0_routing_index.json's own AR0-S3-F2 restates across all three sprints' routing passes (Sprint 1: 64%, Sprint 2: 89%, Sprint 3: 65.6% by points [21 of 32, pre-rebalance] / 66.7% by story count [4 of 6, pre-rebalance] (corrected from a stale '75%' story-count figure found 2026-09-20 while applying SP3-DEC-106; 4/6 = 66.7%, not 75%). Post-rebalance (SP3-DEC-106, 2026-09-20): 3 of 6 stories, 18 of 32 points, 56.25%.). This is the honest scoring result of a single-Python-3.12-codebase lock (HLD NFR-001), not a routing defect, per that same finding's own conclusion. See summary.open_user_decisions SP3-DEC-106 for whether Sprint 3 should actually exercise the pre-scored database-engineer/devops-engineer fallback roster this time, restating SP2-DEC-004's already-deferred question rather than assuming the same answer still holds."
+  },
+  "routing_gaps": [
+    {
+      "id": "AR1-S3-G1",
+      "severity": "LOW",
+      "story": "DASH-STORY-021",
+      "gap": "Not a coverage gap in the Sprint 1/2 sense (no candidate falls below threshold) - the gap this entry records is that FR-011's backlog title ('remaining zone coverage') describes work that, per this session's own direct verification, does not exist: all 8 zones already have shipped adapters.",
+      "why_not_force_assigned": "N/A - assigned normally to python-backend-engineer, which clears threshold for the real (verification, not new-adapter) scope this story actually has.",
+      "recommended_action": "Update future_sprints_backlog.remaining_frs[FR-011]'s own title/note in a subsequent backlog_draft.json pass to reflect that zone coverage is structurally complete, so a future routing pass does not re-open this same false premise a third time."
+    },
+    {
+      "id": "AR1-S3-G2",
+      "severity": "MEDIUM",
+      "story": "DASH-STORY-011",
+      "gap": "Single valid agent, unchanged across three routing passes (ar1_assignments.json Sprint 1, sprint3_ar0_routing_index.json, this file). No vector-database-infrastructure-specific persona narrower than ai-engineer exists in the library, confirmed again this session.",
+      "why_not_force_assigned": "python-backend-engineer at 0.525 would be a force-assignment below threshold, unchanged from Sprint 1's identical finding (ar1_assignments.json AR1-G5).",
+      "recommended_action": "Same as ar1_assignments.json AR1-G5: accept the single-agent risk, or have python-backend-engineer perform the dependency/lockfile mechanics with ai-engineer as a lightweight consult on Qdrant-specific breaking changes. This is now the third consecutive routing pass restating an unresolved risk rather than a new finding - see summary.open_user_decisions SP3-DEC-107."
+    },
+    {
+      "id": "AR1-S3-G3",
+      "severity": "HIGH",
+      "story": "DASH-STORY-023, DASH-STORY-024 (new network-facing attack surface)",
+      "gap": "Neither story triggers a literal P1 security-override criterion (see p1_security_override.considered_and_not_triggered), yet both introduce materially new attack surface this codebase has never had before: DASH-STORY-023 is the first real network-facing host application; DASH-STORY-024 is where real, non-default DB/object-store credentials go live for the first time.",
+      "why_not_force_assigned": "N/A - this is not an implementer-coverage gap (both stories have a single, clearing-threshold candidate); it is a disclosure that the P1 override's three literal criteria (Zone 7 touch, port-interface change, cross-tenant isolation) do not cover 'first real network exposure' or 'first real production credentials' as trigger conditions, even though both are genuine security-relevant firsts for this codebase.",
+      "recommended_action": "Both stories carry a non-blocking advisory_review (api-security-auditor for DASH-STORY-023, cloud-security-architect for DASH-STORY-024) as the closest available control given the literal P1 criteria do not fire. See summary.open_user_decisions SP3-DEC-102/SP3-DEC-104 for explicit user authorization of both, mirroring how sprint2_ar1_assignments.json's AR1-S2-G1 handled DASH-STORY-020's similarly non-triggering-but-sensitive scope."
+    }
+  ],
+  "summary": {
+    "stories_total": 6,
+    "stories_assigned": 6,
+    "stories_unassigned": 0,
+    "below_threshold_assignments": 0,
+    "distinct_implementing_agents": 3,
+    "agent_load": {
+      "python-backend-engineer": {
+        "stories": 3,
+        "story_points": 18,
+        "story_ids": [
+          "DASH-STORY-022",
+          "DASH-STORY-023",
+          "DASH-STORY-025"
+        ],
+        "story_points_note": "Recomputed 2026-09-20 after DASH-STORY-021 was reassigned to api-testing-engineer per SP3-DEC-106: 022(5)+023(8)+025(5)=18."
+      },
+      "api-testing-engineer": {
+        "stories": 1,
+        "story_points": 3,
+        "story_ids": [
+          "DASH-STORY-021"
+        ],
+        "story_points_note": "New 2026-09-20: DASH-STORY-021 reassigned here per SP3-DEC-106 (contract/substitutability testing fit)."
+      },
+      "devops-engineer": {
+        "stories": 1,
+        "story_points": 8,
+        "story_ids": [
+          "DASH-STORY-024"
+        ],
+        "story_points_note": "Split by sub-task with database-engineer per SP3-DEC-103; full story_points retained here as the docker-compose/env/orchestration owner, with database-engineer co-owning the DB-role-credential-binding sub-slice within the same story (not separately pointed)."
+      },
+      "database-engineer": {
+        "stories": 1,
+        "story_points": 0,
+        "story_ids": [
+          "DASH-STORY-024"
+        ],
+        "story_points_note": "Co-owner of DASH-STORY-024 (migration runner + DB-role-credential binding sub-slice) per SP3-DEC-103; 0 shown to avoid double-counting the story's 8 points already attributed to devops-engineer above."
+      },
+      "ai-engineer": {
+        "stories": 1,
+        "story_points": 3,
+        "story_ids": [
+          "DASH-STORY-011"
+        ],
+        "story_points_note": "Consult role (not sole executor) on DASH-STORY-011 per SP3-DEC-107; python-backend-engineer executes."
+      }
+    },
+    "cross_sprint_agent_load_note": "Combined with Sprint 1 (7 stories) and Sprint 2 (8 stories), python-backend-engineer now holds 19 of 26 stories across all three sprints (73%) - consistent with, not a departure from, the concentration pattern all three routing passes have independently recorded (AR0-F2 Sprint 1, AR0-S2-F2 Sprint 2, AR0-S3-F2 Sprint 3), and this file's own dependency_integrity_check.serialization_warning.",
+    "p1_flagged_stories": [],
+    "p1_reviewers": {},
+    "p1_considered_not_triggered": [
+      "DASH-STORY-022 (FR-013 wiring) - see p1_security_override.considered_and_not_triggered; advisory review recommended instead",
+      "DASH-STORY-023 (FR-014 wire/API layer) - see p1_security_override.considered_and_not_triggered; advisory review recommended instead",
+      "DASH-STORY-024 (FR-015 Shape B infra) - see p1_security_override.considered_and_not_triggered; advisory review recommended instead"
+    ],
+    "blocking_math_delegations": [],
+    "advisory_math_delegations": [],
+    "score_range": {
+      "min": 0.8,
+      "max": 0.875,
+      "mean": 0.8375
+    },
+    "fr016_minting_confirmation": "No FR-016 was minted by this file, consistent with sprint3_ar0_routing_index.json's own srs_fr016_minting_decision (already approved). DASH-STORY-025 (DSHN-70) traces to the existing NFR-006/AC-013 obligation.",
+    "open_user_decisions": [
+      {
+        "decision_id": "SP3-DEC-101",
+        "story": "DASH-STORY-022 (FR-013 wiring)",
+        "decision": "Authorize the non-blocking crypto-security-specialist advisory review recommended alongside this story's implementation, given HLD Section 3.8's own characterization of the conflict-detection sweep as 'the single highest-leverage anti-hallucination control in the design.'",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-022's Fix stage is dispatched in a future Phase B round",
+        "status": "ANSWERED by user 2026-09-20: authorize all 4 advisory reviews. Review will run before this story's Fix stage.",
+        "acceptance_criteria": "If accepted, the review must actually run and report before this story is presented as fully closing FR-013's write-path gap."
+      },
+      {
+        "decision_id": "SP3-DEC-102",
+        "story": "DASH-STORY-023 (FR-014 wire/API layer)",
+        "decision": "Authorize the non-blocking api-security-auditor advisory review given this story stands up the first real network-facing host this codebase has ever had, per routing_gaps AR1-S3-G3.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-023's Fix stage is dispatched in a future Phase B round",
+        "status": "ANSWERED by user 2026-09-20: authorize all 4 advisory reviews. Review will run before this story's Fix stage.",
+        "acceptance_criteria": "If accepted, the review must actually run and report before this story is presented as production-ready."
+      },
+      {
+        "decision_id": "SP3-DEC-103",
+        "story": "DASH-STORY-024 (FR-015 Shape B infra)",
+        "decision": "Decide whether to split this story across devops-engineer (docker-compose/env config/service orchestration) and database-engineer (migration-runner and DB-role-binding sub-slice specifically), per sprint3_ar0_routing_index.json's own SP3-DEC-003 question, now carried forward unanswered into this AR.1 pass.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before Phase B execution grouping for this story begins",
+        "status": "ANSWERED by user 2026-09-20: split by sub-task (devops-engineer + database-engineer). See assigned_agent_note on DASH-STORY-024.",
+        "acceptance_criteria": "N/A - a team-shape preference, not a coverage gate; either answer is compliant with the assignment_rule."
+      },
+      {
+        "decision_id": "SP3-DEC-104",
+        "story": "DASH-STORY-024 (FR-015 Shape B infra)",
+        "decision": "Authorize the non-blocking cloud-security-architect advisory review given this story is where real, non-default DB/object-store credentials go live for the first time, per routing_gaps AR1-S3-G3.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-024's Fix stage is dispatched in a future Phase B round",
+        "status": "ANSWERED by user 2026-09-20: authorize all 4 advisory reviews. Review will run before this story's Fix stage.",
+        "acceptance_criteria": "If accepted, the review must actually run and report before real production credentials are provisioned against this story's infrastructure."
+      },
+      {
+        "decision_id": "SP3-DEC-105",
+        "story": "DASH-STORY-025 / DSHN-70",
+        "decision": "Authorize the non-blocking crypto-security-specialist advisory review DSHN-70's own AR.0 candidate entry already recommended, mirroring Sprint 2's SP2-DEC-001 pattern for the same reviewer/story class.",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-025's Fix stage is dispatched in a future Phase B round",
+        "status": "ANSWERED by user 2026-09-20: authorize all 4 advisory reviews. Review will run before this story's Fix stage.",
+        "acceptance_criteria": "If accepted, the review must actually run and report before this story is presented as DPDP-compliant for Zone 3/5; regardless of outcome, OAQ-10's legal question and AC-013's crypto-shredding-mechanism gap both stay explicitly open."
+      },
+      {
+        "decision_id": "SP3-DEC-106",
+        "story": "Sprint-wide (python-backend-engineer concentration)",
+        "decision": "python-backend-engineer held 65.6% of Sprint 3 story points (21 of 32; not 75% -- that figure was a stale story-count-based figure incorrectly applied to points, corrected 2026-09-20) (up from Sprint 1's 64%, down from Sprint 2's 89%). Should Sprint 3 actually exercise the pre-scored database-engineer/devops-engineer fallback roster to parallelize the critical path, or continue deferring as Sprint 2's SP2-DEC-004 did?",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before Phase B execution grouping for Sprint 3 begins",
+        "status": "ANSWERED by user 2026-09-20: rebalance now. DASH-STORY-021 moved from python-backend-engineer to api-testing-engineer (see its assigned_agent_note) -- the only story where a genuinely better-fit alternative persona existed; DASH-STORY-022/023/025 remain python-backend-engineer's since no viable Python-backend alternative exists in the library for a single-Python-3.12 codebase.",
+        "acceptance_criteria": "N/A - a load-balancing preference, not a coverage gate."
+      },
+      {
+        "decision_id": "SP3-DEC-107",
+        "story": "DASH-STORY-011 (Qdrant spike)",
+        "decision": "This spike's single-agent risk (ai-engineer, no fallback above threshold) has now been surfaced identically across three consecutive routing passes (ar1_assignments.json AR1-G5, sprint3_ar0_routing_index.json's implicit carry-forward, this file's AR1-S3-G2) without a decision. Accept the risk outright for Sprint 3, or authorize the python-backend-engineer-plus-ai-engineer-consult split ar1_assignments.json's own AR1-G5 recommended a full sprint ago?",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-011's live-server validation half (sequenced after DASH-STORY-024) is dispatched",
+        "status": "ANSWERED by user 2026-09-20: add a consult split. DASH-STORY-011 now python-backend-engineer (execute) + ai-engineer (consult).",
+        "acceptance_criteria": "N/A - risk-acceptance or split-authorization, either closes this open item."
+      }
+    ],
+    "agent_load_note": "Recomputed 2026-09-20 after applying user decisions SP3-DEC-103/106/107. python-backend-engineer now holds 3 of 6 stories (18 of 32 story points, 56.25%), down from the original 4/6 (21/32, 65.6%) -- rebalanced by moving DASH-STORY-021 to api-testing-engineer, the only story with a genuinely better-fit alternative persona."
+  }
+}
