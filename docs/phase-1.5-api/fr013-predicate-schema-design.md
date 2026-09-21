@@ -4,13 +4,13 @@ Status: DESIGN ONLY — pending user review. No implementation files have been m
 Related: GitHub issue #23, `docs/phase-1.5-api/openapi.yaml`, `src/dashanan/api/schemas.py`,
 `src/dashanan/api/app.py`, `src/dashanan/domain/entity_ownership_specification.py`
 
-**Revision note (v2):** the first draft of this document was reviewed and found genuinely
-incorrect on the routing model (score 4/10). This revision replaces it. The root cause of v1's
-errors: it did not discover `src/dashanan/domain/entity_ownership_specification.py`'s existing
-`CandidateFact`/`classify()` pair before designing a new routing scheme from scratch — that module
-already implements HLD Section 3.4's locked truth table correctly, and already models `predicate`
-as a single fact-level field, not a per-entity-reference one. This revision maps the wire schema
-onto that existing, tested, locked domain code instead of reinventing it.
+**Revision note (v3):** v1 (score 4/10) proposed a routing model that contradicted the locked HLD
+truth table and did not discover `src/dashanan/domain/entity_ownership_specification.py`'s
+existing `CandidateFact`/`classify()` pair before designing routing from scratch. v2 (score 8.5/10)
+fixed the routing model by reusing that existing code, but its own use of that code had two real
+bugs (a missing `tenant_id` on `CandidateFact`, a `classify()` call missing its required factory
+arguments) plus undefined multi-edge provenance semantics and an unresolved atomicity decision.
+This revision (v3) fixes all of those. See the Change Log at the bottom for the full history.
 
 ---
 
@@ -116,12 +116,16 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
 1. Partition `body.content.entity_refs` into `subjects: tuple[str, ...]` / `objects: tuple[str,
    ...]` by `role` (existing logic already does this partitioning today for the 422 check; keep
    it).
-2. Build `entity_ownership_specification.CandidateFact(subjects=subjects, objects=objects,
-   predicate=body.content.predicate or "", statement=body.content.text or "",
-   subject_scope=body.content.subject_scope or "", index_reverse=body.content.index_reverse)`.
-   Read `CandidateFact.__post_init__` (lines 122-150, already read in full during this review) for
-   its own validation before assuming this construction cannot raise — it does raise on
-   structural issues (e.g. blank refs); those become 400s, not 422s, mirroring how
+2. Build `entity_ownership_specification.CandidateFact(tenant_id=caller.tenant_id,
+   subjects=subjects, objects=objects, predicate=body.content.predicate or "",
+   statement=body.content.text or "", subject_scope=body.content.subject_scope or "",
+   index_reverse=body.content.index_reverse)`. `tenant_id` is `CandidateFact`'s first field, no
+   default (`entity_ownership_specification.py:121`) — v2's first draft of this step omitted it
+   (review Finding #1 of the second round, confirmed real); `caller.tenant_id` is already
+   available in `_do_write`'s signature, used identically by every existing branch. Read
+   `CandidateFact.__post_init__` (lines 130-152) for its own validation before assuming this
+   construction cannot raise — it does raise on structural issues (blank `tenant_id` or a blank
+   entry in `subjects`/`objects`); those become 400s, not 422s, mirroring how
    `SemanticEdge.__post_init__`/`GeneralFact.__post_init__` errors are already handled elsewhere
    per this module's own docstring reference.
 3. **Zone 5 write (independent of the Zone 3 decision — apply the truth table's own condition
@@ -133,44 +137,68 @@ what the domain code already does (`entity_ownership_specification.py:280-289`, 
    `ctx.conflict_aware_entity_repository.write_attribute(...)`. This fires for BOTH the
    `\|objects\|==0` case and the `\|objects\|>=1` case, per the truth table — this is the exact
    correction for review Finding #1.
-4. **Zone 3 write:** call `classify(candidate_fact)`. On `SemanticEdgeRouting(edges=...)`, call
-   `ctx.semantic_repository.insert_edge(edge, ...)` once per edge. On
-   `GeneralFactRouting(fact=...)`, call `ctx.semantic_repository.insert_general_fact(fact, ...)`
-   once. On `ZoneFiveOnlyRouting(...)`, do nothing further for Zone 3 (step 3 already handled Zone
-   5 if applicable).
-5. **Provenance/conflict wiring (review Finding #3, only partially resolvable in this document):**
-   `ConflictAwareSemanticRepository.insert_edge`/`insert_general_fact` and
-   `ConflictAwareEntityMemoryRepository.write_attribute` (`conflict_aware_zone_writes.py`, read in
-   full during this revision) all require `provenance_id`, `source_type`, and
-   `retrieval_context_hash` as call parameters — these already run the FR-013 conflict sweep
-   internally (`insert_edge`'s own docstring, "AC-022-1: the sweep runs... BEFORE `edge` is
-   persisted"), so **no separate conflict-detection wiring is needed beyond calling these methods
-   with real arguments** (correcting v1's silence on this — the sweep is not a separate step, it
-   is inside these two repository methods already). `provenance_id` is a fresh UUID (mirrors
-   `write_id` generation already in `_do_write`); `source_type` is already resolved via the
-   existing `_resolve_source_type(body)` call at the top of `_do_write`. **`retrieval_context_hash`
-   has no existing source anywhere in the current request schema or `_do_write`** — this is a
+4. **Zone 3 write:** call `classify(candidate_fact, edge_id_factory=lambda: str(uuid.uuid4()),
+   fact_id_factory=lambda: str(uuid.uuid4()))`. `classify()`'s real signature is keyword-only on
+   both factories (`entity_ownership_specification.py:216-220`) — v2's first draft of this step
+   called `classify(candidate_fact)` with no factories, which does not match the real signature
+   (review Finding #2 of the second round, confirmed real). `uuid.uuid4()` mirrors the existing
+   `write_id = str(uuid.uuid4())` pattern already at the top of `_do_write`; no new ID scheme is
+   introduced. On `SemanticEdgeRouting(edges=...)`, call `ctx.semantic_repository.insert_edge(edge,
+   ...)` once per edge, per step 5's provenance rule below. On `GeneralFactRouting(fact=...)`, call
+   `ctx.semantic_repository.insert_general_fact(fact, ...)` once. On `ZoneFiveOnlyRouting(...)`, do
+   nothing further for Zone 3 (step 3 already handled Zone 5 if applicable).
+5. **Provenance/conflict wiring, including per-edge semantics (review Finding #3, first round;
+   Finding #4, second round):** `ConflictAwareSemanticRepository.insert_edge`/`insert_general_fact`
+   and `ConflictAwareEntityMemoryRepository.write_attribute` (`conflict_aware_zone_writes.py`, read
+   in full) all require `provenance_id`, `source_type`, and `retrieval_context_hash` as call
+   parameters — these already run the FR-013 conflict sweep internally (`insert_edge`'s own
+   docstring, "AC-022-1: the sweep runs... BEFORE `edge` is persisted"), so **no separate
+   conflict-detection wiring is needed beyond calling these methods with real arguments** (the
+   sweep is not a separate step, it is inside these two repository methods already).
+   **Multi-edge provenance is one fresh `provenance_id` PER EDGE, never shared or reused across
+   edges in the same write request** — this is not a stylistic choice, it is required by the
+   sweep's own keying: `_zone3_edge_item_id(subject_ref, predicate, object_ref)`
+   (`conflict_aware_zone_writes.py:155-161`) derives a distinct `item_id` per `(subject, predicate,
+   object)` triple, and `ProvenanceRecord.create` ties one `provenance_id` to one `item_id`'s own
+   hash chain (Zone 7, HLD Section 3.8). Reusing a single `provenance_id` across multiple distinct
+   `item_id`s would corrupt that per-item chain invariant. Each `insert_edge` call in step 4's loop
+   therefore generates its own fresh `provenance_id` (same `uuid.uuid4()` pattern as `edge_id`
+   above), and the single Zone 5 write in step 3 gets its own separate fresh `provenance_id` too —
+   three independent identifiers in the worst case (one Zone 5 attribute write plus N Zone 3 edge
+   writes), never one shared value. `source_type` is already resolved via the existing
+   `_resolve_source_type(body)` call at the top of `_do_write`. **`retrieval_context_hash` has no
+   existing source anywhere in the current request schema or `_do_write`** — this remains a
    genuinely open question, not resolved here: either (a) add a `retrieval_context_hash` field to
-   the wire contract (another schema change, scoped separately from `predicate`/`subject_scope`
-   above), or (b) derive/hash something already present in the request server-side. This decision
-   needs the user/maintainer to pick, not this document.
-6. **Atomicity (review Finding #3, flagged not resolved):** step 3 and step 4 above can each
-   independently succeed or fail (e.g. Zone 5 write succeeds, Zone 3 edge write then fails). The
-   existing `AR1-S3-G3` limitation (`api.composition`'s own module docstring: one shared
-   `psycopg.Connection`, no real transaction/rollback coordination across zone writes today)
-   already applies to the existing Zone 1 durability-mirror pattern in `_do_write` (lines 450-456,
-   which explicitly tolerates and logs a partial-failure case rather than rolling back). The Zone
-   3/5 path introduces the same class of partial-write risk across two zones instead of one. This
-   document does not propose a fix (a real transaction or a compensating-write pattern is FR-015
-   pooling-adjacent scope, per AR1-S3-G3's own note) — it flags this as a known, inherited
-   limitation the implementation must not silently paper over.
+   the wire contract (a schema change scoped separately from `predicate`/`subject_scope` above), or
+   (b) derive/hash something already present in the request server-side. This decision needs the
+   user/maintainer to pick before implementation of this specific step can start; every other step
+   in this plan is implementation-ready independent of it.
+6. **Atomicity — recommended decision (review Finding #5, second round: a decision was requested,
+   not just a flag):** step 3 and step 4 can each independently succeed or fail (e.g. the Zone 5
+   write in step 3 succeeds, a Zone 3 edge write in step 4's loop then fails). No 2-phase-commit or
+   saga/compensating-transaction mechanism exists in this codebase today, and building one is
+   FR-015 pooling-adjacent scope (`AR1-S3-G3`'s own note: one shared `psycopg.Connection`, no
+   cross-zone transaction coordination) — genuinely out of scope for this fix. **Recommended
+   decision, requiring no new infrastructure:** order writes Zone 5 first, then Zone 3 (already the
+   plan's step order); if Zone 5 fails, return the existing `503 WRITE_REJECTED_NOT_DURABLE`
+   immediately and attempt no Zone 3 write, exactly mirroring the existing `except
+   ZoneRepositoryError` handling at `_do_write` lines 436-445. If Zone 5 succeeds but a later Zone 3
+   edge write fails partway through the loop, do NOT attempt to roll back the already-persisted
+   Zone 5 write or any already-persisted Zone 3 edges from earlier loop iterations (no rollback
+   mechanism exists to do this safely); instead return a distinct, honestly-labeled response (e.g.
+   `207` or a `5xx` body carrying `zone5_written: true`, `zone3_edges_written: [...]`,
+   `zone3_edges_failed: [...]`) so the caller can see exactly what state actually landed, mirroring
+   the existing Zone 1 durability-mirror pattern's own choice (`_do_write` lines 450-456: log and
+   continue rather than silently claim full success). This is a fail-fast-plus-honest-reporting
+   contract, not true atomicity — genuine cross-zone atomicity remains explicitly out of scope and
+   tracked under the existing `AR1-S3-G3` limitation, not newly invented or silently promised here.
 7. **Event publishing:** confirm during implementation whether Zone 1/2/4 writes in `_do_write`
    publish any event today (not verified in this design pass) and, if so, whether Zone 3/5 writes
    need parity — flagged as an implementation-time check, not assumed either way here.
 
 ---
 
-## 5. Test matrix (review Finding #5 — full 8-case matrix, up from v1's 4 cases)
+## 5. Test matrix (review Finding #5 — full 10-case matrix, up from v1's 4 cases)
 
 All as real HTTP-level integration tests, mirroring
 `tests/integration/test_api_real_postgres_e2e_dash3.py`'s Scenario style (real Postgres, real
@@ -201,11 +229,15 @@ All as real HTTP-level integration tests, mirroring
 
 ## 6. What this revision does NOT resolve (explicitly, not silently)
 
-- `retrieval_context_hash` sourcing (Section 4.2 step 5) — needs a maintainer decision.
+- `retrieval_context_hash` sourcing (Section 4.2 step 5) — needs a maintainer decision; every other
+  implementation step is independent of this one and does not need to wait on it.
 - Exact HTTP status code for predicate/subject_scope validation failures (400 vs 422) — should
   match whatever convention `SemanticEdge.__post_init__`/`GeneralFact.__post_init__` errors
   already use elsewhere in this handler once that's confirmed during implementation.
-- Multi-zone write atomicity (Section 4.2 step 6) — inherited limitation, not fixed here.
+- True cross-zone atomicity (2-phase-commit/saga) for Zone 5 + Zone 3 writes — Section 4.2 step 6
+  gives a concrete fail-fast-plus-honest-partial-failure-reporting contract that needs no new
+  infrastructure, but genuine atomicity remains explicitly out of scope, tracked under the
+  existing `AR1-S3-G3` limitation.
 - Event-publishing parity for the new write paths (Section 4.2 step 7) — unverified, flagged for
   implementation-time confirmation.
 
@@ -216,4 +248,5 @@ All as real HTTP-level integration tests, mirroring
 | Date | Change |
 |---|---|
 | 2026-09-21 | v1: Initial design (3 competing schema options). Reviewed, scored 4/10 -- routing model contradicted the locked HLD 3.4 truth table, predicate placement was ambiguous, implementation plan and test matrix were incomplete. |
-| 2026-09-21 | v2 (this revision): Replaced the routing model by reusing the existing, locked `CandidateFact`/`classify()` domain primitives instead of reinventing routing. Corrected predicate to a single fact-level field. Added `subject_scope`. Expanded the implementation plan to cover provenance/conflict wiring, atomicity, and event-publishing parity. Expanded the test matrix from 4 to 10 cases. Still DESIGN ONLY -- no implementation performed. |
+| 2026-09-21 | v2: Replaced the routing model by reusing the existing, locked `CandidateFact`/`classify()` domain primitives instead of reinventing routing. Corrected predicate to a single fact-level field. Added `subject_scope`. Expanded the implementation plan to cover provenance/conflict wiring, atomicity, and event-publishing parity. Expanded the test matrix from 4 to 10 cases. Reviewed, scored 8.5/10 -- CandidateFact construction omitted the required `tenant_id`, the `classify()` call omitted its required `edge_id_factory`/`fact_id_factory` keyword args, multi-edge provenance-per-edge semantics were undefined, and atomicity was flagged but no concrete failure contract was proposed; the "8-case" heading also didn't match the actual 10-case matrix. |
+| 2026-09-21 | v3 (this revision): Fixed all five v2 review findings. `CandidateFact` construction now passes `tenant_id=caller.tenant_id`. `classify()` call now passes both required factories. Multi-edge provenance is now explicitly one fresh `provenance_id` per edge, never shared, justified by `_zone3_edge_item_id`'s per-triple keying and the Zone 7 hash-chain's one-`provenance_id`-per-`item_id` invariant. Atomicity now has a concrete, infrastructure-free recommended decision: fail-fast on a Zone 5 failure, honest partial-failure reporting (not silent full-success) if Zone 3 fails after Zone 5 succeeds -- true cross-zone atomicity stays explicitly out of scope under `AR1-S3-G3`. Fixed the "8-case" heading to "10-case". `retrieval_context_hash` remains the one genuinely open question, unchanged from v2 -- every other implementation step is independent of it. Still DESIGN ONLY -- no implementation performed. |
