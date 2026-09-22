@@ -22,21 +22,18 @@ Named after the mythological figure with ten heads, Dashanan gives any AI system
 > conflict-detection sweep wired into the application-layer write path, and the first real
 > end-to-end integration suite wiring the live API host to a real, live Postgres connection.
 >
-> **What's next — FR-013 API-layer reachability (GitHub [#23](https://github.com/techdeveloper-org/Dashanan/issues/23)):**
-> Zone 3/5 writes are wired at the application layer (above) but still unreachable through the
-> public API — `POST /memory/write` has no wire field for the `predicate`/`subject_scope`/
-> `retrieval_context_hash` a Zone 3/5 write needs. The schema fix is fully designed and
-> **IMPLEMENTATION-READY** (`docs/phase-1.5-api/fr013-predicate-schema-design.md`, v7, 9.8/10,
-> 7 independent review rounds), and a real Sprint 4 planning pass (AR.0→AR.1→AR.3→execution-plan→
-> Phase C gate→AR.5→IR.1, mirroring Sprint 1-3's own pipeline) is in progress before implementation
-> starts — see `docs/phase-7-routing/sprint4_*` once complete.
+> **Update (2026-09-22) — FR-013 API-layer reachability (GitHub [#23](https://github.com/techdeveloper-org/Dashanan/issues/23)):**
+> The `predicate`/`subject_scope`/`retrieval_context_hash` wire schema
+> (`docs/phase-1.5-api/fr013-predicate-schema-design.md`, v7, 9.8/10, 7 independent review rounds)
+> is now wired into `POST /memory/write` — `_do_write` normalizes `zone_hint` via
+> `_WIRE_TO_DOMAIN_ZONE` and routes Zone 3/5 writes into the conflict-detection sweep. The same day
+> also fixed `SqlProvenanceRepository`/`SqlSemanticRepository` crash-and-never-commit bugs against
+> real Postgres.
 >
 > **Known, disclosed gaps** (see [`CHANGELOG.md`](CHANGELOG.md)'s `[UNRELEASED]` section for the
 > current, authoritative list — do not treat this README bullet as more current than that file):
-> `_do_write`'s `zone_hint` comparisons don't match their own OpenAPI wire enum
-> ([GitHub #25](https://github.com/techdeveloper-org/Dashanan/issues/25), pre-existing, disclosed
-> not silently fixed); `AR1-S3-G3` — the API host shares one `psycopg.Connection` across zones,
-> not safe for concurrent writes without real pooling (FR-015 follow-up, not started).
+> `AR1-S3-G3` — the API host shares one `psycopg.Connection` across zones, not safe for concurrent
+> writes without real pooling (FR-015 follow-up, not started).
 
 ## What problem does this solve?
 
@@ -75,7 +72,7 @@ infrastructure, not a pre-implementation planning repo. FR-013's remaining API-l
 
 Recommended reading order for someone new to the project:
 1. **This README** — problem statement, the 8-zone model, goals.
-2. [`SRS.md`](SRS.md) — the canonical requirements specification (15 FRs, 15 NFRs, 23 ACs): what the system is required to do.
+2. [`SRS.md`](SRS.md) — the canonical requirements specification (13 FRs, 15 NFRs, 23 ACs): what the system is required to do.
 3. [`docs/phase-1-architecture/HLD.md`](docs/phase-1-architecture/HLD.md) — the High-Level Design: how it's built, with 19 ADRs covering every major technology and mechanism choice.
 4. [`docs/phase-1.5-api/openapi.yaml`](docs/phase-1.5-api/openapi.yaml) — the concrete API contract.
 5. The remaining `docs/phase-*` directories (see Repository layout below) for validation, sprint planning, and pre-implementation routing, in phase order.
@@ -111,7 +108,7 @@ python -m pytest -v
 docker compose up -d
 ```
 
-1719 tests pass as of Sprint 3 (2026-09-21), including an AST-based architecture-fitness test
+1744 tests pass as of 2026-09-22, including an AST-based architecture-fitness test
 enforcing HLD 3.0 invariant 1 (no `dashanan/domain/**` module may import
 `dashanan/infrastructure/**`) and real Docker-Postgres regression tests for the DB-role-wiring
 fixes (GitHub #22/#24). Run `python -m pytest -v` yourself to reconfirm the current count — this
@@ -123,7 +120,7 @@ run.
 ```
 Dashanan/
 ├── README.md                    <- this file
-├── SRS.md                       <- Software Requirements Specification (15 FRs, 15 NFRs, 23 ACs)
+├── SRS.md                       <- Software Requirements Specification (13 FRs, 15 NFRs, 23 ACs)
 ├── VERSION                      <- single-line semver, source of truth for the current release
 ├── CHANGELOG.md                 <- Keep a Changelog format, full version history
 ├── docker-compose.yml            <- Shape B stack: Postgres/Redis/Qdrant/OpenSearch/S3
@@ -141,9 +138,18 @@ Dashanan/
 ├── src/dashanan/
 │   ├── api/                      <- Sprint 3: real FastAPI wire host (JWT auth, 32 endpoints)
 │   ├── domain/, application/, infrastructure/  <- Sprints 1-3: all 8 zones, orchestrator, DB layer
-├── tests/                        <- 1719 tests, including tests/integration/ (real Postgres e2e, cross-zone, adversarial suites)
+├── tests/                        <- 1744 tests, including tests/integration/ (real Postgres e2e, cross-zone, adversarial suites)
 └── pyproject.toml                <- pip install -e ".[dev]" — see Local development below
 ```
+
+## Contributing
+
+This repo follows an issue-first workflow: open a GitHub issue describing the defect or change
+before making it, land the fix/feature referencing that issue number in the commit message, and
+close the issue from the commit (see the recent commit history and `CHANGELOG.md` for examples —
+GitHub #20, #22-#25). Every SRS requirement change is recorded append-only in `SRS.md`'s Change
+Log (§6), and every notable code change is recorded in `CHANGELOG.md`'s `[UNRELEASED]` section
+before being rolled into a versioned release.
 
 ## License
 

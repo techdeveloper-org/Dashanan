@@ -1,0 +1,248 @@
+{
+  "superseded_note_2026_09_22": "SPRINT5-CAND-001 (DASH-STORY-027)'s file list, scoring evidence, and 'v1, DRAFT' design-doc citations below describe the PRE-ROUND-6 scope -- solution-architect review round 6 found the DPDP design doc's original baseline false (the eraseSubject endpoint was already wired, Zone-8-only, and a separate UnifiedSubjectErasureOrchestrator already existed but wasn't composed in) and re-scoped the story from 'build from scratch' to 'wire and extend' (13 SP -> 8 SP). This AR.0 file's own text was never rewritten to match (round 8 finding), since sprint5_ar1_assignments.json's own AR.1 record is the binding, superseding assignment for Phase B dispatch purposes -- but a reader of THIS file alone would get the old, disproven framing with no warning until this note. See sprint5_ar1_assignments.json and docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (now v2.0) for the current, correct scope. SPRINT5-CAND-002 (DASH-STORY-028) is unaffected and remains accurate as written.",
+  "document_id": "AR0-ROUTING-INDEX-SPRINT5-20260922-01",
+  "version": "1.0.0",
+  "author": "orchestrator-agent (Squad pattern, lead_agent infra-squad-lead per patterns.json Pattern 2 'Enterprise Full-Stack')",
+  "phase": "Phase 7 - Agent-Task Routing (AR.0 routing index, Sprint 5 planning)",
+  "date": "2026-09-22",
+  "correlation_id": "DASH-PH7-AR0-SPRINT5-20260922",
+  "planning_status": {
+    "status": "DOCS-ONLY, PLANNING-STAGE ROUTING (2-item, reduced-signal model per Sprint 3/4 precedent) -- NEITHER design doc is IMPLEMENTATION-READY yet, unlike Sprint 4's fr013-predicate-schema-design.md",
+    "note": "Sprint 5 has two candidate items, both closing gaps already named and disclosed in this project's own docs (AC-013's narrow Shape A shortfall; AR1-S3-G3's undocumented shared-connection gap). Both design docs (docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md, docs/phase-1.5-design/connection-pooling-design.md) were produced in the same session as this routing pass and are both marked DRAFT, not IMPLEMENTATION-READY -- neither has been through an independent review round the way fr013-predicate-schema-design.md's 7 rounds hardened it before Sprint 4's own AR.0 ran. This file routes agent-task fit for the two stories' sub-tasks anyway, since that is a genuine, useful planning output even for a DRAFT design -- but scoring here does not certify either design as ready for Phase B dispatch. That gate is a separate, later step (see sprint5-ar5-rs-computation.md's Verdict)."
+  },
+  "orchestration_routing_disclosure": {
+    "decision_tree_path": "D01(Brownfield) -> D12(Phase 1/6/7=RUN, human pre-flight answers inferred from the task's own explicit instructions, not independently confirmed by the user in an AskUserQuestion round for this pass) -> D13(complexity: Squad, see below) -> D14(Pattern 2 'Enterprise Full-Stack', lead_agent=infra-squad-lead, lead_domain=backend-engineering) -> D15(security-audit depth: FULL F.1-F.6, DPDP/crypto is a regulated/PII signal) -> D16(Phase C gate, always) -> D17(context-engineering, always) -> D18(Phase A: solution-architect + consensus-agent) -> D19(orchestrator-agent) -> D21(harness-engineering gate, judged NOT to fire, see below).",
+    "d13_judgment_call": "Squad (not Enterprise) -- mirrors Sprint 3/4's own compressed per-gap story treatment rather than a ground-up Enterprise redesign. This is a disclosed judgment call, not a fact this file's own scoring signals resolve -- see open_questions_for_user SP5-DEC-001 below for the user to override if they judge the DPDP regulatory exposure warrants Enterprise-scale treatment instead.",
+    "d21_judgment_call": "harness-engineering (D50) is judged NOT to fire. Its trigger condition requires the target stack to itself be agentic/LLM/multi-agent at runtime. Dashanan is a deterministic Python/FastAPI/Postgres backend consumed BY AI hosts -- it does not run LLM agent loops itself, confirmed by direct inspection of src/dashanan/ (no LLM API client, no agent-loop code anywhere in the shipped codebase). Disclosed as a judgment call rather than silently assumed -- see open_questions_for_user SP5-DEC-002.",
+    "engineerings_applied": {
+      "context_engineering_D80": "Always active (Squad pattern, agent_count >= 3) -- this file's own per-sub-task context-window design in sprint5_ar3_context_windows.json is the concrete artifact.",
+      "prompt_engineering_D47": "Applies -- every dispatched persona prompt in sprint5_implementation_execution_plan.json is generated under this discipline (verbatim AC/must-not-deviate text, no paraphrase, per-sub-task context budget).",
+      "graph_engineering_D102": "Applies -- the AR.0 -> AR.1 -> AR.3 -> execution-plan -> Phase C gate -> AR.5 -> IR.1 chain is itself the multi-node routing structure this project's own convention names; graph-workflow-design-theory-engineer is listed as a candidate for a future formal DAG-topology validation of this chain (not dispatched in this pass -- see open_questions_for_user SP5-DEC-003).",
+      "loop_engineering_D51": "Judged NOT to apply -- no iterate-until-done refinement loop is designed into this docs-only bundle beyond the standard bounded k=2 retry policy this project already reuses verbatim from Sprint 1-4 (see sprint5_implementation_execution_plan.json).",
+      "harness_engineering_D50": "Judged NOT to apply -- see d21_judgment_call above."
+    }
+  },
+  "source_of_truth": {
+    "design_docs": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT) and docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT), both read in full this session.",
+    "prior_disclosure": "AC-013's shortfall: sprint3_ar1_assignments.json DASH-STORY-025's own disposition ('the crypto-shredding mechanism gap (AC-013)... is out of this story's scope'), CHANGELOG.md's 'Known gaps' section (pre-2026-09-22 edit), README.md's prior status callout. AR1-S3-G3: sprint3_ar1_assignments.json routing_gaps (HIGH severity, raised but never itself promoted to a story), restated in fr013-predicate-schema-design.md Section 6 and CHANGELOG.md.",
+    "srs": "SRS.md AC-013 (verbatim, §4). No SRS AC directly names connection pooling; AR1-S3-G3 is a routing-gap-level finding, not an SRS-numbered item, consistent with how it has been tracked since Sprint 3.",
+    "hld": "HLD.md Section 10 (DPDP-1..6, OAQ-10), ADR-006, ADR-009 for DASH-STORY-027. No existing HLD ADR for connection pooling -- confirmed absent by direct read; DASH-STORY-028's design doc is the first architectural documentation of this concern.",
+    "agent_registry": "claude-global-library/agents/ -- existence-verified by directory listing in this session (2026-09-22) for every candidate agent named below, via `test -f agents/{name}/agent.md`."
+  },
+  "agent_existence_verification": {
+    "method": "Direct `test -f claude-global-library/agents/{name}/agent.md` check for every candidate named in this file, run fresh in this session (2026-09-22).",
+    "rule": "No agent name appears as a candidate in this index unless its agents/{name}/agent.md was confirmed to exist in this session.",
+    "verified_candidates": [
+      "python-backend-engineer",
+      "database-engineer",
+      "india-crypto-regulatory-specialist",
+      "crypto-security-specialist",
+      "security-lead-auditor",
+      "security-compliance-mapper",
+      "security-compliance-auditor",
+      "solution-architect",
+      "consensus-agent",
+      "infra-squad-lead",
+      "orchestrator-agent",
+      "prompt-generation-expert",
+      "graph-workflow-design-theory-engineer",
+      "scrum-master-agent",
+      "integration-testing-engineer"
+    ],
+    "existence_result": "All 15 distinct agent names considered as candidates in this file were confirmed present at claude-global-library/agents/{name}/agent.md by the research pass that preceded this file (see conversation-level Explore agent report, 2026-09-22). No name-does-not-exist rejections this pass.",
+    "not_found_and_not_invented": "No skill or agent named specifically 'connection-pool*' or 'crypto-shredding*' exists in the library -- connection pooling is covered generically inside database-engineer's mandatory rdbms-core/database-schema-migration-core skills, and DPDP-specific erasure design is covered inside india-crypto-regulatory-specialist's india-dpdp-privacy-enhancing-technologies-core skill. This gap is disclosed rather than a narrower skill being invented to fill it."
+  },
+  "scoring_model": {
+    "signals": [
+      { "id": "domain_match", "weight": 0.5, "definition": "Overlap between the agent's declared domain/description keywords and the candidate item's primary engineering domain, read from its design-doc/HLD citation." },
+      { "id": "skill_coverage", "weight": 0.5, "definition": "Fraction of the item's apparent required capability set covered by the agent's frontmatter skills: list (mandatory skills only)." }
+    ],
+    "formula": "score = 0.5*domain_match + 0.5*skill_coverage",
+    "reduced_model_disclosure": "Same reduced 2-signal model sprint3_ar0_routing_index.json/sprint4_ar0_routing_index.json used, reused here for the same narrow-scope reason Sprint 4 gave: with each story's file list already scoped by its own design doc, hld_component_ownership and tech_stack_fit would not discriminate between candidates any differently than domain_match already does.",
+    "assignment_threshold": 0.70,
+    "threshold_source": "Reused unchanged from Sprint 3/4's own choice.",
+    "range": "[0.0, 1.0] per signal and per composite score"
+  },
+  "candidate_items": [
+    {
+      "item_id": "SPRINT5-CAND-001",
+      "story_id": "DASH-STORY-027",
+      "traces_to": "AC-013",
+      "title": "Full DPDP crypto-shredding erasure cascade",
+      "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT)",
+      "sub_tasks": [
+        {
+          "sub_task_id": "SPRINT5-CAND-001-DEV",
+          "title": "Subject-index layer, per-zone key-destroy/compliance-role delete wiring, DELETE/export/job-status endpoint wiring",
+          "files": ["src/dashanan/infrastructure/ (new subject_item_index table + migration, per-zone compliance-role adapters)", "src/dashanan/domain/zone8_crypto_shredding.py (new call sites only, no primitive changes)", "src/dashanan/api/app.py (DELETE/export endpoint handlers)", "docs/phase-1.5-api/openapi.yaml (no schema change expected -- contract already exists; confirm during Dev, do not assume)"],
+          "candidates": [
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.90, "skill_coverage": 0.85},
+              "score": 0.875,
+              "above_threshold": true,
+              "evidence": "Same persona that authored composition_root.py's secure builders and every prior sprint's API/application-layer wiring. Mandatory fastapi-core/api-design-core/rdbms-core cover the endpoint wiring and new Postgres table; error-handling-patterns covers the fail-fast disclosure this story's must_not_deviate requires (never silently claim Zone 4/5 coverage)."
+            }
+          ],
+          "primary_candidate": "python-backend-engineer",
+          "margin": null,
+          "margin_note": "Single viable implementer candidate for the wiring work itself, consistent with every prior sprint's Dev-role pattern. The crypto/compliance DESIGN judgment (already made in the linked design doc) is separately reviewed below, not re-decided by the implementer."
+        },
+        {
+          "sub_task_id": "SPRINT5-CAND-001-QA",
+          "title": "Real-Postgres integration tests proving erasure reach into Zones 1/2/3/6/7/8 and both retrieval indices",
+          "files": ["A new file under tests/integration/, mirroring tests/integration/test_api_real_postgres_e2e_dash3.py's style"],
+          "candidates": [
+            {
+              "agent": "integration-testing-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.85, "skill_coverage": 0.80},
+              "score": 0.825,
+              "above_threshold": true,
+              "evidence": "Same persona and rationale as Sprint 4's DASH-STORY-026-QA assignment (integration-testing-core/contract-testing-core, real-Postgres/TestClient style, database integration testing named directly in its own agent.md)."
+            }
+          ],
+          "primary_candidate": "integration-testing-engineer",
+          "margin": null,
+          "margin_note": "Consistent with Sprint 4's own resolved SP4-DEC-202 (keep narrowest-fitting specialist, not a generalist QA owner)."
+        }
+      ]
+    },
+    {
+      "item_id": "SPRINT5-CAND-002",
+      "story_id": "DASH-STORY-028",
+      "traces_to": "AR1-S3-G3",
+      "title": "Real connection pooling for the API host composition root",
+      "source": "docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT)",
+      "sub_tasks": [
+        {
+          "sub_task_id": "SPRINT5-CAND-002-DEV",
+          "title": "Replace the single-connection factory with psycopg_pool.ConnectionPool; thread acquire/release through the composition root and FastAPI dependency boundary",
+          "files": ["src/dashanan/infrastructure/composition_root.py", "src/dashanan/api/ (FastAPI dependency wiring for per-request connection acquisition)", "pyproject.toml (new psycopg_pool dependency)"],
+          "candidates": [
+            {
+              "agent": "database-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.90, "skill_coverage": 0.85},
+              "score": 0.875,
+              "above_threshold": true,
+              "evidence": "This library's persona whose own description explicitly names connection pooling as an area of responsibility. Mandatory rdbms-core covers the pooling design itself; database-schema-migration-core is a lesser fit (no schema change here) but the agent's core competency is squarely on-point."
+            },
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.80, "skill_coverage": 0.75},
+              "score": 0.775,
+              "above_threshold": true,
+              "evidence": "Also above threshold -- this agent built the composition root originally and could implement the change. Scored slightly below database-engineer because pooling/sizing/backpressure design is the more specialized half of this sub-task's work, per the design doc's own emphasis."
+            }
+          ],
+          "primary_candidate": "database-engineer",
+          "margin": 0.100,
+          "margin_note": "python-backend-engineer remains a genuine above-threshold alternative given its prior authorship of composition_root.py -- recorded as a consult/co-implementer candidate, not dropped, since the FastAPI dependency-injection half of this sub-task (not the pooling design itself) is arguably closer to python-backend-engineer's own prior work."
+        },
+        {
+          "sub_task_id": "SPRINT5-CAND-002-QA",
+          "title": "Real-Postgres integration test proving concurrent cross-zone requests no longer contend on one connection, and pool exhaustion returns 503+Retry-After",
+          "files": ["A new or extended file under tests/integration/"],
+          "candidates": [
+            {
+              "agent": "integration-testing-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.80, "skill_coverage": 0.75},
+              "score": 0.775,
+              "above_threshold": true,
+              "evidence": "Same rationale as SPRINT5-CAND-001-QA -- real-Postgres/TestClient concurrency and contract-boundary testing is this persona's named core responsibility."
+            }
+          ],
+          "primary_candidate": "integration-testing-engineer",
+          "margin": null,
+          "margin_note": "Single above-threshold candidate."
+        }
+      ]
+    }
+  ],
+  "advisory_review_roster": {
+    "note": "Distinct from the implementer sub_tasks above -- non-blocking or gate reviewers, mirroring Sprint 3/4's own separation.",
+    "candidates": [
+      {
+        "agent": "india-crypto-regulatory-specialist",
+        "model": "opus",
+        "role": "DASH-STORY-027 review -- confirms OAQ-10 is not silently asserted as resolved, and that the erasure mechanism's DPDP Act 2023 mapping (§8/§10/§29/§33) is accurately characterized, not overclaimed",
+        "signals": {"domain_match": 0.90, "skill_coverage": 0.85},
+        "score": 0.875,
+        "above_threshold": true,
+        "evidence": "Most on-point persona for DPDP-specific privacy-enhancing-technology mapping in this library, per its own india-dpdp-privacy-enhancing-technologies-core mandatory skill -- more specific to this exact question than the generalist crypto-security-specialist.",
+        "maker_checker": true,
+        "maker_checker_reason": "Zone 7 audit-boundary and OAQ-10 disclosure are exactly the kind of compliance-sensitive judgment this project's own p1_security_override principle exists to gate with a distinct reviewing agent, not the implementer's own self-assessment."
+      },
+      {
+        "agent": "security-lead-auditor",
+        "model": "sonnet",
+        "role": "DASH-STORY-027 review -- F.6 binary-gate aggregation, DPDP Act regulatory-verdict logic",
+        "signals": {"domain_match": 0.80, "skill_coverage": 0.75},
+        "score": 0.775,
+        "above_threshold": true,
+        "evidence": "Its own india-cyber-regulatory-core mandatory skill directly covers this. Complementary to india-crypto-regulatory-specialist's narrower crypto-mapping focus -- this persona's role is the broader compliance-gate aggregation."
+      },
+      {
+        "agent": "solution-architect",
+        "model": "opus",
+        "role": "HLD/ADR update review for both stories -- confirms the two new design docs' architecture-level summaries in HLD.md are consistent with existing ADRs and don't silently contradict a locked decision",
+        "signals": {"domain_match": 0.75, "skill_coverage": 0.70},
+        "score": 0.725,
+        "above_threshold": true,
+        "evidence": "Same role this persona has played at every Phase A/Phase C gate across Sprints 1-4."
+      },
+      {
+        "agent": "consensus-agent",
+        "model": "sonnet",
+        "role": "Both stories' Review sub-tasks -- validates every disclosed failure mode (Zone 4/5 exclusion, pool exhaustion, OAQ-10 non-resolution) has a defined path and no silently-dropped assumption",
+        "signals": {"domain_match": 0.75, "skill_coverage": 0.70},
+        "score": 0.725,
+        "above_threshold": true,
+        "evidence": "Same role as every prior sprint's Phase C gate reviewer."
+      }
+    ]
+  },
+  "index_level_findings": [
+    {
+      "id": "AR0-S5-F1",
+      "severity": "INFO",
+      "finding": "Sprint 5 has two candidate items, unlike Sprint 4's one -- but both are independent (disjoint files, no cross-story dependency), so this does not introduce the sequencing complexity Sprint 4's own single-story split required."
+    },
+    {
+      "id": "AR0-S5-F2",
+      "severity": "WARNING",
+      "finding": "python-backend-engineer scores above threshold on 2 of 4 Dev/QA-class sub-tasks (SPRINT5-CAND-001-DEV, as a consult on SPRINT5-CAND-002-DEV), extending the concentration pattern flagged in every prior sprint's own routing files (Sprint 1: 7/11, Sprint 2: 8/9, Sprint 3: 4/6, Sprint 4: 1/1 with no alternative). Sprint 5 differs from Sprint 1-4 in one respect worth noting: for the first time, a second, genuinely distinct Python-backend-adjacent persona (database-engineer) is the PRIMARY candidate for one sub-task rather than a mere below-threshold alternative -- a partial, not full, rebalancing of the standing concentration finding."
+    },
+    {
+      "id": "AR0-S5-F3",
+      "severity": "WARNING",
+      "finding": "Both design docs are DRAFT, not IMPLEMENTATION-READY. Fit-scoring agent-task assignments against a not-yet-hardened design is a real limitation of this pass: if a future review round changes either design doc's file list or approach materially, this file's own sub-task/file/candidate structure would need re-scoring, not merely re-reading. Disclosed rather than silently treated as final."
+    }
+  ],
+  "open_questions_for_user": [
+    {
+      "id": "SP5-DEC-001",
+      "question": "This file's D13 judgment call recommends Squad complexity (mirroring Sprint 3/4's compressed per-gap treatment) rather than Enterprise, despite DPDP regulatory exposure being a plausible Enterprise-scale signal. Confirm Squad, or override to Enterprise?",
+      "why_it_needs_a_human": "A genuine complexity-tier judgment call the decision tree marks as needing confirmation (D13), not a fact this file's own fit-scoring signals resolve."
+    },
+    {
+      "id": "SP5-DEC-002",
+      "question": "This file's D21 judgment call recommends harness-engineering does NOT fire, since Dashanan's own codebase is a deterministic backend, not an agentic/LLM runtime. Confirm, or does the team consider Dashanan's role as infrastructure FOR other agentic systems enough to warrant harness-engineering treatment of its own SDLC process?",
+      "why_it_needs_a_human": "The decision tree's own trigger condition is stack-detection-based and genuinely ambiguous for a project whose PRODUCT is memory infrastructure for agents but whose own IMPLEMENTATION is not agentic."
+    },
+    {
+      "id": "SP5-DEC-003",
+      "question": "Should graph-workflow-design-theory-engineer be dispatched (in a future, non-docs-only pass) to formally validate the AR.0->AR.1->AR.3->execution-plan->Phase C->AR.5->IR.1 chain's own DAG topology, now that it has run five times (Sprints 1-4 plus this Sprint 5 draft) without ever having been itself graph-theoretically audited?",
+      "why_it_needs_a_human": "A meta-process-quality investment decision, not something this routing pass can decide for the team."
+    },
+    {
+      "id": "SP5-DEC-004",
+      "question": "UPDATED 2026-09-22 per solution-architect review round 9 (was: 'Both design docs are v1 DRAFT' -- stale): connection-pooling-design.md remains v1, single-pass, unreviewed. dpdp-crypto-shredding-full-erasure-design.md is now v2.0, having been through 10 documented solution-architect review rounds (including one major correction). Both still carry disclosed open items (Zone 4/5 Shape B prerequisite and the Zone 7 audit-record adoption decision for DASH-STORY-027; pool-sizing and async-vs-sync confirmation for DASH-STORY-028) and neither is marked IMPLEMENTATION-READY. Should a formal, clean (non-'APPROVE WITH CHANGES') review pass run on connection-pooling-design.md specifically (mirroring FR-013's 7 rounds before Sprint 4, and now roughly mirrored by the DPDP doc's own 8 rounds) before this Sprint 5 bundle is treated as execution-ready, or is the current single-pass draft sufficient given the narrower scope of AR1-S3-G3 relative to FR-013's own API-contract surface?",
+      "why_it_needs_a_human": "A rigor/cost tradeoff the user should decide, not an engineering fact."
+    }
+  ]
+}

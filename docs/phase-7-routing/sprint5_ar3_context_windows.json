@@ -1,0 +1,152 @@
+{
+  "document_id": "AR3-CONTEXT-WINDOWS-SPRINT5-20260922-01",
+  "version": "1.0.0",
+  "author": "orchestrator-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.3 per-sub-task context window design, Sprint 5)",
+  "date": "2026-09-22",
+  "correlation_id": "DASH-PH7-AR3-SPRINT5-20260922",
+  "depends_on": [
+    "docs/phase-7-routing/sprint5_ar1_assignments.json v1.0.0",
+    "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (DRAFT, bumped 2026-09-22 per solution-architect review round 8, was stale at v1)",
+    "docs/phase-1.5-design/connection-pooling-design.md v1 (DRAFT)"
+  ],
+  "methodology_reuse_note": "Same per-sub-task context-window method Sprint 3/4 used: sources are the exact file/section citations each sub-task's own AR.1 record or design doc names, never invented additions. Both Sprint 5 design docs are DRAFT rather than IMPLEMENTATION-READY, so 'the entire design doc' is included in full for every sub-task exactly as Sprint 4 did for its own single design doc -- there is no reduced excerpt to select from a draft that has not yet been trimmed by review rounds.",
+  "classification_model": {
+    "name": "Bell-LaPadula classification-ceiling (carried forward unchanged from Sprints 1-4)",
+    "rule": "No sub-task's context window may include Zone 2/5 content bearing PII unless the sub-task is security-cleared.",
+    "sprint_5_extension_note": "DASH-STORY-027 is the first Sprint 5 story to be genuinely security-cleared for a narrow purpose: its Dev and Review sub-tasks must reason about WHICH subjects/items exist per zone (structurally, via subject_id/item_id references) to build and verify the resolution index, but never need the PAYLOAD content of those items -- the same discipline DASH-STORY-020's own erasure work already established. Both context windows below carry the structural/ID-level content, never PII payload content."
+  },
+  "context_windows": [
+    {
+      "sub_task_id": "DASH-STORY-027-DEV",
+      "story_id": "DASH-STORY-027",
+      "assigned_agent": "python-backend-engineer",
+      "context_budget_tokens": 15000,
+      "context_budget_note": "Raised from 11500 to 15000 on 2026-09-22 per solution-architect review round 6's major re-scoping: 4 real prior-art files (subject_erasure_cascade.py, zone8_crypto_shredding_store.py, unified_subject_erasure_orchestrator.py, sql_zone8_subject_index_repository.py) that round 1-5 never cited must now be read in full, since this sub-task WIRES/EXTENDS them rather than building from scratch. This is the largest context window in the bundle; a judgment-call estimate, not independently token-counted.",
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document -- single source of truth for this sub-task, DRAFT status means every section including the disclosed open items is load-bearing)",
+        "files_to_read_or_modify": [
+          {"file": "src/dashanan/application/unified_subject_erasure_orchestrator.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per solution-architect review round 6: the real, already-built orchestrator this sub-task wires into app.py and extends with a Zone 1 leg + a real SubjectToItemIndex. This is now the primary file this sub-task modifies, not dpdp_erasure_cascade.py."},
+          {"file": "src/dashanan/application/subject_erasure_cascade.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per round 6: the existing, live, Zone-8-only service the eraseSubject endpoint currently calls directly -- must understand its exact job-tracking contract (SubjectErasureJob/SubjectErasureJobStore) before wiring the orchestrator alongside/in place of it without regressing it (AC-027-DEV-2)."},
+          {"file": "src/dashanan/application/zone8_crypto_shredding_store.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per round 6: Zone8SubjectKeyedArchiver.erase_subject, the real collaborator subject_erasure_cascade.py already calls for Zone 8's crypto-shredding -- confirms this sub-task must not touch it, only route around it correctly."},
+          {"file": "src/dashanan/infrastructure/sql_zone8_subject_index_repository.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per round 6: existing prior art for a subject-keyed index repository -- the new SubjectToItemIndex implementation this sub-task builds should follow this file's own conventions, not invent a new style, and must not be confused with or duplicate it (this one is Zone-8-scoped only)."},
+          {"file": "src/dashanan/api/app.py", "line_ranges": ["lines 1-35 (module docstring, AC-023-3)", "864-889 (the eraseSubject handler this sub-task rewires)", "existing _do_write/assemble_context error-handling precedents (400-on-ValueError, 503-on-ZoneRepositoryError patterns), same precedents DASH-STORY-026-DEV reused"], "why": "The exact live handler this sub-task modifies, plus this project's existing error-handling precedents to reuse rather than invent."},
+          {"file": "src/dashanan/infrastructure/dpdp_erasure_cascade.py", "line_ranges": ["full file"], "why": "The existing Shape A CrossZoneDpdpErasureCascade the orchestrator already composes for its Zone 2/6 leg (via the SubjectToItemIndex seam this sub-task implements) -- must understand its current item_id-keyed contract."},
+          {"file": "src/dashanan/domain/zone8_crypto_shredding.py", "line_ranges": ["full file"], "why": "The existing AES-256-GCM primitives -- CONFIRMED already called for real by subject_erasure_cascade.py/zone8_crypto_shredding_store.py, not this sub-task's first call site (corrected AC-027-DEV-2); primitives themselves remain frozen, per must_not_deviate."},
+          {"file": "docs/phase-1.5-api/openapi.yaml", "line_ranges": ["DELETE /tenants/{tenant_id}/subjects/{subject_id}, GET .../export, GET /jobs/{job_id} sections"], "why": "The contract this sub-task's endpoint already partially implements (Zone 8 only) and must extend to the full orchestrator outcome without breaking the existing shape."}
+        ],
+        "domain_files_cited_across_review_rounds": [
+          {"file": "src/dashanan/infrastructure/provenance_schema.sql", "line_ranges": ["existing schema conventions for a new table (naming, tenant_id-first-column pattern, compliance-role grant pattern)"], "why": "The new subject_item_index table should follow this project's existing SQL schema conventions, not invent a new style."},
+          {"file": "src/dashanan/infrastructure/episodic_schema.sql", "line_ranges": ["trg_episodic_entries_append_only trigger definition and its escape-hatch comment"], "why": "Added 2026-09-22 per solution-architect review round 2 finding D: this sub-task's actual deliverable is a compliance-role delete adapter for Zone 2 ONLY (not Zones 1/2/3 -- corrected per round 1 finding 5), and the design doc's own Section 5 grounds that adapter entirely in this file's real append-only trigger and its escape-hatch comment. The implementer must read the trigger itself, not just the design doc's paraphrase of it -- this file was missing from the context window entirely before this correction."},
+          {"file": "src/dashanan/application/zone2_capacity_backstop_sweep.py", "line_ranges": ["Zone2EvictionPort Protocol definition"], "why": "Added 2026-09-22 per solution-architect review round 2 finding C: the new Zone 2 compliance-role adapter implements this existing Zone2EvictionPort Protocol (the same seam DASH-STORY-020's own Zone 2 eviction already uses), NOT the ZoneRepository port -- the implementer needs the real Protocol definition, not an assumed one."}
+        ],
+        "github_issues": [],
+        "cross_reference": "HLD.md Section 10 (DPDP-1..6), OAQ-10, ADR-006 (subject_id secondary index mandate), ADR-009 (Zone 8 per-subject key destroyability)"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "This sub-task builds a subject_id -> item_id[] index and per-zone key-destroy/delete call sites; it operates on IDs and references, not PII payload content. Any code comment or docstring must use abstract placeholders (subject_id, item_id), never example PII-shaped content, matching this project's established discipline."
+    },
+    {
+      "sub_task_id": "DASH-STORY-027-QA",
+      "story_id": "DASH-STORY-027",
+      "assigned_agent": "integration-testing-engineer",
+      "context_budget_tokens": 6000,
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document -- bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
+        "files_to_read_or_modify": [
+          {"file": "tests/integration/test_api_real_postgres_e2e_dash3.py", "line_ranges": ["full file"], "why": "Style precedent -- real Postgres, real TestClient, not mocks."},
+          {"file": "(post-DEV) the new subject_item_index table/migration and endpoint handlers", "line_ranges": ["shipped, not pre-change"], "why": "The live target under test."}
+        ],
+        "domain_files_cited_across_review_rounds": [],
+        "github_issues": [],
+        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-027-QA acceptance_criteria/must_not_deviate"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "Test fixtures use synthetic subject_id/item_id/content values only, never real or realistic PII-shaped content, consistent with every prior sprint's test-authoring discipline.",
+      "dependency_note": "Sequenced after DASH-STORY-027-DEV -- assumes DEV's shipped subject-index/endpoint code as the live target, not a mock."
+    },
+    {
+      "sub_task_id": "DASH-STORY-027-REVIEW",
+      "story_id": "DASH-STORY-027",
+      "assigned_agent": "india-crypto-regulatory-specialist",
+      "context_budget_tokens": 6500,
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document, including its own explicit Section 1 major correction, Section on OAQ-10, and the Zone 7 boundary proposal -- all are the specific subject of this P1 review; bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
+        "files_to_read_or_modify": [
+          {"file": "HLD.md Section 10 (DPDP-1..6), OAQ-10", "line_ranges": ["full section"], "why": "The authoritative statement of what OAQ-10 asks and why it remains unresolved -- this review's central check."},
+          {"file": "(post-DEV/QA) shipped Zone 7 audit-record code and the QA sub-task's own test results", "line_ranges": ["shipped, not pre-change"], "why": "AC-027-REVIEW-2's requirement to confirm the Zone 7 record contains no erased PII."}
+        ],
+        "domain_files_cited_across_review_rounds": [],
+        "github_issues": [],
+        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-027-REVIEW acceptance_criteria/must_not_deviate; p1_security_override.applied_after_criteria_evaluation"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "This is a P1 BLOCKING maker-checker review. Its context window carries the compliance/legal-boundary contract (what OAQ-10 asks, what the Zone 7 record must and must not contain) but not real PII payload content -- the review's job is to confirm the ABSENCE of PII in the audit trail, not to inspect real PII itself.",
+      "dependency_note": "Sequenced after both DASH-STORY-027-DEV and DASH-STORY-027-QA -- post-implementation re-check, BLOCKING per the P1 gate."
+    },
+    {
+      "sub_task_id": "DASH-STORY-028-DEV",
+      "story_id": "DASH-STORY-028",
+      "assigned_agent": "database-engineer",
+      "context_budget_tokens": 6000,
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "files_to_read_or_modify": [
+          {"file": "src/dashanan/infrastructure/composition_root.py", "line_ranges": ["build_postgres_connection and every zone repository builder that currently receives its single connection object"], "why": "The sole factory this sub-task replaces, and every downstream call site that must keep working against the SqlConnection Protocol unchanged."},
+          {"file": "src/dashanan/api/", "line_ranges": ["existing FastAPI app/router setup, to determine where a new per-request connection-acquisition dependency is wired in"], "why": "The design doc's own acquire-per-request decision needs a concrete FastAPI dependency-injection point."},
+          {"file": "pyproject.toml", "line_ranges": ["dependencies list and its existing 'why we added this dependency' comment convention"], "why": "psycopg_pool must be added following this project's own documented-dependency-addition convention."}
+        ],
+        "domain_files_cited_across_review_rounds": [],
+        "github_issues": [],
+        "cross_reference": "HLD.md Section 6 (circuit-breaker precedent for vector-store call failure/backpressure, reused as the model for pool-exhaustion behavior)"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "This sub-task is infrastructure-layer connection-acquisition mechanics -- it never touches row-level content, PII or otherwise, at any point."
+    },
+    {
+      "sub_task_id": "DASH-STORY-028-QA",
+      "story_id": "DASH-STORY-028",
+      "assigned_agent": "integration-testing-engineer",
+      "context_budget_tokens": 5000,
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "files_to_read_or_modify": [
+          {"file": "tests/integration/test_api_real_postgres_e2e_dash3.py", "line_ranges": ["full file"], "why": "Style precedent."},
+          {"file": "(post-DEV) the new pool factory and FastAPI dependency", "line_ranges": ["shipped, not pre-change"], "why": "The live target under test for both the concurrency and pool-exhaustion cases."}
+        ],
+        "domain_files_cited_across_review_rounds": [],
+        "github_issues": [],
+        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-028-QA acceptance_criteria/must_not_deviate"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "No PII involved -- this sub-task tests connection-acquisition concurrency and exhaustion behavior only.",
+      "dependency_note": "Sequenced after DASH-STORY-028-DEV."
+    },
+    {
+      "sub_task_id": "DASH-STORY-028-REVIEW",
+      "story_id": "DASH-STORY-028",
+      "assigned_agent": "consensus-agent",
+      "context_budget_tokens": 4000,
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "files_to_read_or_modify": [
+          {"file": "(post-DEV) shipped composition_root.py changes and every zone repository's own unchanged constructor", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-1's requirement to confirm no zone repository code changed."}
+        ],
+        "domain_files_cited_across_review_rounds": [],
+        "github_issues": [],
+        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-028-REVIEW acceptance_criteria/must_not_deviate"
+      },
+      "pii_exclusion_applied": true,
+      "pii_note": "No PII involved.",
+      "dependency_note": "Sequenced after both DASH-STORY-028-DEV and DASH-STORY-028-QA. Non-blocking advisory (P1 not triggered)."
+    }
+  ],
+  "summary": {
+    "sub_tasks_total": 6,
+    "total_context_budget_tokens": 42500,
+    "total_context_budget_tokens_note": "Updated 2026-09-22, twice: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files). 35500+3500+3500=42500.",
+    "sub_tasks_with_pii_exclusion_applied": 6,
+    "design_doc_included_in_full_for_every_sub_task": true,
+    "note_on_security_clearance": "DASH-STORY-027-DEV and DASH-STORY-027-REVIEW are the first Sprint 5 sub-tasks with a narrow, ID-level (not payload-level) security clearance, reflecting the P1 gate. All other Sprint 5 sub-tasks follow the standard Sprints 1-4 posture (no PII, no clearance needed)."
+  }
+}

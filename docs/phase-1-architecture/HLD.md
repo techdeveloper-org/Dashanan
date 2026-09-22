@@ -1324,6 +1324,66 @@ ADR-019: Assemble RPC transport shape
 
 ---
 
+### ADR-020: API host connection acquisition — pooled (`psycopg_pool`), not a single shared connection
+
+```
+Status:    Proposed (2026-09-22) -- Sprint 5 planning bundle, docs-only pass. NOT YET IMPLEMENTED.
+Context:   AR1-S3-G3 (raised sprint3_ar1_assignments.json routing_gaps, HIGH severity): the real
+    API host's composition root (src/dashanan/infrastructure/composition_root.py,
+    build_postgres_connection) constructs a single psycopg.Connection once and shares it across
+    every zone's SQL repository builder. No pool exists anywhere in this codebase. This is a
+    genuine, previously undocumented architectural gap -- unlike most items in this ADR list, it
+    was never a deliberate decision recorded anywhere before this entry.
+Decision:  Replace the single-connection factory with psycopg_pool.ConnectionPool (sync, matching
+    the API host's existing synchronous FastAPI route handlers -- confirmed by inspection, not
+    assumed), acquired per-request via a FastAPI dependency and released back to the pool at
+    request end, rather than held for the app's lifetime. Every existing zone repository keeps
+    depending only on the already-established SqlConnection Protocol -- only the composition
+    root's own acquisition/release mechanics change, not any repository's constructor.
+  Full design: docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT -- three disclosed
+    open items: pool sizing has no load-test data behind it yet, the circuit-breaker-vs-Postgres
+    decision is deferred, exact DI wiring is not yet line-verified against a live implementation).
+  Pool exhaustion: returns 503 + Retry-After, reusing the existing NFR-014/AC-021
+    contention-handling convention rather than inventing a new one, and echoing this HLD's own
+    Section 6 circuit-breaker precedent for vector-store call backpressure.
+  Explicitly NOT solved by this decision: cross-zone transaction atomicity (2PC/saga) for the
+    Zone 5 + Zone 3 write pair. Sprint 4's existing 202/207/503 fail-fast-plus-honest-partial-
+    reporting contract (fr013-predicate-schema-design.md Section 4.2 step 6) remains the correct
+    interim design even after pooling lands -- pooling fixes connection contention, not
+    multi-statement atomicity, and this ADR does not claim otherwise.
+  Alternatives considered: holding one pool-provided connection per app instance for its lifetime
+    (rejected -- does not actually fix the sharing/contention problem the gap names); an async pool
+    (AsyncConnectionPool) (rejected for now -- the API host's route handlers are synchronous today,
+    an async pool would require a broader concurrency-model change out of this gap's own scope).
+  Consequences:
+    Accepted trade-offs: pool sizing defaults are a first estimate, not measured against real
+      traffic -- flagged as an open item, not presented as final.
+    Risks: if pool sizing is wrong in production, requests could see elevated 503 rates before the
+      issue is caught -- mitigated by the existing OpenTelemetry/structured-logging convention
+      (ADR-014) once implemented, but no dashboard/alert for this specifically exists yet.
+    Documented exception (added 2026-09-22, solution-architect review finding 2): Section 6's
+      design-patterns table mandates Circuit Breaker for "Every adapter call," and Postgres access
+      through this pool is exactly such an adapter call -- this ADR does NOT add a circuit breaker
+      around pooled Postgres access, only the pool itself plus 503+Retry-After on exhaustion. This
+      is a real, scoped, time-bound exception to Section 6's mandatory pattern, not an oversight or
+      a silently separate question: whether pooled Postgres access also needs a full circuit
+      breaker (on top of pool-exhaustion backpressure) is deferred to a follow-on decision once
+      real pool-sizing/failure data exists, per connection-pooling-design.md's own disclosed open
+      item. Per Section 6's own Blueprint Supremacy Rule, this exception must be closed (breaker
+      added, or explicitly re-affirmed as unnecessary with evidence) before this ADR is signed off,
+      not left open indefinitely.
+  India Layer: N/A -- this is a connection-management/infrastructure decision, not a residency or
+      compliance concern.
+  Sign-off:  NOT YET SIGNED OFF. This ADR entry documents a Sprint 5 planning-stage proposal
+      (docs/phase-1.5-design/connection-pooling-design.md v1, DRAFT), not an architect-approved,
+      implemented decision the way ADR-001 through ADR-019 are. Recorded here now specifically
+      because this project's own rules/46-architecture-documentation.md convention requires
+      architectural changes to be reflected in HLD.md, and because AR1-S3-G3's absence of any ADR
+      was itself flagged as a genuine documentation gap during this planning pass.
+```
+
+---
+
 ## Section 5 — DSA Choices per Component
 
 Every implementing agent MUST use these. Deviations require architect sign-off.
@@ -1353,7 +1413,7 @@ Every implementing agent MUST use these. Deviations require architect sign-off.
 |---|---|---|
 | Per-zone rotation policy | **Strategy** | Each zone has a different `lambda_zone`, capacity, TTL, fast-track rule and compression method. Strategy lets the single RotationEngine execute eight policies without eight code paths, and lets an operator swap a policy per deployment (NFR-009) without touching the engine. |
 | All zone persistence | **Repository** (port + adapter) | FR-011 IS the Repository pattern stated as a requirement: decouple each zone's logical behaviour from its physical backend so any zone can be re-bound without changing its orchestration contract. It is also where the mandatory `tenant_id` parameter is enforced (ADR-013). |
-| Every adapter call | **Circuit Breaker** | A slow or dead vector store must fast-fail rather than exhaust the request pool and take the whole read path down with it (error-handling-patterns M3: without a breaker, thread-pool exhaustion converts one dependency's failure into ours). |
+| Every adapter call | **Circuit Breaker*** | A slow or dead vector store must fast-fail rather than exhaust the request pool and take the whole read path down with it (error-handling-patterns M3: without a breaker, thread-pool exhaustion converts one dependency's failure into ours). *Postgres access via the ADR-020 connection pool is a documented, time-bound exception to this row (proposed 2026-09-22, not yet signed off) — see ADR-020's Consequences block for the exception's scope and closure condition, per this section's own Blueprint Supremacy Rule. |
 | Zone transitions | **Observer / Event Bus** | Promotion, compression and archival each have several independent reactors (index maintenance, provenance, metrics, consolidation). Publishing decouples the rotation engine from all of them, so adding a reactor requires no change to the engine. |
 | Storage / index / embedding / broker / summarizer | **Adapter** | The concrete mechanism by which ADR-001's one-codebase-two-shapes claim is realized. |
 | Memory Orchestrator | **Facade** | FR-009 is literally a Facade requirement: "the host never addresses individual zones directly." One entry point over eight subsystems. |
@@ -1621,6 +1681,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 - **DPDP-4 Residency.** Per-tenant `embedding_residency` policy (ADR-015); all stores in-region for tenants handling Indian personal data.
 - **DPDP-5 Breach notification.** 72-hour notification requires knowing *what* was exposed — Zone 7's provenance chain plus the tenant-partitioned structure make the blast radius of any breach precisely enumerable rather than estimated.
 - **DPDP-6 Regulated-identifier minimization at ingestion.** ADR-017's write-gate detector tokenizes the configured regulated-identifier set (Aadhaar, PAN, card numbers) before persistence/indexing. This **narrows, and does not replace,** DPDP-1 (purpose limitation) and DPDP-2 (crypto-shredding erasure): the vast majority of retained content remains lawfully-retained user-stated fact governed by DPDP-1/DPDP-2 as already resolved; DPDP-6 addresses only the narrower risk of a small class of high-risk structured identifiers reaching the vector/lexical index as plain content.
+- **Implementation status update (2026-09-22, Sprint 5 planning bundle, docs-only, NOT YET IMPLEMENTED -- CORRECTED 2026-09-22, solution-architect review round 8, see below):** what ships today only partially realizes DPDP-2/DPDP-3 above. Two mechanisms exist, neither yet composed into one wired cascade: (1) `CrossZoneDpdpErasureCascade` (DASH-STORY-020) is keyed by `item_id`, not `subject_id`, and reaches only Zones 2 and 6 -- itself never calling `zone8_crypto_shredding.py`'s key-destroy primitives; (2) separately, the live `eraseSubject` endpoint (`src/dashanan/api/app.py`, AC-023-3) already calls `SubjectErasureCascadeService`, a real, tested Zone-8-only service that DOES call `zone8_crypto_shredding.py`'s key-destroy primitive for real today -- so the primitive is NOT uncalled system-wide, only uncalled from the Zone 2/6 cascade specifically. A separate, more complete orchestrator (`UnifiedSubjectErasureOrchestrator`, `src/dashanan/application/unified_subject_erasure_orchestrator.py`, DASH-STORY-025/DSHN-70) already fans out to Zones 2/3/5/6/8 but is not yet wired into the live endpoint. A design closing this wiring gap is proposed in `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md` (v2.0, DRAFT, 10 documented solution-architect review rounds): it surfaces a prerequisite finding that Zones 4/5 have no Shape B (Postgres) storage adapter today (Zone 4 permanently, structurally excluded regardless of storage shape), so the near-term scope of wiring the orchestrator in is Zones 1/2/3/6/7/8, with Zone 4/5 as a disclosed, forward-compatible gap rather than a silently-claimed one. **OAQ-10's legal-sufficiency question above remains completely unaffected and unresolved by this update** -- this note documents an implementation-status gap between DPDP-2/DPDP-3's target design and shipped code, not a change to OAQ-10's own still-open legal question.
 
 ### CERT-In
 
@@ -1989,3 +2050,5 @@ header above for the current, live Version/Status/Consensus Gate.
 | 1.3.0 | 2026-09-18 | solution-architect + consensus-agent + india-cyber-compliance-architect (real consensus-gate sign-off) | Closed OAQ-4 (per-zone capacity cap + MaxAge adopted as the mechanism; concrete sizing already existed in §12A) and OAQ-19 (§12G's UserAffinity/TaskRelevance cosine mapping redesigned from a fixed `(cosine+1)/2` to an adapter-calibrated min-max normalization, removing the unverified per-adapter non-negative-cosine assumption; aggregation stays a flat mean but `N=5` becomes per-tenant configurable). Partially closed OAQ-20 (`[ASSUMED]` starting `f_cap` defaults for Zones 1/2, extrapolated from Section 9's Profile B turn-rate proxy; real-telemetry-locked defaults stay open) and OAQ-18 (a citation-backed, counsel-ratification-pending identifier-set recommendation — Aadhaar Act 2016 Section 29, IT Act Section 43A/SPDI Rules 2011, explicitly correcting a common misconception that DPDP Act 2023 itself has a "sensitive personal data" tier, since the enacted Act removed that tiering — plus a fail-closed recommendation for detector unavailability that is NOT adopted at this gate, since ADR-017 itself defers that specific choice to the later Phase 1.5 API-contract sign-off). No OAQ item's status was force-closed past what the evidence actually supported; OAQ-18's two sub-questions and OAQ-20's real-telemetry requirement remain explicitly open. |
 | 1.4.0 | 2026-09-20 | orchestrator-agent (real web research pass, corrected same-day per external review of source quality) | Added real, cited research context to OAQ-10 (DPDP crypto-shredding) and OAQ-18 (regulated-identifier detection) — status left unchanged for both, since neither can be closed without real legal counsel, per their own existing language. Initial research pass leaned on secondary sources (dpdpa.com, SCC Times, Conduktor, VeritasChain, Jupiter Money, Razorpay) and one overstated international-precedent claim (that CNIL had "acknowledged" crypto-shredding for GDPR Article 17); corrected same-day: primary sources promoted to the main citation for each claim (official DPDP Act 2023 text at meity.gov.in; UIDAI Circular No. 8 of 2025 at uidai.gov.in; RBI Notification RBI/2021-22/96 at rbi.org.in), secondary sources kept only as supporting plain-language context, the CNIL claim replaced with the EU's own primary regulator position (EDPB: whether encryption + key destruction satisfies GDPR Article 17 "remains under consideration" — an open question at the EU level too, which argues for MORE caution on OAQ-10, not less), and the Aadhaar "FIPS 140-2 Level 3" HSM-certification detail qualified as sourced only from secondary summaries of the primary circular, not independently confirmed from the circular's own clause text. Also added two new future_sprints_backlog stubs this same day (FR-014 wire/API layer, FR-015 Shape B deployment infra, in `backlog_draft.json`) scoping the concrete path to closing the disclosed DSHN-60 security-wiring gap and the production DB-role-wiring gap — no HLD architecture changed, this is a backlog/roadmap addition referencing already-locked Section 2/Section 7 content. |
 | 1.4.1 | 2026-09-20 | orchestrator-agent (direct-fetch citation verification, same day) | A second external review round proposed 3 alternate citation URLs for OAQ-10/18 (a different MeitY PDF path, UIDAI "Circular No. 14 of 2025," RBI notification `Id=12345`). Each was directly fetched and checked rather than accepted on the reviewer's say-so: the alternate MeitY URL returned HTTP 403 (this HLD's own existing MeitY citation also returns 403 on direct fetch — a server-side bot-blocking behavior on meity.gov.in, not evidence either URL is wrong; the existing citation was originally found via a real search result and is kept). The alternate UIDAI URL resolved to a corrupted/non-document PDF and was rejected, not used. The alternate RBI URL (`Id=12345`) resolved to a genuine, different, and more precisely on-point circular than the one already cited — RBI/2022-23/77, "Restriction on Storage of Actual Card Data" (the storage-restriction circular itself, vs. the previously-cited RBI/2021-22/96 tokenisation-*enablement* circular one step removed) — both direct-fetch-confirmed as real, and both are now cited together in OAQ-18. No claim's underlying substance changed; this is a citation-precision improvement only. |
+| 1.5.0 | 2026-09-22 | orchestrator-agent (Sprint 5 planning bundle, docs-only pass -- NOT an implementation change) | Added ADR-020 (API host connection pooling, closing AR1-S3-G3 -- Proposed, NOT YET SIGNED OFF or implemented) and an implementation-status note under DPDP-2/DPDP-3 in Section 10 (what `CrossZoneDpdpErasureCascade` actually ships today vs. the target design, closing AC-013's remaining gap). Both changes cross-reference new Phase 1.5 design docs (`docs/phase-1.5-design/connection-pooling-design.md`, `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md`, both v1 DRAFT). **OAQ-10's own text and status are explicitly unchanged by this pass** — the DPDP-2/DPDP-3 update documents an implementation-status gap, not a legal-sufficiency answer. No existing ADR (ADR-001..019) or STRIDE/DPDP finding was altered, only added to. |
+| 1.5.1 | 2026-09-22 | solution-architect (round 8 re-review) | Corrected Section 10's DPDP-2/DPDP-3 implementation-status note (added in v1.5.0): it stated the shipped cascade "reaches only Zones 2 and 6, never calling this codebase's own zone8_crypto_shredding.py key-destroy primitives" -- FALSE. A separate, already-wired path (the live `eraseSubject` endpoint calling `SubjectErasureCascadeService`) already calls that primitive for real, today; only the Zone 2/6 cascade itself doesn't. Also corrected the note's design-doc citation from "v1, DRAFT" to "v2.0, DRAFT, 10 documented solution-architect review rounds" -- the DPDP design doc underwent a major (round 6) correction and 2 further verification rounds since v1.5.0 was written. Sourced from `dpdp-crypto-shredding-full-erasure-design.md`'s own Section 1 major correction and Change Log. |

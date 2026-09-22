@@ -1,0 +1,312 @@
+{
+  "document_id": "AR1-ASSIGNMENTS-SPRINT5-20260922-01",
+  "version": "1.0.0",
+  "author": "orchestrator-agent",
+  "phase": "Phase 7 - Agent-Task Routing (AR.1 story-to-agent assignment, Sprint 5)",
+  "date": "2026-09-22",
+  "correlation_id": "DASH-PH7-AR1-SPRINT5-20260922",
+  "depends_on": [
+    "docs/phase-7-routing/sprint5_ar0_routing_index.json v1.0.0",
+    "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (DRAFT, bumped 2026-09-22 per solution-architect review round 8, was stale at v1)",
+    "docs/phase-1.5-design/connection-pooling-design.md v1 (DRAFT)",
+    "docs/phase-6-sprint-planning/backlog_draft.json v1.2.0 (sprint_5_stories, sprint_5_dependency_graph)",
+    "docs/phase-7-routing/sprint4_ar1_assignments.json v1.0.0 (assignment-record structure this file mirrors)"
+  ],
+  "structural_note": "Sprint 5 has two independent stories (unlike Sprint 4's one), each split into Dev/QA/Review sub-tasks, mirroring Sprint 4's story-internal structure but with two parallel stories instead of one, closer to Sprint 3's multi-story shape. UPDATED 2026-09-22 per solution-architect review round 8 (was: 'Both design docs are v1 DRAFT' -- stale): connection-pooling-design.md remains v1 DRAFT; dpdp-crypto-shredding-full-erasure-design.md is now v2.0 DRAFT (10 review rounds, one major correction). Neither is IMPLEMENTATION-READY -- this file assigns agents to the sub-tasks as currently scoped, disclosed as provisional against a hardened design, not final.",
+  "methodology_reuse_note": "Assignment threshold reused verbatim from Sprint 2-4: 0.75. Scores below are lifted directly from sprint5_ar0_routing_index.json's own reduced 2-signal model.",
+  "agent_existence_verification": {
+    "method": "Every agent named below was already verified to exist by sprint5_ar0_routing_index.json's own fresh check (2026-09-22).",
+    "verified_candidates_used": ["python-backend-engineer", "database-engineer", "integration-testing-engineer", "india-crypto-regulatory-specialist", "security-lead-auditor", "solution-architect", "consensus-agent"]
+  },
+  "assignment_rule": {
+    "threshold": 0.75,
+    "policy": "Highest-scoring candidate at or above 0.75 wins each sub-task. A sub-task with no candidate at or above 0.75 is recorded as a routing gap and left flagged -- never force-assigned."
+  },
+  "p1_security_override": {
+    "trigger_criteria": [
+      "Story touches Zone 7 (Provenance/Audit)",
+      "Story touches the storage-adapter (ZoneRepository port) interface",
+      "Story touches cross-tenant isolation"
+    ],
+    "effect": "A mandatory security review gate is attached to the story. The reviewing agent is distinct from the implementing agent (Maker-Checker).",
+    "applied_after_criteria_evaluation": [
+      {
+        "story": "DASH-STORY-027 (full DPDP crypto-shredding erasure cascade)",
+        "reason_triggered": "This story DOES touch Zone 7 directly and for real, unlike Sprint 4's DASH-STORY-026 (which was found NOT to trigger this override): the design doc's own Section on the Zone 7 audit-log-preservation boundary proposes a new Zone 7 write path (a non-PII 'erasure occurred' audit record) -- criterion 1 fires on this alone. Separately, the story also touches Zone 2's compliance-role delete adapter (the only zone whose append-only trigger requires a compliance-role escape hatch, per the design doc's own Section 4 zone-by-zone table -- Zone 3 explicitly needs no such workaround, app_login_user-scoped delete suffices there) -- a genuinely new adapter surface, not reuse of an existing tested one the way DASH-STORY-026 reused conflict_aware_zone_writes.py. This adapter implements the existing `Zone2EvictionPort` Protocol (src/dashanan/application/zone2_capacity_backstop_sweep.py), the same seam DASH-STORY-020's own Zone 2 eviction already uses -- it is NOT the `ZoneRepository` port criterion 2 names. Criterion 1 (Zone 7) independently and correctly triggers this override on its own; criterion 2 (ZoneRepository port) is NOT actually touched by this story and should not be cited as a second trigger reason. Corrected 2026-09-22 per solution-architect review round 1 finding 5 (compliance-role scope) and round 2 finding C (ZoneRepository-vs-Zone2EvictionPort misstatement).",
+        "effect_applied": "P1 maker-checker gate attached to DASH-STORY-027-REVIEW: india-crypto-regulatory-specialist (primary reviewer) is a genuinely distinct agent from python-backend-engineer (Dev). This is a BLOCKING gate, not the non-blocking advisory posture Sprint 4's DASH-STORY-026 received."
+      }
+    ],
+    "considered_and_not_triggered": [
+      {
+        "story": "DASH-STORY-028 (connection pooling)",
+        "reason_considered": "Touches the composition root, which builds every zone's repository.",
+        "reason_not_triggered": "Does not touch Zone 7's own storage or content, does not modify the ZoneRepository PORT interface (only how connections are acquired/released before being handed to already-existing, unchanged repository constructors, per the design doc's own migration-note), and carries no cross-tenant-isolation claim (tenant scoping is unaffected, still enforced inside each repository's own queries, not by the connection-acquisition layer).",
+        "advisory_action": "Non-blocking advisory review attached to DASH-STORY-028-REVIEW (consensus-agent), same posture as Sprint 4's DASH-STORY-026."
+      }
+    ]
+  },
+  "assignments": [
+    {
+      "story_id": "DASH-STORY-027",
+      "jira_key": null,
+      "jira_key_note": "No Jira issue exists yet for this story -- this is a docs-only planning pass; Jira ticket creation (and, if wanted, a GitHub issue) is a Phase B pre-dispatch action.",
+      "title": "Full DPDP crypto-shredding erasure cascade: subject_id resolution, per-zone key-destroy wiring, DELETE /tenants/{tenant_id}/subjects/{subject_id}",
+      "traces_to_ac": "AC-013",
+      "story_points": 8,
+      "gap_confirmed": "RE-CONFIRMED and CORRECTED 2026-09-22, solution-architect review round 6 (was: 'CrossZoneDpdpErasureCascade is keyed by item_id, reaches only Zones 2/6, never calls zone8_crypto_shredding.py; DELETE endpoint is contract-only' -- FALSE on the endpoint claim). Direct read of src/dashanan/api/app.py confirms `eraseSubject` (operation_id, AC-023-3) IS wired and calls `AppContext.subject_erasure_service.request_erasure` -- a real, tested, Zone-8-only cascade (src/dashanan/application/subject_erasure_cascade.py) that DOES call zone8_crypto_shredding.py's key-destroy primitive for real. A separate, more complete orchestrator (src/dashanan/application/unified_subject_erasure_orchestrator.py, DASH-STORY-025/DSHN-70) already fans out to Zones 2/3/5/6/8 but is NOT wired into that endpoint. The real gap: wire the orchestrator into the endpoint, implement its already-defined SubjectToItemIndex Protocol for real (currently NullSubjectToItemIndex, zero items), and add the still-missing Zone 1 leg.",
+      "sub_tasks": [
+        {
+          "sub_task_id": "DASH-STORY-027-DEV",
+          "label": "Dev",
+          "title": "Wire UnifiedSubjectErasureOrchestrator into app.py's eraseSubject handler, implement a real SubjectToItemIndex, add the missing Zone 1 leg, and a Zone 2 compliance-role adapter",
+          "deliverable": "RE-SCOPED 2026-09-22, solution-architect review round 6 (was: 'build a new subject-index layer and cascade from scratch'). Real remaining work: (1) wire the already-built UnifiedSubjectErasureOrchestrator (unified_subject_erasure_orchestrator.py) into app.py's eraseSubject handler in place of/extending the narrower SubjectErasureCascadeService call; (2) implement a real SubjectToItemIndex (a new Shape B subject_item_index table + migration) fulfilling that module's already-defined Protocol seam, replacing the shipped NullSubjectToItemIndex default; (3) add a Zone 1 leg to the orchestrator -- genuinely missing today, no existing mechanism; (4) a compliance-role DELETE adapter for Zone 2 only (Zone 2/6 already partially wired via CrossZoneDpdpErasureCascade, extended not replaced -- Zone 2's own append-only trigger is the only one in scope requiring this escape hatch; Zone 3 has no append-only trigger, app_login_user-scoped delete already suffices there via the orchestrator's existing SqlSemanticRepository call, per the design doc's Section 4 zone-by-zone table). Does NOT modify the orchestrator's existing Zone 3/5/8 legs' own logic, only extends it. Corrected 2026-09-22 per solution-architect review round 1 finding 5 -- an earlier draft of this field over-scoped the compliance-role adapter surface to Zones 1/2/3, which would have provisioned an unnecessary privilege grant on Zone 1/3.",
+          "files": [
+            "src/dashanan/api/app.py (eraseSubject handler -- wire UnifiedSubjectErasureOrchestrator in place of/alongside SubjectErasureCascadeService)",
+            "src/dashanan/application/unified_subject_erasure_orchestrator.py (add Zone 1 leg; wire a real SubjectToItemIndex implementation)",
+            "src/dashanan/infrastructure/ (new subject_item_index table/migration implementing SubjectToItemIndex; new Zone 2 compliance-role adapter)",
+            "src/dashanan/api/composition.py (compose the orchestrator's new dependencies -- SubjectToItemIndex impl, Zone 1 collaborator)"
+          ],
+          "candidates": [
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {"domain_match": 0.90, "skill_coverage": 0.85},
+              "score": 0.875,
+              "above_threshold": true,
+              "evidence": "Carried forward from sprint5_ar0_routing_index.json SPRINT5-CAND-001-DEV. Same persona that authored composition_root.py and every prior sprint's application/API-layer wiring."
+            }
+          ],
+          "assigned_agent": "python-backend-engineer",
+          "model": "sonnet",
+          "score": 0.875,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Single viable implementer candidate for the wiring work; the crypto/compliance architecture judgment is already made in the linked design doc and separately re-checked by this story's Review sub-task, not re-decided by the implementer.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-027-DEV-1", "text": "Given a DPDP erasure request for subject_id S, When DELETE /tenants/{tenant_id}/subjects/{subject_id} is called, Then every item_id associated with S across Zones 1/2/3/6/7/8 is resolved via the new SubjectToItemIndex implementation and enters UnifiedSubjectErasureOrchestrator's cascade -- not only Zone 8 as the live endpoint does today.", "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (once IMPLEMENTATION-READY)" },
+            { "ac_id": "AC-027-DEV-2", "text": "Given Zone 8's per-subject encryption key, When the cascade reaches Zone 8, Then zone8_crypto_shredding.py's existing key-destroy primitive continues to be called for real via SubjectErasureCascadeService, exactly as it already is today -- this story does not touch or regress the existing Zone 8 leg. CORRECTED 2026-09-22, solution-architect review round 6: the original claim that this would be 'the first call site anywhere in the codebase' invoking the primitive was false -- SubjectErasureCascadeService already does this, live, today.", "source": "src/dashanan/application/subject_erasure_cascade.py (this session's own read, round 6)" },
+            { "ac_id": "AC-027-DEV-3", "text": "Given the erasure job may be long-running, When DELETE is called, Then the response is 202 JobAccepted per openapi.yaml's existing contract, pollable via the existing GET /jobs/{job_id}, exactly as it already is today for the Zone-8-only path -- this story extends the SAME job-tracking mechanism to the orchestrator's combined outcome, not a new one.", "source": "docs/phase-1.5-api/openapi.yaml and src/dashanan/application/subject_erasure_cascade.py's existing SubjectErasureJob shape (this session's own read)" }
+          ],
+          "must_not_deviate": [
+            "Does not attempt Zone 4/5 erasure -- explicitly out of scope pending the separate FR-011-ZONE-4-5-SHAPE-B prerequisite (backlog_draft.json future_sprints_backlog)",
+            "Does not modify zone8_crypto_shredding.py's existing AES-256-GCM primitives -- only adds call sites",
+            "Does not modify UnifiedSubjectErasureOrchestrator's existing Zone 3/5/8 legs' own logic -- only extends it with a Zone 1 leg and a real SubjectToItemIndex implementation, per solution-architect review round 6's re-scoping",
+            "Does not assert or imply OAQ-10 is resolved anywhere in code, docstrings, or API responses"
+          ],
+          "p1_security_review": true,
+          "logging_note": "Cite as AR1-S5-027-DEV."
+        },
+        {
+          "sub_task_id": "DASH-STORY-027-QA",
+          "label": "QA",
+          "title": "Real-Postgres integration tests proving erasure reach into Zones 1/2/3/6/7/8 and both retrieval indices",
+          "deliverable": "A new file under tests/integration/ mirroring test_api_real_postgres_e2e_dash3.py's style, covering: the eraseSubject endpoint now driving UnifiedSubjectErasureOrchestrator's full cascade across all 6 in-scope zones (not just Zone 8 as today); Zone 8 key-destroy actually renders the blob unreadable (regression-checked against the existing SubjectErasureCascadeService behavior, per AC-027-DEV-2); Zone 7 audit trail records 'erasure occurred' without retaining erased PII; a negative test confirming Zone 4/5 are NOT silently claimed as erased. Updated 2026-09-22, solution-architect review round 6 re-scoping.",
+          "files": ["A new file under tests/integration/"],
+          "candidates": [
+            { "agent": "integration-testing-engineer", "model": "sonnet", "signals": {"domain_match": 0.85, "skill_coverage": 0.80}, "score": 0.825, "above_threshold": true, "evidence": "Carried forward from sprint5_ar0_routing_index.json." }
+          ],
+          "assigned_agent": "integration-testing-engineer",
+          "model": "sonnet",
+          "score": 0.825,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Single above-threshold candidate, consistent with Sprint 4's resolved SP4-DEC-202.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-027-QA-1", "text": "Given a subject with data across all 6 in-scope zones, When erasure completes, Then a fresh read of each zone for that subject returns nothing recoverable, and Zone 8's blob is confirmed unreadable (key destroyed, not merely soft-deleted).", "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (once IMPLEMENTATION-READY)" },
+            { "ac_id": "AC-027-QA-2", "text": "Given the erasure completes, When Zone 7 is inspected, Then it contains a record that an erasure occurred for that subject, but no field of that record contains the erased PII itself.", "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Zone 7 boundary proposal" }
+          ],
+          "must_not_deviate": [
+            "Must include the explicit negative test that Zone 4/5 data (if any exists in a test fixture) is NOT claimed as erased by this story's own response",
+            "Test style must mirror tests/integration/test_api_real_postgres_e2e_dash3.py -- real Postgres, not mocks"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S5-027-QA. Depends on DASH-STORY-027-DEV landing first."
+        },
+        {
+          "sub_task_id": "DASH-STORY-027-REVIEW",
+          "label": "Review",
+          "title": "P1 maker-checker gate: DPDP Act mapping accuracy, OAQ-10 non-resolution, Zone 7 boundary, compliance-role privilege isolation",
+          "deliverable": "A BLOCKING gate review (per p1_security_override.applied_after_criteria_evaluation above) confirming: (1) the shipped erasure cascade's DPDP Act 2023 mapping is accurate and does not overclaim regulatory sufficiency; (2) OAQ-10 remains explicitly unresolved in every artifact; (3) the Zone 7 audit record genuinely retains no erased PII; (4) the compliance-role adapters use a privilege boundary distinct from app_login_user; (5) Zone 4/5's exclusion is disclosed, not silently absent from documentation.",
+          "files": ["Review output only -- no source files modified"],
+          "candidates": [
+            { "agent": "india-crypto-regulatory-specialist", "model": "opus", "signals": {"domain_match": 0.90, "skill_coverage": 0.85}, "score": 0.875, "above_threshold": true, "evidence": "Carried forward from sprint5_ar0_routing_index.json's advisory_review_roster -- most on-point persona for DPDP-specific privacy-enhancing-technology mapping in this library." },
+            { "agent": "security-lead-auditor", "model": "sonnet", "signals": {"domain_match": 0.80, "skill_coverage": 0.75}, "score": 0.775, "above_threshold": true, "evidence": "Carried forward from sprint5_ar0_routing_index.json -- complementary broader compliance-gate aggregation role." }
+          ],
+          "assigned_agent": "india-crypto-regulatory-specialist",
+          "model": "opus",
+          "score": 0.875,
+          "runner_up": {"agent": "security-lead-auditor", "score": 0.775},
+          "margin": 0.100,
+          "consult_agents": ["security-lead-auditor"],
+          "rationale": "india-crypto-regulatory-specialist is the primary P1 maker-checker reviewer given its direct DPDP-specific mandatory skill; security-lead-auditor retained as a named consult for its broader compliance-gate-aggregation angle, not co-primary.",
+          "hld_ownership_crosscheck": "MATCH - HLD.md Section 10 DPDP-1..6, OAQ-10, ADR-006, ADR-009.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-027-REVIEW-1", "text": "Given the shipped implementation, When reviewed, Then no code, docstring, or API response text asserts that crypto-shredding legally satisfies DPDP Act erasure -- OAQ-10 remains explicitly open.", "source": "HLD.md Section 10 OAQ-10" },
+            { "ac_id": "AC-027-REVIEW-2", "text": "Given the Zone 7 audit record proposal, When reviewed, Then it is confirmed to contain no erased PII, only structural metadata (subject_id hash or reference, timestamp, zone list) sufficient to prove an erasure occurred.", "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Zone 7 boundary section" },
+            { "ac_id": "AC-027-REVIEW-3", "text": "Given Zone 4/5's exclusion from this story's cascade, When reviewed, Then confirm the shipped documentation and API responses disclose this exclusion rather than silently implying full 8-zone coverage.", "source": "backlog_draft.json DASH-STORY-027 scope_correction_2026_09_22" },
+            { "ac_id": "AC-027-REVIEW-4", "text": "Given UnifiedSubjectErasureOrchestrator's existing Zone 3/5/8 legs, When reviewed, Then confirm the shipped Dev sub-task extended/wired them (new Zone 1 leg, real SubjectToItemIndex, endpoint wiring) rather than duplicating or reimplementing any of their existing logic.", "source": "backlog_draft.json DASH-STORY-027 scope_correction_2026_09_22_round6" }
+          ],
+          "must_not_deviate": [
+            "Does not remediate code itself -- audits, reproduces, reports, consistent with this project's maker-checker convention",
+            "Does not attempt to resolve OAQ-10 itself -- that is a legal question, not an engineering review's to answer"
+          ],
+          "p1_security_review": true,
+          "p1_trigger_evaluation": "TRIGGERED -- see p1_security_override.applied_after_criteria_evaluation above. This is a BLOCKING gate, unlike Sprint 4's non-blocking advisory review.",
+          "logging_note": "Cite as AR1-S5-027-REVIEW. Depends on DASH-STORY-027-DEV and DASH-STORY-027-QA both landing first. Story cannot close on the Dev sub-task's own report alone (maker-checker)."
+        }
+      ],
+      "logging_note": "Cite as AR1-S5-027. No GitHub issue exists yet for AC-013's full closure. Depends on DASH-STORY-020 (already shipped)."
+    },
+    {
+      "story_id": "DASH-STORY-028",
+      "jira_key": null,
+      "jira_key_note": "No Jira issue exists yet -- docs-only planning pass.",
+      "title": "Real connection pooling for the API host composition root (closes AR1-S3-G3)",
+      "traces_to_gap": "AR1-S3-G3",
+      "story_points": 8,
+      "gap_confirmed": "CONFIRMED by direct read of src/dashanan/infrastructure/composition_root.py's build_postgres_connection -- a single psycopg.Connection is constructed once and shared across every zone repository builder; no psycopg_pool import exists anywhere in the codebase.",
+      "sub_tasks": [
+        {
+          "sub_task_id": "DASH-STORY-028-DEV",
+          "label": "Dev",
+          "title": "Replace the single-connection factory with psycopg_pool.ConnectionPool and thread acquire/release through the composition root and FastAPI dependency boundary",
+          "deliverable": "composition_root.py's build_postgres_connection replaced by a pool factory; a FastAPI dependency acquiring/releasing a pooled connection per request; pool exhaustion returns 503+Retry-After; every existing zone repository's own constructor and SqlConnection Protocol dependency left unchanged.",
+          "files": ["src/dashanan/infrastructure/composition_root.py", "src/dashanan/api/ (FastAPI dependency wiring)", "pyproject.toml (new psycopg_pool dependency)"],
+          "candidates": [
+            { "agent": "database-engineer", "model": "sonnet", "signals": {"domain_match": 0.90, "skill_coverage": 0.85}, "score": 0.875, "above_threshold": true, "evidence": "Carried forward from sprint5_ar0_routing_index.json -- connection pooling named directly in this persona's own description." },
+            { "agent": "python-backend-engineer", "model": "sonnet", "signals": {"domain_match": 0.80, "skill_coverage": 0.75}, "score": 0.775, "above_threshold": true, "evidence": "Carried forward -- above threshold, retained as a named consult given its prior authorship of composition_root.py." }
+          ],
+          "assigned_agent": "database-engineer",
+          "model": "sonnet",
+          "score": 0.875,
+          "runner_up": {"agent": "python-backend-engineer", "score": 0.775},
+          "margin": 0.100,
+          "consult_agents": ["python-backend-engineer"],
+          "rationale": "database-engineer's pooling-specific expertise is the closer fit for this sub-task's dominant concern (pool sizing, acquire/release semantics, backpressure); python-backend-engineer retained as consult for the FastAPI dependency-injection half specifically, given its prior authorship of the file being changed.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-028-DEV-1", "text": "Given the API host is under concurrent load, When multiple requests touch different zones' SQL repositories simultaneously, Then each acquires its own pooled connection rather than contending on one shared object.", "source": "docs/phase-1.5-design/connection-pooling-design.md (once IMPLEMENTATION-READY)" },
+            { "ac_id": "AC-028-DEV-2", "text": "Given the pool is exhausted, When a new request needs a connection, Then the API returns 503 + Retry-After, not an indefinite block or crash.", "source": "docs/phase-1.5-design/connection-pooling-design.md, cross-referenced with SRS.md AC-021's existing contention-503 pattern" },
+            { "ac_id": "AC-028-DEV-3", "text": "Given the change lands, When any zone repository's own code is inspected, Then it is unchanged -- still depends only on the SqlConnection Protocol.", "source": "src/dashanan/infrastructure/composition_root.py (existing Protocol-typed builders, this session's own read)" }
+          ],
+          "must_not_deviate": [
+            "Does not attempt cross-zone atomicity (2PC/saga) -- Sprint 4's existing 202/207/503 partial-reporting contract remains the correct interim design",
+            "Does not change any zone repository's own constructor signature",
+            "Does not silently drop composition_root.py's existing tenant_credential_signing_key/verify_privileges requirements"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S5-028-DEV."
+        },
+        {
+          "sub_task_id": "DASH-STORY-028-QA",
+          "label": "QA",
+          "title": "Real-Postgres integration test proving concurrent cross-zone requests no longer contend, and pool exhaustion returns 503+Retry-After",
+          "deliverable": "A new or extended file under tests/integration/ mirroring test_api_real_postgres_e2e_dash3.py's style: concurrent-request test across two+ zones proving no shared-connection contention; a pool-exhaustion test (pool sized artificially small for the test) proving 503+Retry-After, not a hang.",
+          "files": ["A new or extended file under tests/integration/"],
+          "candidates": [
+            { "agent": "integration-testing-engineer", "model": "sonnet", "signals": {"domain_match": 0.80, "skill_coverage": 0.75}, "score": 0.775, "above_threshold": true, "evidence": "Carried forward from sprint5_ar0_routing_index.json." }
+          ],
+          "assigned_agent": "integration-testing-engineer",
+          "model": "sonnet",
+          "score": 0.775,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Single above-threshold candidate.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-028-QA-1", "text": "Given concurrent requests across two or more zones, When issued simultaneously against the pooled composition root, Then no request blocks waiting on another zone's in-flight connection.", "source": "docs/phase-1.5-design/connection-pooling-design.md (once IMPLEMENTATION-READY)" },
+            { "ac_id": "AC-028-QA-2", "text": "Given a pool sized to N connections and N+1 concurrent requests, When the (N+1)th request is issued, Then the API returns 503+Retry-After within the configured pool-acquisition timeout, not an indefinite hang.", "source": "docs/phase-1.5-design/connection-pooling-design.md" }
+          ],
+          "must_not_deviate": [
+            "Test style must mirror tests/integration/test_api_real_postgres_e2e_dash3.py -- real Postgres, not mocks",
+            "Does not assert cross-zone atomicity behavior -- out of scope per the design doc's Section on this topic"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S5-028-QA. Depends on DASH-STORY-028-DEV landing first."
+        },
+        {
+          "sub_task_id": "DASH-STORY-028-REVIEW",
+          "label": "Review",
+          "title": "Non-blocking advisory review -- confirms no zone repository code changed and no overclaimed atomicity",
+          "deliverable": "A gate review confirming: (1) no zone repository's own constructor or Protocol dependency changed; (2) the shipped code and its documentation do not claim cross-zone atomicity coverage it does not have; (3) pool sizing defaults are disclosed as unmeasured, not presented as load-tested.",
+          "files": ["Review output only -- no source files modified"],
+          "candidates": [
+            { "agent": "consensus-agent", "model": "sonnet", "signals": {"domain_match": 0.75, "skill_coverage": 0.70}, "score": 0.725, "above_threshold": false, "evidence": "Carried forward from sprint5_ar0_routing_index.json." },
+            { "agent": "solution-architect", "model": "opus", "signals": {"domain_match": 0.75, "skill_coverage": 0.70}, "score": 0.725, "above_threshold": false, "evidence": "Carried forward -- architecture-conformance angle." }
+          ],
+          "assigned_agent": "consensus-agent",
+          "model": "sonnet",
+          "score": 0.725,
+          "runner_up": {"agent": "solution-architect", "score": 0.725},
+          "margin": 0.0,
+          "consult_agents": ["solution-architect"],
+          "rationale": "Neither candidate clears the 0.75 assignment threshold, mirroring Sprint 4's own DASH-STORY-026-REVIEW disposition for solution-architect/consensus-agent -- consensus-agent is assigned as the review-of-record given its established failure-mode/rollback-disclosure focus (directly relevant to this story's pool-exhaustion and atomicity-disclosure ACs), with solution-architect retained as a named consult for architecture conformance specifically.",
+          "acceptance_criteria": [
+            { "ac_id": "AC-028-REVIEW-1", "text": "Given the shipped Dev sub-task, When reviewed, Then confirm no zone repository's own code changed.", "source": "sprint5_ar1_assignments.json DASH-STORY-028-DEV must_not_deviate" },
+            { "ac_id": "AC-028-REVIEW-2", "text": "Given the shipped Dev sub-task's documentation, When reviewed, Then confirm it does not claim cross-zone atomicity coverage it does not have.", "source": "docs/phase-1.5-design/connection-pooling-design.md" }
+          ],
+          "must_not_deviate": ["Does not remediate code itself -- audits, reproduces, reports"],
+          "p1_security_review": false,
+          "p1_trigger_evaluation": "Considered and NOT triggered -- see p1_security_override.considered_and_not_triggered above.",
+          "logging_note": "Cite as AR1-S5-028-REVIEW. Depends on DASH-STORY-028-DEV and DASH-STORY-028-QA both landing first."
+        }
+      ],
+      "logging_note": "Cite as AR1-S5-028. No prior GitHub issue exists for AR1-S3-G3. Depends on nothing else in Sprint 5 or prior sprints -- can be developed in parallel with DASH-STORY-027."
+    }
+  ],
+  "dependency_integrity_check": {
+    "method": "Traverse backlog_draft.json's combined dependency_graph (Sprints 1-2) plus sprint_5_dependency_graph plus this file's own sub-task-level edges for cycles and assignment-induced deadlocks.",
+    "sprint_5_edges": {
+      "DASH-STORY-027-DEV": [],
+      "DASH-STORY-027-QA": ["DASH-STORY-027-DEV"],
+      "DASH-STORY-027-REVIEW": ["DASH-STORY-027-DEV", "DASH-STORY-027-QA"],
+      "DASH-STORY-028-DEV": [],
+      "DASH-STORY-028-QA": ["DASH-STORY-028-DEV"],
+      "DASH-STORY-028-REVIEW": ["DASH-STORY-028-DEV", "DASH-STORY-028-QA"]
+    },
+    "cross_story_edges": "NONE -- DASH-STORY-027 and DASH-STORY-028 touch disjoint files (confirmed by both design docs' own file lists) and have no dependency on each other. Both stories' Dev sub-tasks can start in parallel.",
+    "cycle_detection": "PASS - two independent linear chains (Dev -> QA -> Review each), no cross-story edges, no cycle.",
+    "assignment_induced_deadlock": "NONE. Six distinct implementing/reviewing agents across the two stories (python-backend-engineer, integration-testing-engineer, india-crypto-regulatory-specialist for DASH-STORY-027; database-engineer, integration-testing-engineer, consensus-agent for DASH-STORY-028) -- integration-testing-engineer holds a QA sub-task in both stories but this is sequential load, not a blocking dependency between the two stories.",
+    "unresolvable_dependency": "NONE.",
+    "serialization_warning": "python-backend-engineer and integration-testing-engineer each hold sub-tasks across both stories (Dev for 027, QA for both), continuing the standing concentration pattern every prior sprint's routing files have flagged. Unlike Sprint 4, this sprint's Dev-role concentration is partially reduced: database-engineer, not python-backend-engineer, is the primary Dev candidate for DASH-STORY-028."
+  },
+  "routing_gaps": [
+    {
+      "id": "AR1-S5-G1",
+      "severity": "LOW",
+      "story": "DASH-STORY-028-REVIEW",
+      "gap": "Neither consensus-agent (0.725) nor solution-architect (0.725) clears this file's 0.75 assignment threshold.",
+      "why_not_force_assigned": "consensus-agent is assigned as review-of-record per its established failure-mode-disclosure focus despite being below threshold, mirroring Sprint 4's own DASH-STORY-026-REVIEW disposition where api-security-auditor (above threshold) was primary and solution-architect/consensus-agent (both below) were named consults -- here, uniquely, NEITHER candidate clears 0.75, so this is disclosed as a genuine below-threshold primary assignment, not silently presented as a clean above-threshold pick.",
+      "recommended_action": "Acceptable given this is a non-blocking advisory review (P1 not triggered) for a narrower-scope story; if the user wants a cleaner above-threshold reviewer, api-security-auditor (used for Sprint 4's equivalent role) could be added as a candidate in a future revision of this file."
+    }
+  ],
+  "summary": {
+    "stories_total": 2,
+    "sub_tasks_total": 6,
+    "sub_tasks_assigned": 6,
+    "sub_tasks_unassigned": 0,
+    "below_threshold_assignments": 1,
+    "distinct_implementing_agents": 5,
+    "p1_flagged_stories": ["DASH-STORY-027 (BLOCKING maker-checker, india-crypto-regulatory-specialist, see p1_security_override.applied_after_criteria_evaluation)"],
+    "p1_reviewers": {"DASH-STORY-027": "india-crypto-regulatory-specialist"},
+    "p1_considered_not_triggered": ["DASH-STORY-028 (connection pooling) - see p1_security_override.considered_and_not_triggered; advisory review attached instead"],
+    "score_range": {"min": 0.725, "max": 0.875, "mean": 0.816},
+    "open_user_decisions": [
+      {
+        "decision_id": "SP5-DEC-101",
+        "story": "DASH-STORY-027",
+        "decision": "Confirm the P1 BLOCKING maker-checker gate (india-crypto-regulatory-specialist reviewing python-backend-engineer's Dev output) is the right rigor level, given this is the first Sprint 5 story to trigger P1 status (Sprint 4's equivalent was non-blocking advisory only).",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before DASH-STORY-027-REVIEW is dispatched in a future Phase B round",
+        "status": "OPEN"
+      },
+      {
+        "decision_id": "SP5-DEC-102",
+        "story": "both",
+        "decision": "UPDATED 2026-09-22 per solution-architect review round 9 (was: 'Both design docs are v1 DRAFT' -- stale): connection-pooling-design.md remains v1, unreviewed. dpdp-crypto-shredding-full-erasure-design.md is now v2.0, 10 review rounds including one major correction. Authorize proceeding to a Phase C gate and AR.5 reliability score on the current bundle (as Sprint 5's own honesty convention requires disclosing), or require a formal, clean review pass on connection-pooling-design.md specifically (mirroring FR-013's 7 rounds, and now roughly mirrored by the DPDP doc's own 10-round history) before any further Phase 7 artifact is produced?",
+        "owner": "user (Piyush Makhija)",
+        "due_date": "before Phase B execution grouping for Sprint 5 begins",
+        "status": "OPEN"
+      }
+    ],
+    "agent_load_note": "python-backend-engineer holds DASH-STORY-027-DEV only (not DASH-STORY-028-DEV, where database-engineer is primary) -- a partial rebalancing of the standing concentration finding every prior sprint has raised, though not a full resolution since python-backend-engineer remains a named consult on DASH-STORY-028-DEV."
+  }
+}

@@ -1,10 +1,11 @@
 {
   "document_id": "SP0-BACKLOG-20260917-01",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "scrum-master-agent",
-  "phase": "Phase 6 - Sprint Planning (SP.0 draft; Sprint 2 finalized 2026-09-19)",
+  "phase": "Phase 6 - Sprint Planning (SP.0 draft; Sprint 2 finalized 2026-09-19; Sprint 5 candidate stories added 2026-09-22)",
   "date": "2026-09-17",
-  "last_updated": "2026-09-19",
+  "last_updated": "2026-09-22",
+  "sprint_5_note": "Sprint 5 (2 candidate stories: DASH-STORY-027, DASH-STORY-028) added 2026-09-22, closing the two remaining disclosed gaps that make up Dashanan's ~25-30% shortfall against its SRS v1 target-state: AC-013 (full DPDP crypto-shredding erasure, currently only the narrower Shape A mechanism DASH-STORY-020 shipped) and AR1-S3-G3 (the API host's shared single psycopg.Connection, flagged as a HIGH-severity routing gap in sprint3_ar1_assignments.json but never itself promoted to a story). This bundle is DOCS-ONLY per explicit user instruction: no source code was changed to produce it, and no Jira issues were created for DASH-STORY-027/028 (jira_key left null in the Phase 7 routing files, same convention DASH-STORY-026 used pre-dispatch). Note that this backlog file was not itself updated when Sprint 3 (DASH-STORY-021..025) or Sprint 4 (DASH-STORY-026) shipped -- future_sprints_backlog.remaining_frs still described FR-013 as 'Not detailed into INVEST stories yet' even after DASH-STORY-026 closed it. That pre-existing drift is left as-is here (correcting Sprint 3/4's own backlog bookkeeping is outside this pass's scope) rather than silently rewritten; only FR-013's remaining_frs entry is annotated below to note it was in fact detailed and shipped, since Sprint 5's own DASH-STORY-027 story text below cites it.",
   "sprint_2_note": "Sprint 2 (Jira sprint_id 201, board 100) created 2026-09-19 from the BA+PM-refined INVEST drafts for FR-003, FR-004, FR-005 and FR-008. This scrum-master-agent finalization pass reconciled a DASH-STORY-012/013/014 story-ID collision across the four independently-authored drafts (each draft's author assumed it would receive the next available ID starting at 012): FR-003 keeps DASH-STORY-012..014 as drafted; FR-004's two stories were renumbered DASH-STORY-015..016; FR-005's one story was renumbered DASH-STORY-017; FR-008's three stories (originally also drafted as DASH-STORY-012..014) were renumbered DASH-STORY-018..020. All depends_on references below are corrected to the renumbered IDs. Real Jira Story issues DSHN-61..DSHN-69 were created under epics DSHN-3/DSHN-4/DSHN-5/DSHN-8 and moved into sprint_id 201.",
   "source_of_truth": {
     "srs": "SRS.md v1.0.0 (12 FRs, 17 ACs)",
@@ -627,6 +628,77 @@
       ]
     }
   ],
+  "sprint_5_stories": [
+    {
+      "story_id": "DASH-STORY-027",
+      "title": "Full DPDP crypto-shredding erasure cascade: subject_id resolution, per-zone key-destroy wiring, DELETE /tenants/{tenant_id}/subjects/{subject_id}",
+      "traces_to_ac": "AC-013",
+      "traces_to_hld": "HLD.md Section 10 DPDP-2/DPDP-3, ADR-006, ADR-009, OAQ-10 (unresolved)",
+      "design_doc": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md",
+      "invest": {
+        "independent": "Builds on DASH-STORY-020's already-shipped Zone 8 per-subject key primitives and DASH-STORY-020/CrossZoneDpdpErasureCascade's Zone 2/Zone 6 reach; does not require any other Sprint 5 story first.",
+        "negotiable": "RESOLVED by the linked design doc's Section 4 (corrected 2026-09-22, solution-architect review round 4 finding 2 -- this field previously described the question as still open and mischaracterized the resolution): crypto-shredding is scoped to Zone 8 only (the sole WORM/object-locked zone); Zone 3 has no append-only trigger and is erased by plain app_login_user-scoped DELETE, no compliance-role adapter needed; Zone 2 is the only zone needing a compliance-role DELETE escape hatch (its append-only trigger); Zones 4/5 are blocked on the separate Section 2 Shape B storage prerequisite, not a crypto-shredding-vs-delete question.",
+        "valuable": "Closes AC-013 for real -- today the live `eraseSubject` endpoint (DASH-STORY-023) only invokes the Zone-8-only `SubjectErasureCascadeService`; the already-built `UnifiedSubjectErasureOrchestrator` (DASH-STORY-025/DSHN-70), which fans out to Zones 2/3/5/6/8, is not yet wired into it, and no leg touches Zone 1 or resolves subject_id->item_id for the Zone 2/6 leg (`NullSubjectToItemIndex` is the shipped default). Corrected 2026-09-22, solution-architect review round 6: this field previously and falsely claimed the endpoint was 'contract-only' and the cascade 'never reaches Zones 1/3/4/5/8' -- both false; see the design doc's Section 1 major correction.",
+        "estimable": "RE-ESTIMATED 2026-09-22, solution-architect review round 6 (was 13 SP, based on a false 'build from scratch' premise): the real remaining gap is wiring `UnifiedSubjectErasureOrchestrator` into `app.py`'s `eraseSubject` handler, implementing a real `SubjectToItemIndex` (the design doc's Section 3 subject-index table, reframed as fulfilling this already-defined Protocol), and adding the still-missing Zone 1 leg to the orchestrator -- narrower than building 4 zone-erasure mechanisms from scratch, since Zone 3/5/8 mechanisms and the job-tracking lifecycle already exist and are already tested. Re-estimated to 8 SP, comparable in shape to DASH-STORY-028's own 8 SP wiring-focused story.",
+        "small": "Scoped to the erasure cascade and its wiring only -- does not reopen the crypto primitives in zone8_crypto_shredding.py themselves (AES-256-GCM, already shipped and tested), does not modify UnifiedSubjectErasureOrchestrator's existing Zone 3/5/8 legs' own logic, and does not attempt to resolve OAQ-10's legal-sufficiency question, which stays explicitly open.",
+        "testable": "AC-013's own SRS wording plus the design doc's own Definition-of-Done section give concrete Given-When-Then coverage per zone."
+      },
+      "scope_correction_2026_09_22": "The linked design doc surfaced a prerequisite finding not known when this story was first drafted: Zones 4 (Procedural) and 5 (Entity) have no Postgres/Shape-B storage adapter at all today (only in-process, non-durable Shape A stores) -- there is nothing durable to erase there in a real deployment. This story's own cascade scope is therefore Zones 1, 2, 3, 6, 7, 8 (the zones with durable storage) plus a forward-compatible interface for Zone 4/5, NOT all 8 zones directly. Zone 4/5 Shape B adapters are tracked as a separate, out-of-scope infrastructure prerequisite (see future_sprints_backlog below) rather than silently assumed complete by this story.",
+      "scope_correction_2026_09_22_round6": "MAJOR: solution-architect review round 6 found this story's original design doc never read `subject_erasure_cascade.py`, `zone8_crypto_shredding_store.py`, `unified_subject_erasure_orchestrator.py`, or `sql_zone8_subject_index_repository.py` -- all real, already-built prior art from DASH-STORY-020/025. The endpoint IS wired (Zone 8 only, live today); a separate, more complete orchestrator (Zones 2/3/5/6/8) is already built but NOT wired into that endpoint; Zone 1 is genuinely missing from both. This story is RE-SCOPED from 'build the full cascade' to 'wire the existing orchestrator into the live endpoint, implement its already-defined SubjectToItemIndex seam for real, and add the missing Zone 1 leg' -- see the design doc's own Section 1 major correction for full detail. Zone 4 is now known to be PERMANENTLY excluded (no subject-linkable field exists, not merely storage-blocked); Zone 5's real remaining gap is a Shape B adapter only (its erasure LOGIC already works today for Shape A).",
+      "acceptance_criteria": [
+        { "ac_id": "AC-013", "text": "SRS.md AC-013 (verbatim, see SRS.md for the exact text) -- a subject-scoped erasure request reaches all 8 zones, both retrieval indices, and Zone 8 archives.", "source": "SRS.md AC-013" },
+        { "ac_id": "AC-027-1", "text": "Given a DPDP erasure request for subject_id S, When DELETE /tenants/{tenant_id}/subjects/{subject_id} is called, Then every item_id associated with S across Zones 1, 2, 3, 6, 7, 8 (the zones with durable Shape B storage today) is resolved via a real subject_id index and enters the erasure cascade -- via UnifiedSubjectErasureOrchestrator's existing Zone 2/3/5/6/8 fan-out plus this story's own new Zone 1 leg, not a from-scratch cascade -- and the interface is forward-compatible so Zone 4/5 slot in once their own Shape B adapters exist.", "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 1/2 (once IMPLEMENTATION-READY)" },
+        { "ac_id": "AC-027-2", "text": "Given the review completes, When OAQ-10 (does crypto-shredding legally satisfy DPDP Act erasure) is checked, Then no shipped code, docstring, or API response asserts legal sufficiency -- the question remains explicitly open, carried forward from HLD.md and the design doc unchanged.", "source": "HLD.md Section 10 OAQ-10" }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Wire the already-built UnifiedSubjectErasureOrchestrator into app.py's eraseSubject handler (replacing/extending the narrower Zone-8-only SubjectErasureCascadeService call); implement a real SubjectToItemIndex (Shape B Postgres subject-index table, with per-zone row cleanup after successful erasure) fulfilling the orchestrator's already-defined Protocol seam; add a Zone 1 leg to the orchestrator (genuinely missing today); a compliance-role DELETE adapter for Zone 2 ONLY (implementing the existing Zone2EvictionPort Protocol -- Zone 1 is an ordinary hot-buffer evict and Zone 3 has no append-only trigger, so neither needs one, per the design doc's Section 4 zone-by-zone table). Re-scoped 2026-09-22 per solution-architect review round 6 -- was 'build the full cascade from scratch', corrected to 'wire and extend the already-built orchestrator'." },
+        { "type": "QA", "story_points": 2, "description": "Real-Postgres integration tests proving erasure reach into Zones 1/2/3/6/7/8 and both retrieval indices via the newly-wired orchestrator, mirroring tests/integration/test_api_real_postgres_e2e_dash3.py's style; a negative test confirming Zone 7 retains an 'erasure occurred' audit trail without retaining the erased PII; a regression test confirming Zone 8's existing SubjectErasureCascadeService behavior is unchanged for any caller still using it directly." },
+        { "type": "Review", "story_points": 1, "description": "Security/compliance review confirming OAQ-10 is not silently asserted as resolved, the compliance-role privilege boundary is distinct from app_login_user, Zone 4/5's exclusion is disclosed rather than silently claimed as covered, no in-scope zone is silently skipped by the cascade, and the orchestrator's existing Zone 3/5/8 legs were extended/wired, not duplicated." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": ["DASH-STORY-020", "DASH-STORY-025"],
+      "must_not_deviate": [
+        "Does not reopen or modify zone8_crypto_shredding.py's existing AES-256-GCM primitives -- only adds new call sites/orchestration around them",
+        "Does not assert or imply OAQ-10 is resolved -- the legal-sufficiency question stays explicitly open in every artifact this story produces",
+        "Does not silently drop DASH-STORY-020's existing Zone 2/Zone 6 reach -- this story extends it to the remaining durable zones, not replaces it",
+        "Does not claim Zone 4/5 erasure coverage this story cannot actually provide -- their absence of Shape B storage is disclosed, not silently glossed over as done"
+      ]
+    },
+    {
+      "story_id": "DASH-STORY-028",
+      "title": "Real connection pooling for the API host composition root (closes AR1-S3-G3)",
+      "traces_to_gap": "AR1-S3-G3 (raised sprint3_ar1_assignments.json routing_gaps, HIGH severity, never itself promoted to a story until now)",
+      "traces_to_hld": "No existing ADR -- this story's design doc is the first architectural documentation of connection pooling in this project",
+      "design_doc": "docs/phase-1.5-design/connection-pooling-design.md",
+      "invest": {
+        "independent": "Touches only the composition root's connection-acquisition boundary; does not require DASH-STORY-027 or any other Sprint 5 story first, and the two Sprint 5 stories can be developed in parallel (disjoint files).",
+        "negotiable": "Acquire-per-request vs. app-lifetime pool checkout, and exact pool sizing, are open design decisions the linked design doc must resolve and justify, not assumed here.",
+        "valuable": "Closes a genuine, undocumented architectural gap: every zone's SQL repository currently shares one psycopg.Connection built once at composition-root time, a real concurrency/robustness risk for the live API host.",
+        "estimable": "Scope is bounded to composition_root.py's connection-acquisition boundary plus the new psycopg_pool dependency; estimated 8 SP, comparable to DASH-STORY-023's wire-layer wiring (also 8 SP).",
+        "small": "Does not attempt cross-zone transaction atomicity (2PC/saga) -- explicitly out of scope, preserving Sprint 4's existing 202/207/503 fail-fast-plus-honest-partial-reporting contract as the deliberate substitute.",
+        "testable": "The design doc's own Definition-of-Done section (pool exhaustion returns 503+Retry-After, repositories keep depending only on the SqlConnection Protocol) gives concrete Given-When-Then coverage."
+      },
+      "acceptance_criteria": [
+        { "ac_id": "AC-028-1", "text": "Given the API host is under concurrent load, When multiple requests touch different zones' SQL repositories simultaneously, Then each acquires its own pooled connection rather than contending on one shared psycopg.Connection object.", "source": "docs/phase-1.5-design/connection-pooling-design.md (once IMPLEMENTATION-READY)" },
+        { "ac_id": "AC-028-2", "text": "Given the pool is exhausted under load, When a new request needs a connection, Then the API returns 503 + Retry-After, consistent with the existing NFR-014/AC-021 contention-handling pattern, rather than blocking indefinitely or crashing.", "source": "docs/phase-1.5-design/connection-pooling-design.md (once IMPLEMENTATION-READY), cross-referenced with SRS.md AC-021" },
+        { "ac_id": "AC-028-3", "text": "Given the change lands, When any existing zone repository's own code is inspected, Then it is unchanged -- it still depends only on the SqlConnection Protocol; only the composition root's acquisition/release mechanics change.", "source": "src/dashanan/infrastructure/composition_root.py (existing Protocol-typed repository builders)" }
+      ],
+      "story_points": 8,
+      "sub_tasks": [
+        { "type": "Dev", "story_points": 5, "description": "Replace build_postgres_connection's single-connection factory with psycopg_pool.ConnectionPool (or AsyncConnectionPool, per the design doc's async-vs-sync decision); thread acquire/release through the composition root into each zone repository builder." },
+        { "type": "QA", "story_points": 2, "description": "Real-Postgres integration test proving concurrent requests across zones no longer contend on one connection object, and that pool exhaustion returns 503+Retry-After rather than hanging." },
+        { "type": "Review", "story_points": 1, "description": "Review confirming no zone repository's own code changed (Protocol boundary preserved) and that this story does not silently claim cross-zone atomicity it does not provide." }
+      ],
+      "sub_task_sp_sum": 8,
+      "depends_on": [],
+      "must_not_deviate": [
+        "Does not attempt cross-zone atomicity (2PC/saga) for the Zone 5 + Zone 3 write pair -- Sprint 4's existing 202/207/503 partial-reporting contract remains the correct interim design even after pooling lands",
+        "Does not change any zone repository's own constructor signature or its SqlConnection Protocol dependency -- only how the composition root acquires/releases connections changes",
+        "Does not silently drop the composition root's existing tenant_credential_signing_key/verify_privileges secure-by-construction requirements"
+      ]
+    }
+  ],
   "future_sprints_backlog": {
     "note": "Not detailed into INVEST stories yet - candidates for a subsequent Phase 6 sprint planning pass.",
     "remaining_frs": [
@@ -641,7 +713,14 @@
         "wsjf_rank": 7,
         "wsjf_score": 4.25,
         "note": "FR-013 postdates pm-wsjf-revalidation.md's 12-FR table (added to SRS.md 2026-09-18, table dated 2026-09-17), so it was never scored there. Scored here using that document's own method (CoD = UBV+TC+RRO, WSJF = CoD/Job Size): UBV=7 (HLD Section 3.8, verbatim: 'it is the single highest-leverage anti-hallucination control in the design' -- high value, but derived/instrumental rather than an independent user-facing capability, so below the 9s); TC=3 (explicitly gated -- cannot build or matter before Zone 3/FR-003 and Zone 5/FR-005 exist, both already deferred at ranks 9-10); RRO=7 (HLD's OAQ-14 row, verbatim: 'it is the strongest memory-poisoning control (T-1)' -- comparable to FR-007's RRO=9 but narrower, a mechanism not a full zone); Job Size=4 (a targeted write-path check + conflict-marking scheme layered onto existing Zone 3/5 write paths, not a new zone -- comparable to or smaller than FR-011's Job Size=5). CoD=7+3+7=17, WSJF=17/4=4.25, which lands at rank 7 on the 12-FR table's rank scale (1,2,3,4,5,6,6,8,9,10,11,12 -- rank 7 is the unoccupied slot from the 6/6 tie; no existing entry needs renumbering).",
-        "sequencing_note": "Despite ranking above FR-011 (rank 8) on pure WSJF, FR-013's own text ('on every write targeting Zone 3 or Zone 5') hard-dependency-gates it behind FR-003 and FR-005 -- it cannot be built or deployed before those zones exist. This is a novel judgment call for this round, not an existing documented precedent: pm-wsjf-revalidation.md Section 6 was checked and does not contain an equivalent dependency-gating case (its FR-010-vs-FR-001 discussion concludes 'no contradiction', i.e. no gate was needed there)."
+        "sequencing_note": "Despite ranking above FR-011 (rank 8) on pure WSJF, FR-013's own text ('on every write targeting Zone 3 or Zone 5') hard-dependency-gates it behind FR-003 and FR-005 -- it cannot be built or deployed before those zones exist. This is a novel judgment call for this round, not an existing documented precedent: pm-wsjf-revalidation.md Section 6 was checked and does not contain an equivalent dependency-gating case (its FR-010-vs-FR-001 discussion concludes 'no contradiction', i.e. no gate was needed there).",
+        "status_correction_2026_09_22": "This entry's 'note' field above still reads 'Not detailed into INVEST stories yet', which is no longer accurate: FR-013 was in fact detailed and shipped as DASH-STORY-022 (Sprint 3, conflict-detection sweep wiring) and DASH-STORY-026 (Sprint 4, API-layer wire schema, closes GitHub #23), per sprint3_ar1_assignments.json and sprint4_ar1_assignments.json. This backlog file was not updated when those sprints shipped; that pre-existing drift is disclosed here rather than silently left unremarked, but is not otherwise corrected by this pass (out of scope -- see this file's own sprint_5_note)."
+      },
+      {
+        "fr_id": "FR-011-ZONE-4-5-SHAPE-B",
+        "title": "Postgres (Shape B) storage adapters for Zone 4 (Procedural) and Zone 5 (Entity) -- prerequisite for full AC-013 erasure reach",
+        "wsjf_rank": null,
+        "note": "Added 2026-09-22, surfaced by docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 2: today Zone 4/5 have only in-process, non-durable Shape A stores (no procedural_schema.sql/entity_schema.sql exist, unlike Zones 2/3/7/8). DASH-STORY-027 (Sprint 5) explicitly scopes its own erasure cascade to the zones that already have durable storage and treats this as a separate, not-yet-scheduled prerequisite for extending that cascade to Zone 4/5 -- not silently assumed complete. Not yet WSJF-scored or detailed into an INVEST story; a candidate for a future sprint once prioritized."
       },
       {
         "fr_id": "FR-014",
@@ -683,5 +762,11 @@
     "DASH-STORY-020": ["DASH-STORY-018"],
     "renumbering_note": "FR-003 (DASH-STORY-012..014), FR-004 (DASH-STORY-015..016), FR-005 (DASH-STORY-017), and FR-008 (DASH-STORY-018..020) were drafted independently by BA+PM passes; FR-003 and FR-008 each independently used DASH-STORY-012..014 for their own first stories, causing an ID collision. This scrum-master-agent finalization pass kept FR-003's numbering as-drafted (it was first in FR order) and renumbered FR-004, FR-005 and FR-008's stories sequentially from DASH-STORY-015, correcting every internal depends_on reference accordingly (e.g. FR-008's Story 2's depends_on Zone-8-store reference, originally written as 'DASH-STORY-012' inside the FR-008 draft, now correctly points to DASH-STORY-018).",
     "promotion_reason": "All Sprint 2 zone-store stories (DASH-STORY-012, -015, -017, -018) depend only on DASH-STORY-001 (Orchestrator facade), consistent with Sprint 1's promotion_reason that every write/read routes through the facade and zones are leaves by design (HLD Section 3.11). DASH-STORY-013 and DASH-STORY-014 depend on their own zone's store (DASH-STORY-012) landing first, plus DASH-STORY-007 (Zone 6) for the projection story. DASH-STORY-016 (Zone 4 backstop) depends on DASH-STORY-008 (MemoryScore engine) and DASH-STORY-009 (rotation state machine) exactly as DASH-STORY-004 (the Zone 2 analogue) did in Sprint 1. DASH-STORY-019 and DASH-STORY-020 depend on DASH-STORY-018 (Zone 8 store) landing first, since both extend the store's write path (rotation completion and DPDP cascade respectively)."
+  },
+  "sprint_5_dependency_graph": {
+    "DASH-STORY-027": ["DASH-STORY-020", "DASH-STORY-025"],
+    "DASH-STORY-028": [],
+    "promotion_reason": "DASH-STORY-027 (full DPDP erasure cascade) depends on DASH-STORY-020 (Sprint 2's narrower Shape A crypto-shredding/Zone-8-reach mechanism) AND DASH-STORY-025 (already-shipped UnifiedSubjectErasureOrchestrator fan-out, added 2026-09-22 per solution-architect review round 6 -- this story wires/extends that orchestrator rather than building a new cascade from scratch). DASH-STORY-028 (connection pooling) has no dependency on any existing story -- it touches only composition_root.py's connection-acquisition boundary, disjoint from every zone-store story's own files -- and no dependency on DASH-STORY-027 either, since the two stories touch disjoint file sets (confirmed by both design docs) and can be developed in parallel.",
+    "not_a_dependency_note": "DASH-STORY-027 does NOT depend on the new FR-011-ZONE-4-5-SHAPE-B backlog stub above -- that stub is a prerequisite for extending DASH-STORY-027's cascade to Zone 4/5 in a LATER story, not a blocker for DASH-STORY-027 itself, which scopes its own cascade to the zones with durable storage today."
   }
 }

@@ -1,0 +1,58 @@
+{
+  "document_id": "SP5-PLAN-20260922-01",
+  "version": "1.0.0",
+  "author": "scrum-master-agent",
+  "phase": "Phase 6 - Sprint Planning (Sprint 5, docs-only planning bundle)",
+  "date": "2026-09-22",
+  "scope_note": "DOCS-ONLY per explicit user instruction: no source code was changed to produce this file or any Sprint 5 bundle file. No Jira issues were created for DASH-STORY-027/028 (jira_key left null throughout, same pre-dispatch convention DASH-STORY-026 used). This plan closes the two remaining disclosed gaps behind Dashanan's ~25-30% shortfall against its SRS v1 target-state: AC-013 (full DPDP crypto-shredding erasure) and AR1-S3-G3 (API host connection pooling).",
+  "locked_scope_frs_or_gaps": ["AC-013", "AR1-S3-G3"],
+  "story_list": ["DASH-STORY-027", "DASH-STORY-028"],
+  "total_story_points": 16,
+  "total_story_points_note": "UPDATED 2026-09-22 per solution-architect review round 8 (was 21 = 13+8, stale after round 6 re-scoped DASH-STORY-027 from 13 SP to 8 SP): current total is 16 = 8 (DASH-STORY-027) + 8 (DASH-STORY-028), matching backlog_draft.json and sprint5_ar1_assignments.json.",
+  "gap_to_story_map": {
+    "AC-013": "DASH-STORY-027",
+    "AR1-S3-G3": "DASH-STORY-028"
+  },
+  "design_doc_map": {
+    "DASH-STORY-027": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (DRAFT, not IMPLEMENTATION-READY -- see Section 6 open items)",
+    "DASH-STORY-028": "docs/phase-1.5-design/connection-pooling-design.md (DRAFT, not IMPLEMENTATION-READY -- 3 open items disclosed)"
+  },
+  "design_doc_maturity_note": "UPDATED 2026-09-22 per solution-architect review round 8 (was: 'both Sprint 5 design docs are first-draft (v1), not yet independently reviewed' -- stale after the DPDP doc's own review history grew). connection-pooling-design.md remains first-draft (v1), not yet independently reviewed. dpdp-crypto-shredding-full-erasure-design.md is now v2.0, having been through 10 documented solution-architect review rounds, including one MAJOR correction (round 6) to a previously false 'what ships today' baseline -- closer in review depth to Sprint 4's fr013-predicate-schema-design.md (v7, 9.8/10, IMPLEMENTATION-READY after 7 rounds) than to a single-pass draft, though still not itself marked IMPLEMENTATION-READY (round 8 itself returned APPROVE WITH CHANGES, not a clean APPROVE). Both docs still explicitly mark themselves DRAFT with disclosed open items. This sprint plan and the Phase 7 routing bundle that follows it are therefore honestly scoped as PRE-IMPLEMENTATION-READY planning, not a review-hardened bundle ready for Phase B dispatch -- see sprint5-ar5-rs-computation.md's Verdict for the explicit gating consequence of this.",
+  "dependency_graph": {
+    "source": "docs/phase-6-sprint-planning/backlog_draft.json sprint_5_dependency_graph (v1.2.0)",
+    "build_order_groups": [
+      ["DASH-STORY-027", "DASH-STORY-028"]
+    ],
+    "note": "Both stories are in one build-order group -- they touch disjoint files (DASH-STORY-027: subject-index table, zone8_crypto_shredding call sites, compliance-role adapters, DELETE/export endpoints; DASH-STORY-028: composition_root.py's connection-acquisition boundary only) and neither depends on the other, so they can be planned, reviewed, and (in a future Phase B) dispatched in parallel. DASH-STORY-027 depends on the already-shipped DASH-STORY-020, which is not a Sprint 5 story."
+  },
+  "risk_flags": [
+    {
+      "id": "SP5-RISK-1",
+      "severity": "MEDIUM",
+      "story": "DASH-STORY-027",
+      "risk": "The design doc surfaced a new prerequisite finding during this planning pass: Zones 4/5 have no Shape B (Postgres) storage today, so DASH-STORY-027's own cascade cannot reach them. Story scope was narrowed to Zones 1/2/3/6/7/8 with a forward-compatible interface, and a new backlog stub (FR-011-ZONE-4-5-SHAPE-B) records the prerequisite rather than silently shrinking AC-013's own SRS text to match. AC-013 will not be FULLY closed by DASH-STORY-027 alone until that prerequisite also ships."
+    },
+    {
+      "id": "SP5-RISK-2",
+      "severity": "MEDIUM",
+      "story": "DASH-STORY-027",
+      "risk": "OAQ-10 (does crypto-shredding legally satisfy DPDP Act 2023 erasure) remains unresolved and is not something an engineering story can close -- it requires real legal review, disclosed as out of this story's own reach in every artifact this bundle produces."
+    },
+    {
+      "id": "SP5-RISK-3",
+      "severity": "LOW",
+      "story": "DASH-STORY-028",
+      "risk": "Pool sizing (min/max) is not backed by real load-test data -- the design doc's own recommended defaults are explicitly flagged as unmeasured. Should be revisited once real traffic data exists rather than treated as final."
+    },
+    {
+      "id": "SP5-RISK-4",
+      "severity": "LOW",
+      "story": "both",
+      "risk": "UPDATED 2026-09-22 per solution-architect review round 8: connection-pooling-design.md has been through no independent review round and remains a v1 draft. dpdp-crypto-shredding-full-erasure-design.md HAS been through 10 review rounds (v2.0) including one major correction, closer to FR-013's own 7-round precedent than a single-pass draft -- but is still not marked IMPLEMENTATION-READY. This sprint plan and its Phase 7 routing bundle should not be treated as equivalently hardened to Sprint 4's own bundle -- see sprint5-ar5-rs-computation.md."
+    }
+  ],
+  "notes": [
+    "Story point estimates (8 + 8 = 16, updated 2026-09-22 per solution-architect review round 6/8 -- DASH-STORY-027 was originally 13 SP, re-estimated to 8 SP when round 6 found it was a wire-and-extend task, not a from-scratch build) follow this project's existing Fibonacci/70-20-10 Dev-QA-Review split convention (backlog_draft.json estimation_method).",
+    "Neither story has a GitHub issue yet -- AR1-S3-G3 was raised inline in sprint3_ar1_assignments.json's routing_gaps, not as its own GitHub issue; AC-013's gap has no GitHub issue either (DASH-STORY-020's own Review sub-task text is the closest prior tracking artifact). Opening GitHub issues for both, per this project's Section 5 issue-first convention, is a Phase B pre-dispatch action, not performed by this docs-only pass."
+  ]
+}
