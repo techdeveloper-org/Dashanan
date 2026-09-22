@@ -1,6 +1,7 @@
 {
   "document_id": "AR3-CONTEXT-WINDOWS-SPRINT5-20260922-01",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "version_note": "1.1.0 (2026-09-22, consensus-agent round-5 re-review remediation -- stale citation, solution-architect): DASH-STORY-028-REVIEW's context window had no citation of AC-028-REVIEW-4 (added to sprint5_ar1_assignments.json in its own 1.3.0 pass) and its files_to_read_or_modify list named no fallback-test file for that AC. Fixed alongside the same-round decision-ownership fix (sprint5_ar1_assignments.json v1.4.0 / sprint5_implementation_execution_plan.json v1.5.0): the POOLING_ENABLED flag is DEFERRED for DASH-STORY-028, so no fallback-test file exists to cite -- added a sources.cross_reference note stating this explicitly, and a files_to_read_or_modify entry pointing the reviewer at Section 7.1's code-revert procedure (the actual DEV-independent artifact AC-028-REVIEW-4's deferred branch is verified against) instead of a nonexistent test file.",
   "author": "orchestrator-agent",
   "phase": "Phase 7 - Agent-Task Routing (AR.3 per-sub-task context window design, Sprint 5)",
   "date": "2026-09-22",
@@ -135,11 +136,12 @@
         "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.2 (entire document)",
         "files_to_read_or_modify": [
           {"file": "(post-DEV) shipped composition_root.py changes and every zone repository's own unchanged constructor", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-1's requirement to confirm no zone repository code changed."},
-          {"file": "(post-DEV) shipped api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-3's requirement to confirm the per-request DI refactor is correctly wired end to end across both files for all of Zone 2/3/5/7/8-manifest, not only that zone repository code is unchanged."}
+          {"file": "(post-DEV) shipped api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-3's requirement to confirm the per-request DI refactor is correctly wired end to end across both files for all of Zone 2/3/5/7/8-manifest, not only that zone repository code is unchanged."},
+          {"file": "docs/phase-1.5-design/connection-pooling-design.md v2.2 Section 7.1 (Rollback procedure)", "line_ranges": ["the concrete, ordered, three-file code-revert procedure"], "why": "ADDED 2026-09-22 (solution-architect, AC-028-REVIEW-4 decision-ownership fix): POOLING_ENABLED is deferred for DASH-STORY-028 (see sprint5_ar1_assignments.json v1.4.0's DASH-STORY-028-DEV deliverable), so there is no fallback-test file to cite here -- AC-028-REVIEW-4's deferred branch is verified against this section's revert procedure instead, confirming it is still accurate against the as-shipped file layout (composition_root.py, api/composition.py, api/app.py)."}
         ],
         "domain_files_cited_across_review_rounds": [],
         "github_issues": [],
-        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-028-REVIEW acceptance_criteria/must_not_deviate"
+        "cross_reference": "sprint5_ar1_assignments.json DASH-STORY-028-REVIEW acceptance_criteria/must_not_deviate, including AC-028-REVIEW-4 (added there in v1.3.0). No POOLING_ENABLED fallback-test file exists to cite: sprint5_ar1_assignments.json v1.4.0's DASH-STORY-028-DEV deliverable explicitly deferred the flag, so AC-028-REVIEW-4's deferred branch applies and this review checks Section 7.1's code-revert procedure instead of test coverage."
       },
       "pii_exclusion_applied": true,
       "pii_note": "No PII involved.",
