@@ -1,6 +1,6 @@
 # Connection Pooling Design — Closing AR1-S3-G3 (Composition Root)
 
-Status: DRAFT v2.2 — pending user review. No implementation files have been modified.
+Status: DRAFT v2.4 — pending user review. No implementation files have been modified.
 Related: `src/dashanan/infrastructure/composition_root.py`, `src/dashanan/api/composition.py`,
 `src/dashanan/api/app.py`, `docs/phase-1-architecture/HLD.md` Section 6 (circuit-breaker
 precedent), `docs/phase-1.5-api/fr013-predicate-schema-design.md` Section 6 (the exact wording
@@ -216,16 +216,131 @@ structurally similar "the system is temporarily saturated" condition:
 - On `PoolTimeout`, return `503` with the same error-body shape `_do_write`'s existing
   `WRITE_REJECTED_NOT_DURABLE`/contention-503 responses already use (code + message), plus a
   `Retry-After` header (a fixed small value, e.g. 1 second, since pool exhaustion is typically
-  short-lived under bursty load, not a sustained outage).
+  short-lived under bursty load, not a sustained outage). **Error code (added v2.4, see Section
+  5.1's disambiguation subsection below): `POOL_EXHAUSTED`.**
 - This ties into HLD Section 6's existing circuit-breaker precedent conceptually (both are
   "fail fast rather than let one saturated dependency exhaust a shared resource and take the
-  whole request path down with it," `error-handling-patterns` M3) without requiring a full
-  circuit-breaker state machine for this gap alone — a bounded pool with a bounded acquire timeout
-  already provides the fail-fast property Section 6's breaker provides for the vector store.
-  Whether Postgres access should *also* get a full circuit breaker (e.g. to fast-fail overload
-  from repeated connect failures, not just pool exhaustion) is a separate, larger decision left
-  explicitly open (Section 8) — this design solves the pooling gap, not "does Postgres access need
-  a breaker," which HLD.md has never scoped for this codebase's relational store.
+  whole request path down with it," `error-handling-patterns` M3): a bounded pool with a bounded
+  acquire timeout already provides the fail-fast property Section 6's breaker provides for the
+  vector store, for the specific case where Postgres is healthy but momentarily saturated.
+  **RESOLVED 2026-09-22 (user decision, see Section 8 item 2 and the Change Log): pooled Postgres
+  access also gets a full circuit breaker**, matching HLD Section 6's mandatory "Every adapter
+  call -> Circuit Breaker" row with no exception, rather than relying on pool-exhaustion
+  backpressure alone to cover the distinct "Postgres itself is down or refusing connections" case.
+  Section 5.1 below specifies the breaker.
+
+### 5.1 Circuit breaker for pooled Postgres access
+
+This subsection closes HLD.md ADR-020's previously-disclosed "Documented exception" (Section 6's
+design-patterns table mandates Circuit Breaker for "Every adapter call"; pooled Postgres access is
+such an adapter call and had none). It mirrors HLD Section 8's existing vector-store (Qdrant)
+breaker pattern exactly, reusing the same count-based ring-buffer implementation HLD Section 5
+already mandates for "Circuit breakers" generically (`Count-based ring buffer (sliding window,
+N=20) | Failure-rate and slow-call-rate over the window`) — this is not a second, bespoke breaker
+design; it is the existing breaker utility given a Postgres-specific failure predicate and wired
+in front of `pool.connection(...)`.
+
+**What counts as a "failure" for this breaker (and what does not).** The breaker's ring buffer
+records only *connection-establishment* outcomes — the pool's own attempt to open or re-open a
+physical TCP/TLS connection to Postgres (`psycopg.OperationalError` on connect, connection
+refused, DNS/network unreachable, authentication failure against `app_login_user`) — never
+query-level outcomes on an already-open, healthy connection:
+
+- **Counts as a breaker failure:** a connect attempt the pool makes (at pool construction, on
+  `pool_min` top-up, or replacing a connection the pool itself discarded as broken) raising a
+  connection-level error, and a connect attempt that succeeds but exceeds a slow-call threshold
+  (mirroring HLD's vector-store definition below).
+- **Does NOT count as a breaker failure:** any error raised by a query running on a connection the
+  pool already successfully handed out — `IntegrityError`, constraint violations, syntax errors,
+  application-level validation failures, or any other normal query outcome. These are business
+  logic, not a dependency-health signal, and must not be allowed to trip the breaker; conflating
+  them would let a single malformed request (e.g. a duplicate-key insert) fast-fail unrelated
+  concurrent requests.
+- **Does NOT count as a breaker failure:** `PoolTimeout` (Section 5's existing pool-exhaustion
+  signal). Pool exhaustion means every pooled connection is healthy but currently checked out —
+  a saturation condition already handled by Section 5's bounded `timeout` + 503/Retry-After. The
+  breaker exists for the distinct case where Postgres itself cannot be reached at all; mixing the
+  two signals would trip the breaker on ordinary bursty load with no actual backend outage.
+
+**Thresholds (identical to HLD Section 8's vector-store breaker, for one consistent operator
+mental model across every adapter in this system):**
+
+- Sliding window: the last **20** connect attempts (ring buffer, per HLD Section 5's `Circuit
+  breakers` DSA row).
+- Trip to **OPEN** when failure rate >= **50%** over the window, OR slow-connect rate >= **30%**
+  at >= **2x** the measured p99 connect latency.
+- **OPEN state fallback behavior:** the breaker is checked *before* `pool.connection(...)` is
+  called at all — when OPEN, the request fails fast with `503` + `Retry-After` immediately,
+  without attempting pool acquisition and without waiting out Section 5's own acquire `timeout`.
+  This is deliberately cheaper than Section 5's PoolTimeout path: a known-down backend should not
+  cost every caller a multi-second acquire-timeout wait before failing.
+- **HALF_OPEN probe behavior:** the breaker half-opens after `30s * 2^(trips - 1)`, capped at
+  `300s` (identical backoff formula to HLD Section 8's vector-store breaker). While HALF_OPEN, a
+  bounded number of **5** probe connection attempts are allowed through to the real pool; **all 5
+  must succeed** to transition to CLOSED. Any probe failure re-opens the breaker and restarts the
+  backoff clock (trip count increments).
+- **CLOSED state:** normal operation — every request proceeds to `pool.connection(...)` as
+  Section 3/5 already describe, with connect outcomes continuing to feed the same ring buffer.
+
+**Where this sits relative to Section 5's PoolTimeout handling.** The breaker wraps the *outer*
+acquisition path; Section 5's `timeout` + `PoolTimeout` -> 503 mapping is unchanged and still
+applies whenever the breaker is CLOSED or HALF_OPEN and a request reaches `pool.connection(...)`
+but the pool itself (not Postgres) is momentarily saturated. The two mechanisms answer different
+questions — "is Postgres reachable at all" (breaker) vs. "are all pooled connections currently
+checked out" (PoolTimeout) — and both map to the same `503` + `Retry-After` response shape for
+response-contract consistency, but are tripped by different, non-overlapping signals per the
+failure-definition above.
+
+**Migration note (added to Section 7's table by this revision):** the breaker wraps
+`get_pooled_connection`'s `with pool.connection(timeout=...) as conn: yield conn` body — the
+breaker's OPEN check happens as the first line of that generator dependency, before entering the
+`with` block, so an OPEN breaker never invokes `pool.connection()` at all. No repository or
+service class is touched; this is confined to the same FastAPI dependency-provider layer Section
+3/7 already scope this design to.
+
+### 5.1.1 Retry-After and error-code disambiguation from PoolTimeout (added v2.4, consensus-agent review remediation, BLOCKER fix)
+
+Prior to this revision, Section 5.1's OPEN-state 503 reused the exact same "503 + Retry-After"
+response shape as Section 5's `PoolTimeout` 503, with no distinguishing value or error code. This
+was a real defect: `PoolTimeout` is a short-lived saturation signal (Section 5's `Retry-After: 1`
+second is sized for that), while breaker-OPEN can persist for up to 300 seconds (`30s *
+2^(trips-1)`, capped). A client reusing the 1-second `Retry-After` value against a breaker-OPEN
+response would hammer a known-down Postgres roughly once per second for up to five minutes,
+defeating the breaker's entire purpose — and an operator reading only the response body could not
+tell "Postgres is unreachable" from "the pool is momentarily saturated but Postgres itself is
+healthy" without cross-referencing server-side breaker state.
+
+**Decision: breaker-OPEN and PoolTimeout now return distinguishable `Retry-After` values AND
+distinguishable error codes.**
+
+- **`Retry-After` value for breaker-OPEN:** computed dynamically from the breaker's own state, not
+  a second fixed constant. The breaker already tracks `opened_at` (the timestamp it last
+  transitioned to OPEN) and the current backoff duration `30s * 2^(trips - 1)` (capped at `300s`,
+  per Section 5.1's existing HALF_OPEN formula). `Retry-After` is set to
+  `max(1, ceil(opened_at + backoff_duration - now))` — the actual remaining time until the breaker
+  next transitions to HALF_OPEN and allows a probe through. This is more useful to a well-behaved
+  client than a fixed value: a client retrying exactly when the breaker is about to probe wastes no
+  requests, and a client retrying during the early part of a long backoff window is told the real
+  wait, not an artificially short one that invites exactly the hammering behavior this fix exists
+  to prevent. Recomputed per-response (not cached), since `now` advances between requests.
+- **Error code for breaker-OPEN: `POSTGRES_UNAVAILABLE`** (distinct from Section 5's
+  `POOL_EXHAUSTED` for `PoolTimeout`). Returned in the same error-body shape `_do_write`'s existing
+  contention-503 responses already use (code + message), so this is a new *value* of an existing
+  field, not a new response schema. The message text should name the distinction explicitly (e.g.
+  `"Postgres is currently unreachable (circuit breaker OPEN); retry after the indicated interval"`)
+  so an operator reading logs or a client error handler branching on `error.code` can tell the two
+  conditions apart without needing to inspect the `Retry-After` value's magnitude.
+- **Why not reuse `PoolTimeout`'s fixed 1-second value for breaker-OPEN, simplified:** a fixed
+  larger constant (e.g. always 30 seconds) was considered and rejected — it does not shrink as the
+  breaker approaches its next HALF_OPEN probe, so a client polling on a fixed cadence would either
+  poll too aggressively early in a long backoff window or wait needlessly long right before the
+  breaker is about to recover. The dynamically-computed remaining-backoff value strictly dominates
+  a fixed constant for both correctness and client-experience reasons, at negligible implementation
+  cost (the breaker already stores the two timestamps this computation needs).
+- **This disambiguation is part of Section 5.1's existing OPEN-state fallback behavior, not a
+  separate code path:** the same first-line-of-the-generator-dependency check that fails fast
+  without calling `pool.connection()` now also computes and attaches this `Retry-After` value and
+  `error.code` before returning.
 
 ---
 
@@ -264,7 +379,8 @@ uses it that way. That logic does not exist today and this document does not add
 | `api/app.py` route handlers | **Corrected (v2).** This is not a connection-source swap at unchanged call sites — the call sites themselves move. The ~10 handlers currently reading `ctx.provenance_repository` (`app.py:302,305`), `ctx.semantic_repository`/`ctx.conflict_aware_entity_repository` (`app.py:420,449,482,498`), `ctx.episodic_repository` (`app.py:572,588`), and `ctx.subject_erasure_service` (`app.py:878,885`) as closure variables are rewritten to receive the repository/service as a parameter via `Depends(get_<repository>)` from `api/composition.py`'s new dependency providers. The existing `ctx.postgres_available`-guarded not-configured branches are re-expressed as the equivalent condition inside the dependency (raising the same `503`/not-configured response) rather than an `if ctx.x is None` check inside the handler body. |
 | `SqlProvenanceRepository`, `SqlEpisodicRepository`, `SqlSemanticRepository`, `ConflictAware*Repository`, `SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService` | **No changes.** Each already depends only on the minimal DB-API 2.0 `SqlConnection` Protocol (`.cursor()`) or on repository instances built from one, which a pool-checked-out `psycopg.Connection` satisfies identically to the single long-lived connection it satisfied before. This is the whole point of the existing Protocol-based typing — it already decouples "what a repository needs from a connection" from "how that connection was obtained," so this migration is confined to the composition root, the new per-request dependency providers, and the route-handler signatures that consume them. This row now explicitly includes the Zone 8 manifest/consolidation/crypto-shredding/erasure-cascade classes identified in Section 1's v2 scope correction — they were omitted from this table in v1. |
 | `docker-compose.yml` | No required changes (Postgres's own `max_connections=100` default already covers the recommended `pool_max=20` starting point with headroom); optionally document the recommended pool env vars alongside the other Shape B settings in `.env.example`. |
-| `HLD.md` | Add a new ADR (Section 8 below drafts its content) documenting the pooling model, sizing rationale, and failure/backpressure behavior — closing the "no ADR for connection pooling" gap this document's Section 1 identified. |
+| `HLD.md` | Add a new ADR (Section 8 below drafts its content) documenting the pooling model, sizing rationale, and failure/backpressure behavior — closing the "no ADR for connection pooling" gap this document's Section 1 identified. **Also closes ADR-020's own "Documented exception" (see this document's Section 5.1 and HLD.md ADR-020's updated Consequences block).** |
+| `api/composition.py` (breaker) | `get_pooled_connection` gains a Postgres-specific circuit breaker (Section 5.1) wrapping `pool.connection(timeout=...)`, reusing the same count-based ring-buffer breaker utility HLD Section 5 already mandates — not a new breaker implementation. |
 
 No database schema changes are required. No changes to per-zone Postgres roles/privileges are
 required — the pool connects as the same `app_login_user` `build_postgres_connection` already
@@ -335,16 +451,21 @@ order, with no schema involvement — it is not an open-ended investigation.
 Unlike `fr013-predicate-schema-design.md` (which reached IMPLEMENTATION-READY after seven
 review rounds resolving every open question against this codebase's own existing precedents),
 this document has now been through one dedicated adversarial review round (2026-09-22, see the
-Change Log), which resolved item 3 below in place. Two genuinely open items remain that a further
-review pass should resolve before implementation:
+Change Log) plus a user-decision resolution round (2026-09-22, v2.3), which together resolved
+items 2 and 3 below in place. One genuinely open item remains that a further review pass should
+resolve before implementation:
 
 1. **Pool sizing is a reasoned estimate, not measured.** Section 4's `pool_min=2, pool_max=20`
    is derived from a formula, not from load-test data — no load test exists for this codebase
    yet. A review round should either accept this as a documented starting default (adjustable via
    env var, no code change needed to retune later) or require a load test first.
-2. **Whether Postgres access should also get a full circuit breaker** (beyond the pool's own
-   bounded-timeout fail-fast behavior) is flagged in Section 5 as explicitly separate and
-   unresolved — needs an explicit accept/defer decision.
+2. ~~**Whether Postgres access should also get a full circuit breaker**~~ **RESOLVED in v2.3.**
+   The user decided pooled Postgres access REQUIRES a full circuit breaker now, matching HLD
+   Section 6's existing mandatory "Every adapter call -> Circuit Breaker" pattern with no
+   exception, rather than deferring the question. Section 5.1 specifies the breaker (thresholds,
+   states, fallback behavior, and the Postgres-specific failure definition), reusing HLD Section
+   5's existing count-based ring-buffer breaker utility rather than inventing a new mechanism.
+   This item is closed — it is not carried forward as still-open.
 3. ~~**The exact FastAPI dependency-injection wiring point** (Section 3/7) is described at the
    component level, not verified line-by-line against `api/composition.py`'s and `api/app.py`'s
    real current structure...~~ **Resolved in v2.** A dedicated adversarial review round (2026-09-22)
@@ -395,6 +516,18 @@ review pass should resolve before implementation:
       env-var gate is implemented and its single-connection fallback code path is exercised by
       at least one test, or the flag is explicitly deferred and Section 7.1's concrete
       code-revert procedure is confirmed accurate against the as-shipped file layout.
+- [ ] Section 5.1's circuit breaker is implemented in front of `get_pooled_connection`, reusing
+      HLD Section 5's existing count-based ring-buffer breaker utility: connect-attempt failures
+      (not query-level errors, not `PoolTimeout`) trip it per the documented thresholds, OPEN
+      fails fast with `503` + `Retry-After` without attempting pool acquisition, and HALF_OPEN's
+      5-probe-must-all-succeed recovery path is exercised by at least one test proving all three
+      state transitions (CLOSED -> OPEN, OPEN -> HALF_OPEN, HALF_OPEN -> CLOSED/OPEN).
+- [ ] Section 5.1.1's Retry-After/error-code disambiguation is implemented and independently
+      verified (not only self-certified by Dev/QA): breaker-OPEN responses carry
+      `error.code = POSTGRES_UNAVAILABLE` and a `Retry-After` computed from the breaker's actual
+      remaining backoff (`max(1, ceil(opened_at + backoff_duration - now))`), while `PoolTimeout`
+      responses carry `error.code = POOL_EXHAUSTED` and the existing fixed ~1s `Retry-After` —
+      confirmed distinguishable in at least one test asserting both response bodies side by side.
 
 ---
 
@@ -406,3 +539,5 @@ review pass should resolve before implementation:
 | 2026-09-22 | v2 (`solution-architect`): First dedicated adversarial deep-dive review of this document (prior review rounds only touched it as a side-effect of reviewing other stories) found and fixed a real defect verified against source: v1's Section 3/7 claimed call sites "change their connection source, not their call shape," implying the zone-repository builders are called per-request today. Verified against `api/composition.py:145-253` (`build_app_context`) and `api/app.py:127-140` (`create_app`) that this is **false** — every builder runs exactly once at startup, results are stored as fixed `AppContext` fields, and ~10 route handlers reference them as closure variables (`app.py:302,305,420,449,482,498,572,588,878,885`); there is no per-request call site to swap a connection source at. Rewrote Section 3 and Section 7's `api/app.py`/`api/composition.py` rows to describe the real required refactor: move repository/service construction out of startup-time `build_app_context` into per-request FastAPI `Depends(...)` providers, and rewrite the affected route handlers to receive their repository via dependency injection instead of a closure read. Extended Section 1's problem statement and Section 7's migration table to include Zone 8's connection-sharing surface (`SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`), confirmed via `composition.py`'s own docstring (lines 38-45, "reused across Zone 2/3/7/8-manifest") and never previously in scope. Added a new Definition-of-Done item (Section 9) requiring the per-request wiring to be verified for all of Zone 2/3/5/7/8-manifest, not only the previously-named subset. Resolved Section 8's former open item 3 (DI wiring point not line-verified) in place — closed, not carried forward as open; Section 8's two remaining open items (pool sizing unmeasured, circuit-breaker-vs-Postgres decision) are unaffected by this revision. Companion fixes in the same review, tracked outside this file: `sprint5_ar1_assignments.json` AC-028-REVIEW-1 was scoped too narrowly to catch this class of defect (checked only zone repository code, not the `api/app.py`+`api/composition.py` wiring layer) — added AC-028-REVIEW-3 requiring the reviewer to confirm the per-request DI refactor covers both files correctly; propagated into `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-REVIEW dispatch prompt. Still DRAFT, not IMPLEMENTATION-READY, pending the two remaining Section 8 open items. |
 | 2026-09-22 | v2.1 (`solution-architect`, round-2 adversarial re-review): Fixed a zone-number/repository-name mispairing in Section 9's DoD item introduced by the v2 fix pass — it read "Zone 2 (provenance), Zone 3 (conflict-aware entity/semantic), Zone 5 (episodic), Zone 7 (conflict-aware semantic)," which scrambled the mapping. Verified the real mapping against `src/dashanan/domain/zone.py`'s `ZoneId` enum and `src/dashanan/api/app.py:80-89`'s `_WIRE_TO_DOMAIN_ZONE` table: Zone 2 = episodic, Zone 3 = semantic, Zone 5 = entity, Zone 7 = provenance. Section 9's DoD item now reads "Zone 2 (episodic), Zone 3 (semantic), Zone 5 (conflict-aware entity), Zone 7 (provenance)," correctly pairing `episodic_repository` with Zone 2, `semantic_repository` with Zone 3, `conflict_aware_entity_repository` with Zone 5, and `provenance_repository` with Zone 7. No other section of this document repeats the scrambled pairing. Also, DASH-STORY-028's story-point estimate (8 SP) was found not to reflect this doc's own v2-corrected, wider refactor scope -- re-estimated to 13 SP in the routing bundle (tracked outside this file). |
 | 2026-09-22 | v2.2 (`solution-architect`, consensus-agent APPROVED_WITH_CONDITIONS remediation): consensus-agent's review of DASH-STORY-028's 13 SP scope gave APPROVED_WITH_CONDITIONS (2 WARNING, 2 INFO), not a clean APPROVE. WARNING 1 fixed here: Section 7's migration table already noted `build_postgres_connection()` "is not deleted, only no longer used as the API host's per-request connection source," but that fact was never named as a disclosed rollback mechanism — added new Section 7.1 ("Rollback procedure") proposing a `POOLING_ENABLED` env-var gate (letting `composition_root.py`/`api/composition.py` fall back to the pre-existing single-connection startup path without a code deploy) as the primary mechanism, plus a concrete, ordered, three-file code-revert procedure as a fallback if the flag is deferred. Added a matching Definition of Done item (Section 9) requiring the rollback path to be real, not aspirational, before this story closes. WARNING 2 (retry granularity for DASH-STORY-028-DEV's larger scope) and INFO 1 (AC-028-QA-3's escalating-gate cross-reference) and INFO 2 (QA/REVIEW context-budget sizing) are fixed in `sprint5_implementation_execution_plan.json`, `sprint5_ar1_assignments.json`, and `sprint5_ar3_context_windows.json` respectively — tracked outside this file, per this document's own established companion-fix convention (see the v2 entry above). |
+| 2026-09-22 | v2.3 (`solution-architect`, user-decision resolution): the user resolved Section 8's former open item 2 ("whether Postgres access should also get a full circuit breaker") by REQUIRING a full circuit breaker now, matching HLD Section 6's existing "Every adapter call -> Circuit Breaker" mandatory pattern (previously carrying a documented, time-bound exception for pooled Postgres access, per ADR-020's Consequences block) rather than deferring the question further. Added new Section 5.1 ("Circuit breaker for pooled Postgres access") specifying: the Postgres-specific failure definition (connect/acquire-establishment failures only — never normal query-level errors, and never `PoolTimeout`, which remains Section 5's separate pool-exhaustion signal); thresholds identical to HLD Section 8's existing vector-store breaker (failure rate >= 50% or slow-connect rate >= 30% at 2x p99 over a 20-call ring-buffer window, reusing HLD Section 5's existing count-based ring-buffer breaker utility rather than inventing a new one); OPEN-state fallback behavior (fail-fast 503+Retry-After without even attempting `pool.connection()`); and HALF_OPEN probe behavior (backoff `30s * 2^(trips-1)` capped at 300s, 5 probes all must succeed to close) — identical shape to HLD's vector-store breaker for one consistent operator mental model. Updated Section 5's own paragraph to point to 5.1 instead of deferring. Updated Section 7's migration table with a new `api/composition.py` (breaker) row and a cross-reference on the `HLD.md` row. Resolved Section 8's former open item 2 in place — closed, not carried forward as open; Section 8's one remaining open item (pool sizing unmeasured) is unaffected by this revision. Added a new Definition of Done item (Section 9) requiring the breaker's three state transitions to be tested. Companion fixes in the same pass, tracked outside this file: `HLD.md` ADR-020's "Documented exception" Consequences text is updated to record the exception as closed (see HLD.md's own Revision History); `sprint5_ar1_assignments.json` gains AC-028-DEV-4/AC-028-QA-4 and DASH-STORY-028's story points are re-estimated from 13 SP to 21 SP (Dev 13/QA 5/Review 3) to account for this real, nontrivial added scope; `sprint5_sprint_plan.json`, `sprint5_implementation_execution_plan.json`, and `sprint5_ar3_context_windows.json` are updated to match. |
+| 2026-09-22 | v2.4 (`solution-architect`, consensus-agent review remediation — 4 BLOCKER findings on v2.3's Section 5.1): a consensus-agent review of DASH-STORY-028's new circuit-breaker design found and required fixes for 4 issues, all BLOCKER. (1) **Retry-After/error-code disambiguation gap**: v2.3's Section 5.1 OPEN-state 503 reused the exact same response shape as Section 5's `PoolTimeout` 503 with no distinguishing value or error code — a client or operator could not tell "Postgres is down" (breaker-OPEN, can persist up to 300s) from "pool momentarily saturated" (`PoolTimeout`, ~1s) from the response alone, and reusing the 1s value against breaker-OPEN would hammer a known-down dependency roughly once per second for up to five minutes, defeating the breaker's purpose. Fixed by adding new Section 5.1.1 ("Retry-After and error-code disambiguation from PoolTimeout"): breaker-OPEN now returns `error.code = POSTGRES_UNAVAILABLE` and a dynamically-computed `Retry-After` (`max(1, ceil(opened_at + backoff_duration - now))`, the actual remaining time until the next HALF_OPEN probe), while `PoolTimeout` (Section 5) is given the corresponding `error.code = POOL_EXHAUSTED` for symmetry. Added a matching Definition of Done item (Section 9). (2) **Missing independent REVIEW-side verification of the breaker**: DASH-STORY-028-REVIEW's 4 ACs verified DI-wiring, atomicity-overclaim absence, and rollback, but none verified the breaker itself was implemented per spec, despite this bundle's own established precedent (AC-028-REVIEW-3) that self-certified Dev/QA claims about correctness-critical behavior get independent review — the breaker is 8 of the story's 21 SP, its own largest scope addition, with zero prior REVIEW coverage. Fixed outside this file: `sprint5_ar1_assignments.json` gains AC-028-REVIEW-5 (failure taxonomy, thresholds/backoff, and this revision's Retry-After/error-code disambiguation, all independently verified against source); propagated into `sprint5_implementation_execution_plan.json`'s review_prompt. (3) **Stale v2.2 citation**: `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-REVIEW `review_prompt` CONTEXT SOURCES still cited `design_doc_full_connection-pooling-design.md_v2.2` after this doc advanced to v2.3 — fixed to cite v2.4 (this revision). (4) **Internal v2.2/v2.3 inconsistency**: `sprint5_ar3_context_windows.json`'s DASH-STORY-028-REVIEW entry had `sources.design_doc_full` correctly at v2.3 but its own `files_to_read_or_modify` two lines later still cited "connection-pooling-design.md v2.2 Section 7.1" — fixed within the same object to v2.4. Section 8's one remaining open item (pool sizing unmeasured) is unaffected by this revision; no new open item was introduced — the disambiguation gap was a defect in already-"resolved" v2.3 content, not a newly discovered design question. |

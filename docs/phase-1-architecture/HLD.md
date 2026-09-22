@@ -4,7 +4,7 @@
 <!-- Consensus gate (consensus-agent) runs as a SEPARATE step after this document. -->
 
 **Document ID:** HLD-20260917-01
-**Version:** 1.4.1
+**Version:** 1.5.3
 **Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, 2026-09-17); narrower-scope re-confirmation (story-patch verification across the 10 originally-governed Sprint-1 stories), not a standalone Phase 1 architecture re-review. DASH-STORY-011, added to the Sprint 1 backlog after this verification ran, received its own genuine supplemental IR.1/IR.2/IR.5-equivalent review on 2026-09-19 (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`, APPROVED on attempt 1) -- it is now covered by the same governed-approval scope as the original 10 stories.
 **Created:** 2026-09-17
 **Entry Mode:** Greenfield (Mode A) — verified: `Dashanan/` contained only `README.md` + `docs/` (no prior architecture artifacts, no source tree)
@@ -1340,9 +1340,11 @@ Decision:  Replace the single-connection factory with psycopg_pool.ConnectionPoo
     request end, rather than held for the app's lifetime. Every existing zone repository keeps
     depending only on the already-established SqlConnection Protocol -- only the composition
     root's own acquisition/release mechanics change, not any repository's constructor.
-  Full design: docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT -- three disclosed
-    open items: pool sizing has no load-test data behind it yet, the circuit-breaker-vs-Postgres
-    decision is deferred, exact DI wiring is not yet line-verified against a live implementation).
+  Full design: docs/phase-1.5-design/connection-pooling-design.md (v2.4, DRAFT -- one disclosed
+    open item remains: pool sizing has no load-test data behind it yet. The former circuit-
+    breaker-vs-Postgres deferral and the exact-DI-wiring-point item are both resolved: v2.3 adds
+    the mandatory circuit breaker per a user decision (Section 5.1), and v2 line-verified the DI
+    wiring against the live composition.py/app.py implementation).
   Pool exhaustion: returns 503 + Retry-After, reusing the existing NFR-014/AC-021
     contention-handling convention rather than inventing a new one, and echoing this HLD's own
     Section 6 circuit-breaker precedent for vector-store call backpressure.
@@ -1361,17 +1363,31 @@ Decision:  Replace the single-connection factory with psycopg_pool.ConnectionPoo
     Risks: if pool sizing is wrong in production, requests could see elevated 503 rates before the
       issue is caught -- mitigated by the existing OpenTelemetry/structured-logging convention
       (ADR-014) once implemented, but no dashboard/alert for this specifically exists yet.
-    Documented exception (added 2026-09-22, solution-architect review finding 2): Section 6's
+    Documented exception (added 2026-09-22, solution-architect review finding 2; CLOSED 2026-09-22,
+      user decision -- see connection-pooling-design.md v2.4 Change Log): Section 6's
       design-patterns table mandates Circuit Breaker for "Every adapter call," and Postgres access
-      through this pool is exactly such an adapter call -- this ADR does NOT add a circuit breaker
-      around pooled Postgres access, only the pool itself plus 503+Retry-After on exhaustion. This
-      is a real, scoped, time-bound exception to Section 6's mandatory pattern, not an oversight or
-      a silently separate question: whether pooled Postgres access also needs a full circuit
-      breaker (on top of pool-exhaustion backpressure) is deferred to a follow-on decision once
-      real pool-sizing/failure data exists, per connection-pooling-design.md's own disclosed open
-      item. Per Section 6's own Blueprint Supremacy Rule, this exception must be closed (breaker
-      added, or explicitly re-affirmed as unnecessary with evidence) before this ADR is signed off,
-      not left open indefinitely.
+      through this pool is exactly such an adapter call. This ADR originally did NOT add a circuit
+      breaker around pooled Postgres access, only the pool itself plus 503+Retry-After on
+      exhaustion -- a real, scoped, time-bound exception to Section 6's mandatory pattern, not an
+      oversight or a silently separate question, with the exception's own text requiring it be
+      closed (breaker added, or explicitly re-affirmed as unnecessary with evidence) before this
+      ADR is signed off. RESOLVED: rather than re-affirming the exception as unnecessary, the user
+      chose to close it by REQUIRING the breaker. connection-pooling-design.md v2.4 Section 5.1
+      (Section 5.1.1 added 2026-09-22, consensus-agent round-1 remediation: breaker-OPEN 503s now
+      carry a distinguishing `POSTGRES_UNAVAILABLE` error code and a dynamic Retry-After value,
+      instead of reusing PoolTimeout's fixed ~1s value, so clients back off appropriately instead
+      of hammering a known-down dependency)
+      now specifies a full circuit breaker in front of pooled Postgres connection acquisition,
+      mirroring this HLD's own Section 8 vector-store breaker pattern exactly (same 20-call
+      ring-buffer window, same 50%-failure-rate/30%-slow-call-rate OPEN thresholds, same
+      `30s * 2^(trips-1)` capped-at-300s half-open backoff, same 5-probes-must-all-succeed
+      recovery) and reusing Section 5's existing count-based ring-buffer breaker utility rather
+      than inventing a new one. The breaker's failure signal is scoped to connection-establishment
+      failures only (never ordinary query-level errors, never `PoolTimeout`, which remains a
+      separate pool-exhaustion signal per Section 5's own 503+Retry-After mapping). Section 6's
+      "Every adapter call" row no longer carries an exception for Postgres access once this
+      breaker is implemented -- this ADR's exception is CLOSED, not left open indefinitely, per
+      Section 6's own Blueprint Supremacy Rule.
   India Layer: N/A -- this is a connection-management/infrastructure decision, not a residency or
       compliance concern.
   Sign-off:  NOT YET SIGNED OFF. This ADR entry documents a Sprint 5 planning-stage proposal
@@ -1413,7 +1429,7 @@ Every implementing agent MUST use these. Deviations require architect sign-off.
 |---|---|---|
 | Per-zone rotation policy | **Strategy** | Each zone has a different `lambda_zone`, capacity, TTL, fast-track rule and compression method. Strategy lets the single RotationEngine execute eight policies without eight code paths, and lets an operator swap a policy per deployment (NFR-009) without touching the engine. |
 | All zone persistence | **Repository** (port + adapter) | FR-011 IS the Repository pattern stated as a requirement: decouple each zone's logical behaviour from its physical backend so any zone can be re-bound without changing its orchestration contract. It is also where the mandatory `tenant_id` parameter is enforced (ADR-013). |
-| Every adapter call | **Circuit Breaker*** | A slow or dead vector store must fast-fail rather than exhaust the request pool and take the whole read path down with it (error-handling-patterns M3: without a breaker, thread-pool exhaustion converts one dependency's failure into ours). *Postgres access via the ADR-020 connection pool is a documented, time-bound exception to this row (proposed 2026-09-22, not yet signed off) — see ADR-020's Consequences block for the exception's scope and closure condition, per this section's own Blueprint Supremacy Rule. |
+| Every adapter call | **Circuit Breaker** | A slow or dead vector store must fast-fail rather than exhaust the request pool and take the whole read path down with it (error-handling-patterns M3: without a breaker, thread-pool exhaustion converts one dependency's failure into ours). Postgres access via the ADR-020 connection pool previously carried a documented, time-bound exception to this row (proposed 2026-09-22, not yet signed off); CLOSED 2026-09-22 (user decision) — ADR-020's Consequences block now requires the same breaker pattern for pooled Postgres access, specified in connection-pooling-design.md v2.4 Section 5.1/5.1.1. No exception remains against this row. |
 | Zone transitions | **Observer / Event Bus** | Promotion, compression and archival each have several independent reactors (index maintenance, provenance, metrics, consolidation). Publishing decouples the rotation engine from all of them, so adding a reactor requires no change to the engine. |
 | Storage / index / embedding / broker / summarizer | **Adapter** | The concrete mechanism by which ADR-001's one-codebase-two-shapes claim is realized. |
 | Memory Orchestrator | **Facade** | FR-009 is literally a Facade requirement: "the host never addresses individual zones directly." One entry point over eight subsystems. |
@@ -2052,3 +2068,5 @@ header above for the current, live Version/Status/Consensus Gate.
 | 1.4.1 | 2026-09-20 | orchestrator-agent (direct-fetch citation verification, same day) | A second external review round proposed 3 alternate citation URLs for OAQ-10/18 (a different MeitY PDF path, UIDAI "Circular No. 14 of 2025," RBI notification `Id=12345`). Each was directly fetched and checked rather than accepted on the reviewer's say-so: the alternate MeitY URL returned HTTP 403 (this HLD's own existing MeitY citation also returns 403 on direct fetch — a server-side bot-blocking behavior on meity.gov.in, not evidence either URL is wrong; the existing citation was originally found via a real search result and is kept). The alternate UIDAI URL resolved to a corrupted/non-document PDF and was rejected, not used. The alternate RBI URL (`Id=12345`) resolved to a genuine, different, and more precisely on-point circular than the one already cited — RBI/2022-23/77, "Restriction on Storage of Actual Card Data" (the storage-restriction circular itself, vs. the previously-cited RBI/2021-22/96 tokenisation-*enablement* circular one step removed) — both direct-fetch-confirmed as real, and both are now cited together in OAQ-18. No claim's underlying substance changed; this is a citation-precision improvement only. |
 | 1.5.0 | 2026-09-22 | orchestrator-agent (Sprint 5 planning bundle, docs-only pass -- NOT an implementation change) | Added ADR-020 (API host connection pooling, closing AR1-S3-G3 -- Proposed, NOT YET SIGNED OFF or implemented) and an implementation-status note under DPDP-2/DPDP-3 in Section 10 (what `CrossZoneDpdpErasureCascade` actually ships today vs. the target design, closing AC-013's remaining gap). Both changes cross-reference new Phase 1.5 design docs (`docs/phase-1.5-design/connection-pooling-design.md`, `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md`, both v1 DRAFT). **OAQ-10's own text and status are explicitly unchanged by this pass** — the DPDP-2/DPDP-3 update documents an implementation-status gap, not a legal-sufficiency answer. No existing ADR (ADR-001..019) or STRIDE/DPDP finding was altered, only added to. |
 | 1.5.1 | 2026-09-22 | solution-architect (round 8 re-review) | Corrected Section 10's DPDP-2/DPDP-3 implementation-status note (added in v1.5.0): it stated the shipped cascade "reaches only Zones 2 and 6, never calling this codebase's own zone8_crypto_shredding.py key-destroy primitives" -- FALSE. A separate, already-wired path (the live `eraseSubject` endpoint calling `SubjectErasureCascadeService`) already calls that primitive for real, today; only the Zone 2/6 cascade itself doesn't. Also corrected the note's design-doc citation from "v1, DRAFT" to "v2.0, DRAFT, 10 documented solution-architect review rounds" -- the DPDP design doc underwent a major (round 6) correction and 2 further verification rounds since v1.5.0 was written. Sourced from `dpdp-crypto-shredding-full-erasure-design.md`'s own Section 1 major correction and Change Log. |
+| 1.5.2 | 2026-09-22 | solution-architect (user-decision resolution) | Closed ADR-020's own "Documented exception" (Section 6's mandatory Circuit-Breaker-for-every-adapter-call pattern, previously carrying a scoped exception for pooled Postgres access): the user chose to REQUIRE a full circuit breaker for Postgres access now, rather than defer or re-affirm the exception as unnecessary. Updated ADR-020's "Full design" citation (now v2.3) and its Consequences block's "Documented exception" text to record closure, cross-referencing connection-pooling-design.md v2.3 Section 5.1 for the breaker's specification (mirrors this HLD's own Section 8 vector-store breaker exactly: 20-call ring-buffer window, 50%-failure-rate/30%-slow-call-rate OPEN thresholds, `30s * 2^(trips-1)` capped-300s half-open backoff, 5-probes-must-all-succeed recovery, reusing Section 5's existing count-based ring-buffer breaker utility). Updated Section 6's design-patterns table row for "Every adapter call -> Circuit Breaker" to remove the asterisked exception footnote, since no exception remains against that row once the breaker is implemented. No other ADR, STRIDE/DPDP finding, or OAQ was altered by this pass; DASH-STORY-028's re-estimation (13 SP -> 21 SP) for the added breaker scope is tracked in the Sprint 5 routing bundle (`sprint5_ar1_assignments.json`, `backlog_draft.json`, `sprint5_sprint_plan.json`), not in this HLD. |
+| 1.5.3 | 2026-09-22 | solution-architect (consensus-agent round-2 remediation) | connection-pooling-design.md advanced to v2.4 (new Section 5.1.1: breaker-OPEN 503s now carry a distinguishing `POSTGRES_UNAVAILABLE` error code and a dynamic `Retry-After` value tied to the current backoff window, instead of reusing PoolTimeout's fixed ~1s value, so clients back off appropriately instead of hammering a known-down dependency -- a consensus-agent finding on the v2.3 breaker design). This HLD's own ADR-020 citations (Full design line, Documented-exception paragraph, Section 6's design-patterns table row) were bumped from v2.3 to v2.4 to match -- previously left stale after this same round's design-doc bump, itself the exact propagation-miss class this bundle's review history repeatedly self-catches. No ADR content beyond the version citation changed; the breaker's architecture (thresholds, states, ring buffer) is unchanged from 1.5.2. |
