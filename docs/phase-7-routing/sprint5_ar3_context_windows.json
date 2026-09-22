@@ -8,7 +8,7 @@
   "depends_on": [
     "docs/phase-7-routing/sprint5_ar1_assignments.json v1.0.0",
     "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.2 (DRAFT, bumped 2026-09-22 per solution-architect review round 8, was stale at v1)",
-    "docs/phase-1.5-design/connection-pooling-design.md v2.1 (DRAFT, bumped 2026-09-22 after its own dedicated 2-round adversarial solution-architect review, was stale at v1)"
+    "docs/phase-1.5-design/connection-pooling-design.md v2.2 (DRAFT, bumped 2026-09-22 after its own dedicated 2-round adversarial solution-architect review, was stale at v1)"
   ],
   "methodology_reuse_note": "Same per-sub-task context-window method Sprint 3/4 used: sources are the exact file/section citations each sub-task's own AR.1 record or design doc names, never invented additions. Both Sprint 5 design docs are DRAFT rather than IMPLEMENTATION-READY, so 'the entire design doc' is included in full for every sub-task exactly as Sprint 4 did for its own single design doc -- there is no reduced excerpt to select from a draft that has not yet been trimmed by review rounds.",
   "classification_model": {
@@ -91,7 +91,7 @@
       "context_budget_tokens": 9500,
       "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 6000 to 9500: the design doc's v2 fix pass established this sub-task touches ~10 route handlers in api/app.py plus ~8 new per-request Depends(...) provider functions in api/composition.py, not just composition_root.py's single factory function -- both files must now be read in full (not excerpted) to correctly locate every ctx.<repository>/ctx.<service> closure-variable read across Zone 2/3/5/7/8-manifest, and the v2.1 design doc itself is materially longer than the v1 doc this budget was originally sized against.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.2 (entire document)",
         "files_to_read_or_modify": [
           {"file": "src/dashanan/infrastructure/composition_root.py", "line_ranges": ["build_postgres_connection and every zone repository builder that currently receives its single connection object"], "why": "The sole factory this sub-task replaces, and every downstream call site that must keep working against the SqlConnection Protocol unchanged."},
           {"file": "src/dashanan/api/composition.py", "line_ranges": ["build_app_context (lines ~145-253) -- the 8 builder calls it currently makes at startup, all of which move to per-request Depends(...) providers"], "why": "This is where startup-time construction is replaced with ~8 new per-request FastAPI dependency-provider functions, per connection-pooling-design.md v2 Section 3/7."},
@@ -109,10 +109,10 @@
       "sub_task_id": "DASH-STORY-028-QA",
       "story_id": "DASH-STORY-028",
       "assigned_agent": "integration-testing-engineer",
-      "context_budget_tokens": 6500,
-      "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 5000 to 6500: AC-028-QA-3 now requires coverage across all 5 repository/service surfaces (Zone 2/3/5/7/8-manifest), not a generic 2-zone concurrency check, which needs more of the shipped composition.py/app.py wiring in context to write per-surface assertions.",
+      "context_budget_tokens": 9000,
+      "context_budget_note": "RAISED 2026-09-22 twice: first (round-2 adversarial re-review, solution-architect) from 5000 to 6500 for AC-028-QA-3's 5-surface coverage requirement; now (consensus-agent APPROVED_WITH_CONDITIONS review, INFO finding 2, solution-architect remediation) from 6500 to 9000. Measured, not re-guessed: connection-pooling-design.md v2.2 is ~3721 words (~4900 tokens) and is read in full for every DASH-STORY-028 sub-task; tests/integration/test_api_real_postgres_e2e_dash3.py (the mandatory style precedent) is ~2996 words (~3900 tokens) on its own -- design doc + style precedent alone already total ~8800 tokens, before any of the actual post-DEV diff content (the ~8 new Depends(...) providers in api/composition.py and the ~10 rewritten handlers in api/app.py) this sub-task must also read to write per-surface assertions. The prior 6500 budget was already tight against just the first two sources; raised to 9000 to leave genuine headroom for the diff content rather than forcing the dispatched agent to under-read one of its two mandatory sources. Word counts are this session's own `wc -w` on both files, not an estimate.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.2 (entire document)",
         "files_to_read_or_modify": [
           {"file": "tests/integration/test_api_real_postgres_e2e_dash3.py", "line_ranges": ["full file"], "why": "Style precedent."},
           {"file": "(post-DEV) the new pool factory and per-request FastAPI dependency providers", "line_ranges": ["shipped, not pre-change -- api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers"], "why": "The live target under test for the concurrency, pool-exhaustion, and per-surface DI-wiring-verification cases across all of Zone 2/3/5/7/8-manifest."}
@@ -129,10 +129,10 @@
       "sub_task_id": "DASH-STORY-028-REVIEW",
       "story_id": "DASH-STORY-028",
       "assigned_agent": "consensus-agent",
-      "context_budget_tokens": 5000,
-      "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 4000 to 5000: AC-028-REVIEW-3 already requires verifying the per-request DI wiring across api/composition.py and api/app.py, not only that zone repository classes are unchanged -- this budget now names both files explicitly so the reviewer isn't scoped only to composition_root.py.",
+      "context_budget_tokens": 6500,
+      "context_budget_note": "RAISED 2026-09-22 twice: first (round-2 adversarial re-review, solution-architect) from 4000 to 5000 to explicitly name both api/composition.py and api/app.py as required reading. Now (consensus-agent APPROVED_WITH_CONDITIONS review, INFO finding 2, solution-architect remediation) from 5000 to 6500. Measured, not re-guessed: connection-pooling-design.md v2.2 (read in full, ~4900 tokens per this session's own `wc -w`) alone consumed nearly all of the prior 5000-token budget, leaving well under 1000 tokens for the actual post-DEV diff review of the ~8 new Depends(...) providers plus the ~10 rewritten route handlers across 2 full files (api/composition.py at 940 words/~1200 tokens whole, api/app.py at 2906 words/~3800 tokens whole -- real diffs are a fraction of either full file, but a reviewer needs enough surrounding context per changed function to verify correct wiring, not a bare unified diff). Raised to 6500 to leave a genuine ~1600-token margin for that diff content instead of forcing the reviewer to skim.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.2 (entire document)",
         "files_to_read_or_modify": [
           {"file": "(post-DEV) shipped composition_root.py changes and every zone repository's own unchanged constructor", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-1's requirement to confirm no zone repository code changed."},
           {"file": "(post-DEV) shipped api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-3's requirement to confirm the per-request DI refactor is correctly wired end to end across both files for all of Zone 2/3/5/7/8-manifest, not only that zone repository code is unchanged."}
@@ -148,8 +148,8 @@
   ],
   "summary": {
     "sub_tasks_total": 6,
-    "total_context_budget_tokens": 48500,
-    "total_context_budget_tokens_note": "Updated 2026-09-22, three times: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files); then from 42500 to 48500 (round-2 adversarial re-review of connection-pooling-design.md v2, solution-architect: DASH-STORY-028-DEV 6000->9500, DASH-STORY-028-QA 5000->6500, DASH-STORY-028-REVIEW 4000->5000, a further +6000 to account for the wider per-request DI refactor scope across api/composition.py and api/app.py). 35500+3500+3500+6000=48500.",
+    "total_context_budget_tokens": 52500,
+    "total_context_budget_tokens_note": "Updated 2026-09-22, four times: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files); then from 42500 to 48500 (round-2 adversarial re-review of connection-pooling-design.md v2, solution-architect: DASH-STORY-028-DEV 6000->9500, DASH-STORY-028-QA 5000->6500, DASH-STORY-028-REVIEW 4000->5000, a further +6000 to account for the wider per-request DI refactor scope across api/composition.py and api/app.py); then from 48500 to 52500 (consensus-agent APPROVED_WITH_CONDITIONS review, INFO finding 2, solution-architect remediation: DASH-STORY-028-QA 6500->9000, DASH-STORY-028-REVIEW 5000->6500, a further +4000, this time backed by measured `wc -w` token estimates on the design doc and test-precedent file rather than a qualitative judgment call). 35500+3500+3500+6000+4000=52500.",
     "sub_tasks_with_pii_exclusion_applied": 6,
     "design_doc_included_in_full_for_every_sub_task": true,
     "note_on_security_clearance": "DASH-STORY-027-DEV and DASH-STORY-027-REVIEW are the first Sprint 5 sub-tasks with a narrow, ID-level (not payload-level) security clearance, reflecting the P1 gate. All other Sprint 5 sub-tasks follow the standard Sprints 1-4 posture (no PII, no clearance needed)."

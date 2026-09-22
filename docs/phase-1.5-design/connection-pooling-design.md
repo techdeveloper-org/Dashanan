@@ -1,6 +1,6 @@
 # Connection Pooling Design — Closing AR1-S3-G3 (Composition Root)
 
-Status: DRAFT v2.1 — pending user review. No implementation files have been modified.
+Status: DRAFT v2.2 — pending user review. No implementation files have been modified.
 Related: `src/dashanan/infrastructure/composition_root.py`, `src/dashanan/api/composition.py`,
 `src/dashanan/api/app.py`, `docs/phase-1-architecture/HLD.md` Section 6 (circuit-breaker
 precedent), `docs/phase-1.5-api/fr013-predicate-schema-design.md` Section 6 (the exact wording
@@ -270,6 +270,64 @@ No database schema changes are required. No changes to per-zone Postgres roles/p
 required — the pool connects as the same `app_login_user` `build_postgres_connection` already
 uses.
 
+### 7.1 Rollback procedure
+
+This table's own row for `composition_root.py` already notes that
+`build_postgres_connection()` — the pre-existing single-connection factory — "is not deleted,
+only no longer used as the API host's per-request connection source." That fact was previously
+implicit; this subsection names it explicitly as the deliberate rollback path for this change,
+so the migration is not a one-way door with no disclosed exit if per-request pooling introduces
+a production regression discovered only post-rollout (e.g. a connection leak under sustained
+load, or pool-exhaustion behavior that manifests differently against real traffic than against
+the DASH-STORY-028-QA test suite's synthetic load).
+
+**Recommended mechanism: a `POOLING_ENABLED` environment-variable gate, following this
+codebase's existing `load_postgres_settings_from_env` convention (Section 4).**
+
+- `composition_root.py` reads `POOLING_ENABLED` (default `true`) alongside its other
+  env-sourced `PostgresSettings`. When `true` (the default, post-rollout), `build_app_context`
+  wires the per-request `Depends(...)` providers described in Section 3/7. When explicitly set
+  to `false`, `build_app_context` falls back to calling `build_postgres_connection()` once at
+  startup and constructing every repository/service (`build_provenance_repository`,
+  `build_episodic_repository`, `build_conflict_aware_semantic_repository`,
+  `build_conflict_aware_entity_memory_repository`, `SqlManifestRepository`,
+  `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`) exactly
+  as it did before this change — the pre-pooling code path this document is replacing, not a new
+  one written for the flag.
+- This requires `build_app_context` to keep both code paths (pooled and single-connection)
+  live rather than deleting the single-connection wiring outright, until the flag itself is
+  removed in a later cleanup once pooling has been running in production without incident for
+  an agreed period (an explicit follow-up item, not scoped by this document).
+- The flag flips behavior with an env-var change and a process restart — **no code deploy, no
+  rollback commit, no redeploy pipeline run** — which is the property that makes this a genuine
+  emergency rollback path rather than a same-speed-as-forward-fix revert.
+
+**Concrete revert procedure, if the flag is judged out of scope for the initial implementation
+(fallback to disclose regardless of the flag decision):**
+
+1. Revert `api/app.py`'s route-handler signatures from `Depends(get_<repository>)` parameters
+   back to `ctx.<repository>` closure reads (the ~10 handlers Section 7's migration table
+   names).
+2. Revert `api/composition.py`'s `build_app_context` to construct
+   `build_provenance_repository`, `build_episodic_repository`,
+   `build_conflict_aware_semantic_repository`, `build_conflict_aware_entity_memory_repository`,
+   `SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, and
+   `SubjectErasureCascadeService` once at startup from a single connection, and delete the
+   per-request `Depends(...)` provider functions added by this change.
+3. Revert `composition_root.py` to call `build_postgres_connection()` (already present,
+   unmodified) instead of `build_postgres_connection_pool()`, and remove the pool construction
+   call from startup.
+4. `psycopg[pool]` may remain in `pyproject.toml` (harmless if unused) or be removed in the
+   same revert commit — either is acceptable, since it is an additive dependency with no schema
+   or data impact.
+5. No database migration, schema, or data revert is required at any step — this entire rollback
+   is confined to the composition root and the FastAPI dependency-injection layer, matching
+   Section 7's migration table's own scope for the forward change.
+
+This procedure requires a code revert and redeploy (unlike the flag-based path above), but it
+is bounded to exactly the three files Section 7's migration table already names, in a fixed
+order, with no schema involvement — it is not an open-ended investigation.
+
 ---
 
 ## 8. Open items (why this is DRAFT, not IMPLEMENTATION-READY)
@@ -333,6 +391,10 @@ review pass should resolve before implementation:
       by confirming `api/composition.py` has a per-request `Depends(...)` provider for each of the
       eight builders/classes listed in Section 7's migration table, and that `api/app.py` has zero
       remaining `ctx.<repository>`/`ctx.<service>` closure-variable reads for any of them.
+- [ ] Section 7.1's rollback path is real, not aspirational: either the `POOLING_ENABLED`
+      env-var gate is implemented and its single-connection fallback code path is exercised by
+      at least one test, or the flag is explicitly deferred and Section 7.1's concrete
+      code-revert procedure is confirmed accurate against the as-shipped file layout.
 
 ---
 
@@ -343,3 +405,4 @@ review pass should resolve before implementation:
 | 2026-09-22 | v1: Initial design. Confirmed the API host is synchronous (plain `def` route handlers) from `api/app.py`, settling the `ConnectionPool` vs `AsyncConnectionPool` choice from evidence rather than preference. Recommended acquire-per-request via a FastAPI generator dependency over app-lifetime connection holding, since only acquire-per-request actually resolves the shared-connection contention AR1-S3-G3 names. Derived a pool-sizing formula from Postgres's default `max_connections=100` and FastAPI's default threadpool ceiling. Mapped pool exhaustion to the existing NFR-014/AC-021 503+Retry-After convention rather than inventing a new one. Explicitly restated (not contradicted) Sprint 4's existing partial-reporting contract and the still-separate cross-zone-atomicity gap. Marked DRAFT, not IMPLEMENTATION-READY, pending a review round per Section 8's three open items — no review round has run yet. |
 | 2026-09-22 | v2 (`solution-architect`): First dedicated adversarial deep-dive review of this document (prior review rounds only touched it as a side-effect of reviewing other stories) found and fixed a real defect verified against source: v1's Section 3/7 claimed call sites "change their connection source, not their call shape," implying the zone-repository builders are called per-request today. Verified against `api/composition.py:145-253` (`build_app_context`) and `api/app.py:127-140` (`create_app`) that this is **false** — every builder runs exactly once at startup, results are stored as fixed `AppContext` fields, and ~10 route handlers reference them as closure variables (`app.py:302,305,420,449,482,498,572,588,878,885`); there is no per-request call site to swap a connection source at. Rewrote Section 3 and Section 7's `api/app.py`/`api/composition.py` rows to describe the real required refactor: move repository/service construction out of startup-time `build_app_context` into per-request FastAPI `Depends(...)` providers, and rewrite the affected route handlers to receive their repository via dependency injection instead of a closure read. Extended Section 1's problem statement and Section 7's migration table to include Zone 8's connection-sharing surface (`SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`), confirmed via `composition.py`'s own docstring (lines 38-45, "reused across Zone 2/3/7/8-manifest") and never previously in scope. Added a new Definition-of-Done item (Section 9) requiring the per-request wiring to be verified for all of Zone 2/3/5/7/8-manifest, not only the previously-named subset. Resolved Section 8's former open item 3 (DI wiring point not line-verified) in place — closed, not carried forward as open; Section 8's two remaining open items (pool sizing unmeasured, circuit-breaker-vs-Postgres decision) are unaffected by this revision. Companion fixes in the same review, tracked outside this file: `sprint5_ar1_assignments.json` AC-028-REVIEW-1 was scoped too narrowly to catch this class of defect (checked only zone repository code, not the `api/app.py`+`api/composition.py` wiring layer) — added AC-028-REVIEW-3 requiring the reviewer to confirm the per-request DI refactor covers both files correctly; propagated into `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-REVIEW dispatch prompt. Still DRAFT, not IMPLEMENTATION-READY, pending the two remaining Section 8 open items. |
 | 2026-09-22 | v2.1 (`solution-architect`, round-2 adversarial re-review): Fixed a zone-number/repository-name mispairing in Section 9's DoD item introduced by the v2 fix pass — it read "Zone 2 (provenance), Zone 3 (conflict-aware entity/semantic), Zone 5 (episodic), Zone 7 (conflict-aware semantic)," which scrambled the mapping. Verified the real mapping against `src/dashanan/domain/zone.py`'s `ZoneId` enum and `src/dashanan/api/app.py:80-89`'s `_WIRE_TO_DOMAIN_ZONE` table: Zone 2 = episodic, Zone 3 = semantic, Zone 5 = entity, Zone 7 = provenance. Section 9's DoD item now reads "Zone 2 (episodic), Zone 3 (semantic), Zone 5 (conflict-aware entity), Zone 7 (provenance)," correctly pairing `episodic_repository` with Zone 2, `semantic_repository` with Zone 3, `conflict_aware_entity_repository` with Zone 5, and `provenance_repository` with Zone 7. No other section of this document repeats the scrambled pairing. Also, DASH-STORY-028's story-point estimate (8 SP) was found not to reflect this doc's own v2-corrected, wider refactor scope -- re-estimated to 13 SP in the routing bundle (tracked outside this file). |
+| 2026-09-22 | v2.2 (`solution-architect`, consensus-agent APPROVED_WITH_CONDITIONS remediation): consensus-agent's review of DASH-STORY-028's 13 SP scope gave APPROVED_WITH_CONDITIONS (2 WARNING, 2 INFO), not a clean APPROVE. WARNING 1 fixed here: Section 7's migration table already noted `build_postgres_connection()` "is not deleted, only no longer used as the API host's per-request connection source," but that fact was never named as a disclosed rollback mechanism — added new Section 7.1 ("Rollback procedure") proposing a `POOLING_ENABLED` env-var gate (letting `composition_root.py`/`api/composition.py` fall back to the pre-existing single-connection startup path without a code deploy) as the primary mechanism, plus a concrete, ordered, three-file code-revert procedure as a fallback if the flag is deferred. Added a matching Definition of Done item (Section 9) requiring the rollback path to be real, not aspirational, before this story closes. WARNING 2 (retry granularity for DASH-STORY-028-DEV's larger scope) and INFO 1 (AC-028-QA-3's escalating-gate cross-reference) and INFO 2 (QA/REVIEW context-budget sizing) are fixed in `sprint5_implementation_execution_plan.json`, `sprint5_ar1_assignments.json`, and `sprint5_ar3_context_windows.json` respectively — tracked outside this file, per this document's own established companion-fix convention (see the v2 entry above). |

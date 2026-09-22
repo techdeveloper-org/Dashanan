@@ -39,10 +39,11 @@ it:
 2. **Both underlying design docs remain formally NOT IMPLEMENTATION-READY, though both now have
    real, dedicated review history.** UPDATED 2026-09-22, FINAL (was: "connection-pooling-design.md
    is still v1, one authoring pass, no review rounds" -- stale after that doc's own dedicated
-   2-round adversarial solution-architect review): `connection-pooling-design.md` is now v2.1,
+   2-round adversarial solution-architect review): `connection-pooling-design.md` is now v2.2,
    having been through its own dedicated 2-round review (round 1 found a real defect in its
    migration description and a missing Zone 8 scope; round 2 verified the fix and caught 2 further
-   issues, both fixed; final verdict APPROVE). `dpdp-crypto-shredding-full-erasure-design.md` is
+   issues, both fixed; a third fix pass added an explicit rollback procedure per a subsequent
+   consensus-agent finding, bumping to v2.2; final verdict APPROVE). `dpdp-crypto-shredding-full-erasure-design.md` is
    v2.2, having been through 13 solution-architect rounds AND a separate 4-round consensus-agent
    failure-mode/retry/rollback/escalation review, both ending in clean APPROVE. Neither doc is
    formally marked IMPLEMENTATION-READY in its own Status line — that label is reserved for a doc
@@ -64,7 +65,7 @@ dispatch:
 1. A real Phase C gate (dispatched `hallucination-detector` + `context-faithfulness-engineer`),
    per `sprint5-phase-c-gate-results.md`'s own recommendation.
 2. UPDATED 2026-09-22, FINAL: both design docs have now cleared their own dedicated review loops
-   with a final clean APPROVE (connection-pooling-design.md v2.1; dpdp-crypto-shredding-full-
+   with a final clean APPROVE (connection-pooling-design.md v2.2; dpdp-crypto-shredding-full-
    erasure-design.md v2.2). This item is resolved -- remaining before either is formally marked
    IMPLEMENTATION-READY is a real dispatched Phase C gate (item 1 above), not a further design
    review round.
