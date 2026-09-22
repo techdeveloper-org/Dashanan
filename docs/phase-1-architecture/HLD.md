@@ -4,7 +4,7 @@
 <!-- Consensus gate (consensus-agent) runs as a SEPARATE step after this document. -->
 
 **Document ID:** HLD-20260917-01
-**Version:** 1.5.3
+**Version:** 1.5.5
 **Status:** APPROVED — ratified via Phase 8 IR.5 Pre-Implementation Alignment Consensus Gate (`docs/phase-8-alignment/ir5_alignment_verdict.json`, 2026-09-17); narrower-scope re-confirmation (story-patch verification across the 10 originally-governed Sprint-1 stories), not a standalone Phase 1 architecture re-review. DASH-STORY-011, added to the Sprint 1 backlog after this verification ran, received its own genuine supplemental IR.1/IR.2/IR.5-equivalent review on 2026-09-19 (`ir5_alignment_verdict.json`'s `story_011_supplemental_verdict`, APPROVED on attempt 1) -- it is now covered by the same governed-approval scope as the original 10 stories.
 **Created:** 2026-09-17
 **Entry Mode:** Greenfield (Mode A) — verified: `Dashanan/` contained only `README.md` + `docs/` (no prior architecture artifacts, no source tree)
@@ -1398,6 +1398,73 @@ Decision:  Replace the single-connection factory with psycopg_pool.ConnectionPoo
       was itself flagged as a genuine documentation gap during this planning pass.
 ```
 
+### ADR-021: Zone 5 (Entity) Shape B storage — dedicated `entity_schema.sql`, fulfilling ADR-006
+
+```
+Status:    Proposed (2026-09-22) -- Sprint 5 planning bundle, docs-only pass. NOT YET IMPLEMENTED.
+Context:   ADR-006 already approves PostgreSQL as Zone 5's Shape B storage engine at the
+    architecture level, but no concrete schema was ever authored -- confirmed by inspection:
+    src/dashanan/infrastructure/ has episodic_schema.sql, semantic_schema.sql,
+    provenance_schema.sql, zone8_consolidation_schema.sql, but no entity_schema.sql. Surfaced by
+    docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 2: Zone 5's own
+    erasure LOGIC already works today for Shape A (EntityMemoryRepository.erase_entity, already
+    called by UnifiedSubjectErasureOrchestrator), but a real Shape B deployment has nothing
+    durable to erase without this adapter -- DASH-STORY-027's own forward-compatible cascade
+    cannot reach Zone 5 in production until this ADR's design ships.
+Decision:  A dedicated entity_schema.sql (two tables: entity_attributes, row-per-attribute
+    matching EntityMemoryRepository's own dict-per-attribute-name storage shape so a single-
+    attribute write never rewrites a whole entity; entity_aliases, a separate table since one
+    entity may have zero or many aliases), a new SqlEntityMemoryRepository implementing the
+    identical ZoneRepository/erase_entity interface the Shape A adapter already exposes (so
+    UnifiedSubjectErasureOrchestrator's existing Zone 5 call site needs zero code changes when the
+    composition root's Zone 5 builder is swapped from Shape A to Shape B), and an extension of
+    dpdp-crypto-shredding-full-erasure-design.md Section 5's existing dashanan_compliance_erasure_role
+    (not a new role) with a DELETE grant on both new tables, as a defense-in-depth posture for
+    the erasure path distinct from Zone 5's own ordinary dashanan_entity_role app-write grant.
+  Full design: docs/phase-1.5-design/zone5-shape-b-storage-design.md (v3, DRAFT -- 5 disclosed
+    open items remain: Shape A/B write_attribute signature symmetry for subject_id, whether the
+    orchestrator's existing direct entity_id call site should be reconciled with
+    subject_item_index resolution, an unaudited Postgres-native concurrency model, an undecided
+    file location for the compliance role's own CREATE ROLE statement, and no real-Postgres
+    load/integration test yet).
+  Zone 5 append-only question, resolved: unlike Zone 2 (Episodic, append-only) and Zone 7
+    (Provenance, append-only), Zone 5's own EntityMemoryRepository.write_attribute OVERWRITES its
+    dict entry on every call -- a current-state store, not an event log. entity_attributes is
+    therefore an ordinary mutable table (UPDATE/DELETE both permitted under the app role), with
+    no append-only trigger and no dashanan_schema_owner ownership-hardening tail, mirroring
+    semantic_schema.sql's own precedent rather than episodic_schema.sql's.
+  Explicitly out of scope: Zone 4 (Procedural). A prior planning pass's own backlog stub
+    (FR-011-ZONE-4-5-SHAPE-B) conflated Zone 4 and Zone 5 under one prerequisite framing; this
+    ADR and its underlying design doc correct that: Zone 4's domain model carries no
+    subject-linkable field at all (Procedure has no subject_id/entity_id), so it has no erasure
+    seam to build toward regardless of storage shape, and is not addressed here. A future,
+    separately-motivated Zone 4 Postgres adapter (durability only, no DPDP relevance) remains an
+    unscored backlog stub (backlog_draft.json future_sprints_backlog.remaining_frs
+    FR-011-ZONE-4-SHAPE-B), not part of this ADR.
+  Alternatives considered: a single JSONB "attributes" column per entity, one row per
+    (tenant_id, entity_id) (rejected -- would force a whole-row read-modify-write on every
+    single-attribute write_attribute call, breaking the same "one dict entry per call" guarantee
+    AC-005-2 already requires of the Shape A adapter); a new, Zone-5-specific compliance role
+    instead of extending the existing dashanan_compliance_erasure_role (rejected -- Section 5 of
+    the design doc's own rationale: one erasure-job credential across every zone is a smaller,
+    more auditable blast radius than one role per zone for the same compliance operation).
+  Consequences:
+    Accepted trade-offs: extending the shared compliance role to a fourth grant target (after
+      Zone 2, with Zone 4/8 out of scope) is a security-posture choice, not a schema-forced
+      requirement -- disclosed as such rather than asserted as the only correct design.
+    Risks: Postgres-native concurrency (row-level locking replacing Shape A's per-tenant
+      threading.Lock) is reasoned from general MVCC behavior, not yet load-tested or race-audited
+      -- flagged as an open item (design doc Section 8 item 3), not presented as verified.
+  India Layer: DPDP right-to-erasure (DPDP-2/DPDP-3 below) -- this ADR is what makes Zone 5
+      erasure durable-and-reachable in a real Shape B deployment, closing part of the gap
+      DPDP-2/DPDP-3's own implementation-status note (below) already discloses.
+  Sign-off:  NOT YET SIGNED OFF. Recorded here per rules/46-architecture-documentation.md's
+      requirement that a new architectural element (a new zone-persistence schema, ADR-006's own
+      "one relational engine ... with SEPARATE SCHEMAS and separate roles per zone" now given a
+      concrete Zone 5 implementation) be reflected in this HLD at the time it is proposed, not
+      deferred until implementation.
+```
+
 ---
 
 ## Section 5 — DSA Choices per Component
@@ -1697,7 +1764,7 @@ All values `[ASSUMED]`. They are derived from the persona shapes in PRD section 
 - **DPDP-4 Residency.** Per-tenant `embedding_residency` policy (ADR-015); all stores in-region for tenants handling Indian personal data.
 - **DPDP-5 Breach notification.** 72-hour notification requires knowing *what* was exposed — Zone 7's provenance chain plus the tenant-partitioned structure make the blast radius of any breach precisely enumerable rather than estimated.
 - **DPDP-6 Regulated-identifier minimization at ingestion.** ADR-017's write-gate detector tokenizes the configured regulated-identifier set (Aadhaar, PAN, card numbers) before persistence/indexing. This **narrows, and does not replace,** DPDP-1 (purpose limitation) and DPDP-2 (crypto-shredding erasure): the vast majority of retained content remains lawfully-retained user-stated fact governed by DPDP-1/DPDP-2 as already resolved; DPDP-6 addresses only the narrower risk of a small class of high-risk structured identifiers reaching the vector/lexical index as plain content.
-- **Implementation status update (2026-09-22, Sprint 5 planning bundle, docs-only, NOT YET IMPLEMENTED -- CORRECTED 2026-09-22, solution-architect review round 8, see below):** what ships today only partially realizes DPDP-2/DPDP-3 above. Two mechanisms exist, neither yet composed into one wired cascade: (1) `CrossZoneDpdpErasureCascade` (DASH-STORY-020) is keyed by `item_id`, not `subject_id`, and reaches only Zones 2 and 6 -- itself never calling `zone8_crypto_shredding.py`'s key-destroy primitives; (2) separately, the live `eraseSubject` endpoint (`src/dashanan/api/app.py`, AC-023-3) already calls `SubjectErasureCascadeService`, a real, tested Zone-8-only service that DOES call `zone8_crypto_shredding.py`'s key-destroy primitive for real today -- so the primitive is NOT uncalled system-wide, only uncalled from the Zone 2/6 cascade specifically. A separate, more complete orchestrator (`UnifiedSubjectErasureOrchestrator`, `src/dashanan/application/unified_subject_erasure_orchestrator.py`, DASH-STORY-025/DSHN-70) already fans out to Zones 2/3/5/6/8 but is not yet wired into the live endpoint. A design closing this wiring gap is proposed in `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md` (v2.0, DRAFT, 10 documented solution-architect review rounds): it surfaces a prerequisite finding that Zones 4/5 have no Shape B (Postgres) storage adapter today (Zone 4 permanently, structurally excluded regardless of storage shape), so the near-term scope of wiring the orchestrator in is Zones 1/2/3/6/7/8, with Zone 4/5 as a disclosed, forward-compatible gap rather than a silently-claimed one. **OAQ-10's legal-sufficiency question above remains completely unaffected and unresolved by this update** -- this note documents an implementation-status gap between DPDP-2/DPDP-3's target design and shipped code, not a change to OAQ-10's own still-open legal question.
+- **Implementation status update (2026-09-22, Sprint 5 planning bundle, docs-only, NOT YET IMPLEMENTED -- CORRECTED 2026-09-22, solution-architect review round 8, see below):** what ships today only partially realizes DPDP-2/DPDP-3 above. Two mechanisms exist, neither yet composed into one wired cascade: (1) `CrossZoneDpdpErasureCascade` (DASH-STORY-020) is keyed by `item_id`, not `subject_id`, and reaches only Zones 2 and 6 -- itself never calling `zone8_crypto_shredding.py`'s key-destroy primitives; (2) separately, the live `eraseSubject` endpoint (`src/dashanan/api/app.py`, AC-023-3) already calls `SubjectErasureCascadeService`, a real, tested Zone-8-only service that DOES call `zone8_crypto_shredding.py`'s key-destroy primitive for real today -- so the primitive is NOT uncalled system-wide, only uncalled from the Zone 2/6 cascade specifically. A separate, more complete orchestrator (`UnifiedSubjectErasureOrchestrator`, `src/dashanan/application/unified_subject_erasure_orchestrator.py`, DASH-STORY-025/DSHN-70) already fans out to Zones 2/3/5/6/8 but is not yet wired into the live endpoint. A design closing this wiring gap is proposed in `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md` (v2.0, DRAFT, 10 documented solution-architect review rounds): it surfaces a prerequisite finding that Zones 4/5 have no Shape B (Postgres) storage adapter today (Zone 4 permanently, structurally excluded regardless of storage shape), so the near-term scope of wiring the orchestrator in is Zones 1/2/3/6/7/8, with Zone 4/5 as a disclosed, forward-compatible gap rather than a silently-claimed one. **Update (2026-09-22, solution-architect, user-directed scope pull-forward): Zone 5's own half of that prerequisite is now addressed by ADR-021 and its design doc `docs/phase-1.5-design/zone5-shape-b-storage-design.md` (v3, DRAFT, NOT YET IMPLEMENTED) -- once implemented, DASH-STORY-027's already-forward-compatible cascade wiring can reach Zone 5 in a real Shape B deployment with no change to the cascade's own code. Zone 4 remains permanently out of scope (no erasure seam exists, Shape A or B), tracked only as an unscored, non-erasure-motivated durability stub (`backlog_draft.json` `FR-011-ZONE-4-SHAPE-B`).** **OAQ-10's legal-sufficiency question above remains completely unaffected and unresolved by this update** -- this note documents an implementation-status gap between DPDP-2/DPDP-3's target design and shipped code, not a change to OAQ-10's own still-open legal question.
 
 ### CERT-In
 
@@ -2070,3 +2137,5 @@ header above for the current, live Version/Status/Consensus Gate.
 | 1.5.1 | 2026-09-22 | solution-architect (round 8 re-review) | Corrected Section 10's DPDP-2/DPDP-3 implementation-status note (added in v1.5.0): it stated the shipped cascade "reaches only Zones 2 and 6, never calling this codebase's own zone8_crypto_shredding.py key-destroy primitives" -- FALSE. A separate, already-wired path (the live `eraseSubject` endpoint calling `SubjectErasureCascadeService`) already calls that primitive for real, today; only the Zone 2/6 cascade itself doesn't. Also corrected the note's design-doc citation from "v1, DRAFT" to "v2.0, DRAFT, 10 documented solution-architect review rounds" -- the DPDP design doc underwent a major (round 6) correction and 2 further verification rounds since v1.5.0 was written. Sourced from `dpdp-crypto-shredding-full-erasure-design.md`'s own Section 1 major correction and Change Log. |
 | 1.5.2 | 2026-09-22 | solution-architect (user-decision resolution) | Closed ADR-020's own "Documented exception" (Section 6's mandatory Circuit-Breaker-for-every-adapter-call pattern, previously carrying a scoped exception for pooled Postgres access): the user chose to REQUIRE a full circuit breaker for Postgres access now, rather than defer or re-affirm the exception as unnecessary. Updated ADR-020's "Full design" citation (now v2.3) and its Consequences block's "Documented exception" text to record closure, cross-referencing connection-pooling-design.md v2.3 Section 5.1 for the breaker's specification (mirrors this HLD's own Section 8 vector-store breaker exactly: 20-call ring-buffer window, 50%-failure-rate/30%-slow-call-rate OPEN thresholds, `30s * 2^(trips-1)` capped-300s half-open backoff, 5-probes-must-all-succeed recovery, reusing Section 5's existing count-based ring-buffer breaker utility). Updated Section 6's design-patterns table row for "Every adapter call -> Circuit Breaker" to remove the asterisked exception footnote, since no exception remains against that row once the breaker is implemented. No other ADR, STRIDE/DPDP finding, or OAQ was altered by this pass; DASH-STORY-028's re-estimation (13 SP -> 21 SP) for the added breaker scope is tracked in the Sprint 5 routing bundle (`sprint5_ar1_assignments.json`, `backlog_draft.json`, `sprint5_sprint_plan.json`), not in this HLD. |
 | 1.5.3 | 2026-09-22 | solution-architect (consensus-agent round-2 remediation) | connection-pooling-design.md advanced to v2.4 (new Section 5.1.1: breaker-OPEN 503s now carry a distinguishing `POSTGRES_UNAVAILABLE` error code and a dynamic `Retry-After` value tied to the current backoff window, instead of reusing PoolTimeout's fixed ~1s value, so clients back off appropriately instead of hammering a known-down dependency -- a consensus-agent finding on the v2.3 breaker design). This HLD's own ADR-020 citations (Full design line, Documented-exception paragraph, Section 6's design-patterns table row) were bumped from v2.3 to v2.4 to match -- previously left stale after this same round's design-doc bump, itself the exact propagation-miss class this bundle's review history repeatedly self-catches. No ADR content beyond the version citation changed; the breaker's architecture (thresholds, states, ring buffer) is unchanged from 1.5.2. |
+| 1.5.4 | 2026-09-22 | solution-architect (user-directed scope pull-forward, DASH-STORY-029) | Added ADR-021 (Zone 5 Entity Shape B storage -- Proposed, NOT YET IMPLEMENTED), fulfilling ADR-006's already-approved-but-never-concretely-schema'd Zone 5 storage engine choice and cross-referencing the new `docs/phase-1.5-design/zone5-shape-b-storage-design.md` (v3, DRAFT). Updated Section 10's DPDP-2/DPDP-3 implementation-status note with a pointer to ADR-021 and an explicit restatement that Zone 4 remains permanently out of scope (no erasure seam, any storage shape). **OAQ-10's own text and status are unchanged.** No existing ADR (ADR-001..020) or STRIDE/DPDP finding was altered, only added to. Propagated into `backlog_draft.json` (new DASH-STORY-029, 8 SP), `sprint5_ar0_routing_index.json`, `sprint5_ar1_assignments.json`, `sprint5_ar3_context_windows.json`, `sprint5_implementation_execution_plan.json` (3 new prompts, PREPARED FOR FUTURE USE, NOT EXECUTED), and `sprint5_sprint_plan.json`. |
+| 1.5.5 | 2026-09-22 | solution-architect (round-6 review remediation on DASH-STORY-029) | `zone5-shape-b-storage-design.md` advanced v1->v2 (round 1, a fabrication-risk correction) then v2->v3 (round 5, a bare citation-scope fix) since 1.5.4 was written; ADR-021's own three citations of that doc (Full design line, Section 10's implementation-status note, this Revision History table's own 1.5.4 row) were left stale at v2 -- bumped to v3. No ADR content, STRIDE/DPDP finding, or OAQ was altered by this pass; this is a version-citation-currency fix only, mirroring 1.5.3's identical fix for connection-pooling-design.md's own v2.3->v2.4 propagation miss. |

@@ -1,8 +1,8 @@
 {
   "superseded_note_2026_09_22": "SPRINT5-CAND-001 (DASH-STORY-027)'s file list, scoring evidence, and 'v1, DRAFT' design-doc citations below describe the PRE-ROUND-6 scope -- solution-architect review round 6 found the DPDP design doc's original baseline false (the eraseSubject endpoint was already wired, Zone-8-only, and a separate UnifiedSubjectErasureOrchestrator already existed but wasn't composed in) and re-scoped the story from 'build from scratch' to 'wire and extend' (13 SP -> 8 SP). This AR.0 file's own text was never rewritten to match (round 8 finding), since sprint5_ar1_assignments.json's own AR.1 record is the binding, superseding assignment for Phase B dispatch purposes -- but a reader of THIS file alone would get the old, disproven framing with no warning until this note. See sprint5_ar1_assignments.json and docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (now v2.2, bumped 2026-09-22 for the same version-citation-currency reason this note already exists for -- the design doc advanced through v2.1 and v2.2 via the consensus-agent failure-mode/retry/rollback/escalation review and its round-2 re-review after this note was first written at the v2.0 citation) for the current, correct scope. CORRECTION 2026-09-22: SPRINT5-CAND-002 (DASH-STORY-028) is NO LONGER unaffected -- a round-2 adversarial re-review of connection-pooling-design.md v2 found SPRINT5-CAND-002-DEV's title/files below also described a narrower scope than the design doc's own v2 fix pass established; see that item's own scope_update_2026_09_22 note for the correction. sprint5_ar1_assignments.json and sprint5_implementation_execution_plan.json remain the binding, superseding records for Phase B dispatch purposes for both stories.",
   "document_id": "AR0-ROUTING-INDEX-SPRINT5-20260922-01",
-  "version": "1.3.0",
-  "version_note": "1.3.0 (2026-09-22, user-decision resolution): SP5-DEC-001/002 marked CONFIRMED (Squad tier; harness-engineering N/A -- both already the bundle's own assumption, no structural change), SP5-DEC-003 marked DEFERRED (no dispatch authorized), SP5-DEC-004 marked SUPERSEDED (user chose to resolve connection-pooling-design.md's open items and pull Zone 5 Shape B storage into scope now, rather than authorizing the Phase C gate immediately -- see sprint5_ar1_assignments.json's SP5-DEC-102 for the same resolution at the AR.1 level). 1.2.0 (2026-09-22, consensus-agent round-3 re-review remediation, item 2 of 4): bumped every stale 'v1, DRAFT'/'v2.0' citation of docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md to v2.2 (superseded_note_2026_09_22, source_of_truth.design_docs, SPRINT5-CAND-001's own source field, SP5-DEC-004) so a reader of this file alone is not told the design doc is two review rounds behind its real state -- connection-pooling-design.md citations were intentionally left at v1 at the time this note was written, since that doc genuinely had not been reviewed yet. UPDATE 2026-09-22, later same day: connection-pooling-design.md has SINCE been through its own dedicated 2-round adversarial solution-architect review (real defect found and fixed) plus a follow-on consensus-agent rollback/retry-granularity fix, landing at v2.2 with a final clean APPROVE -- see source_of_truth.design_docs below and sprint5_ar1_assignments.json for the current, correct citation; this v1.2.0 note's own 'intentionally left at v1' statement is now itself historical, not current. 1.1.0 (2026-09-22, consensus-agent failure-mode/retry/rollback/escalation review remediation): renamed 'assignment_threshold' to 'candidate_screening_threshold' and added candidate_screening_threshold_renamed_note clarifying the field is AR.0's own screening threshold, distinct from sprint5_ar1_assignments.json's separate 0.75 assignment threshold (finding 4); added owner/due_date to SP5-DEC-001..004 (finding 6).",
+  "version": "1.6.0",
+  "version_note": "1.6.0 (2026-09-22, solution-architect round-6 review remediation on DASH-STORY-029): zone5-shape-b-storage-design.md advanced v2->v3 (round 5's bare citation-scope fix) but the bump was never propagated -- SPRINT5-CAND-003's source field was left at the stale v2; bumped to v3. No routing/scoring content changed. 1.5.0 (2026-09-22, solution-architect round-3 review remediation on DASH-STORY-029): zone5-shape-b-storage-design.md advanced from v1 to v2 (Section 2's subject_id convention claim corrected -- verified false against episodic_schema.sql/semantic_schema.sql, now accurately labeled a new pattern) -- SPRINT5-CAND-003's source field was left at the stale v1; bumped to v2. No routing/scoring content changed. 1.4.0 (2026-09-22, solution-architect, user-directed scope pull-forward): added SPRINT5-CAND-003 (DASH-STORY-029, Zone 5 Shape B storage), routed to database-engineer (primary, schema/role/repository work directly matching this persona's own description) with integration-testing-engineer for the QA sub-task, mirroring SPRINT5-CAND-002's own routing shape (both are Postgres-schema-and-repository stories). No change to SPRINT5-CAND-001/002's own routing. 1.3.0 (2026-09-22, user-decision resolution): SP5-DEC-001/002 marked CONFIRMED (Squad tier; harness-engineering N/A -- both already the bundle's own assumption, no structural change), SP5-DEC-003 marked DEFERRED (no dispatch authorized), SP5-DEC-004 marked SUPERSEDED (user chose to resolve connection-pooling-design.md's open items and pull Zone 5 Shape B storage into scope now, rather than authorizing the Phase C gate immediately -- see sprint5_ar1_assignments.json's SP5-DEC-102 for the same resolution at the AR.1 level). 1.2.0 (2026-09-22, consensus-agent round-3 re-review remediation, item 2 of 4): bumped every stale 'v1, DRAFT'/'v2.0' citation of docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md to v2.2 (superseded_note_2026_09_22, source_of_truth.design_docs, SPRINT5-CAND-001's own source field, SP5-DEC-004) so a reader of this file alone is not told the design doc is two review rounds behind its real state -- connection-pooling-design.md citations were intentionally left at v1 at the time this note was written, since that doc genuinely had not been reviewed yet. UPDATE 2026-09-22, later same day: connection-pooling-design.md has SINCE been through its own dedicated 2-round adversarial solution-architect review (real defect found and fixed) plus a follow-on consensus-agent rollback/retry-granularity fix, landing at v2.2 with a final clean APPROVE -- see source_of_truth.design_docs below and sprint5_ar1_assignments.json for the current, correct citation; this v1.2.0 note's own 'intentionally left at v1' statement is now itself historical, not current. 1.1.0 (2026-09-22, consensus-agent failure-mode/retry/rollback/escalation review remediation): renamed 'assignment_threshold' to 'candidate_screening_threshold' and added candidate_screening_threshold_renamed_note clarifying the field is AR.0's own screening threshold, distinct from sprint5_ar1_assignments.json's separate 0.75 assignment threshold (finding 4); added owner/due_date to SP5-DEC-001..004 (finding 6).",
   "author": "orchestrator-agent (Squad pattern, lead_agent infra-squad-lead per patterns.json Pattern 2 'Enterprise Full-Stack')",
   "phase": "Phase 7 - Agent-Task Routing (AR.0 routing index, Sprint 5 planning)",
   "date": "2026-09-22",
@@ -157,6 +157,75 @@
               "score": 0.775,
               "above_threshold": true,
               "evidence": "Same rationale as SPRINT5-CAND-001-QA -- real-Postgres/TestClient concurrency and contract-boundary testing is this persona's named core responsibility."
+            }
+          ],
+          "primary_candidate": "integration-testing-engineer",
+          "margin": null,
+          "margin_note": "Single above-threshold candidate."
+        }
+      ]
+    },
+    {
+      "item_id": "SPRINT5-CAND-003",
+      "story_id": "DASH-STORY-029",
+      "traces_to": "FR-005 / HLD.md ADR-006 (already-approved storage engine choice, no concrete Zone 5 schema until this item) / new ADR-021",
+      "title": "Zone 5 (Entity) Shape B (Postgres) storage adapter",
+      "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md (v3, DRAFT)",
+      "added": "2026-09-22 (solution-architect, user-directed scope pull-forward)",
+      "sub_tasks": [
+        {
+          "sub_task_id": "SPRINT5-CAND-003-DEV",
+          "title": "Author entity_schema.sql (entity_attributes + entity_aliases, subject_id index, role grants); implement SqlEntityMemoryRepository matching EntityMemoryRepository's exact ZoneRepository/erase_entity interface; wire into migration_runner.py; extend dashanan_compliance_erasure_role",
+          "files": [
+            "src/dashanan/infrastructure/entity_schema.sql (new)",
+            "src/dashanan/infrastructure/sql_entity_memory_repository.py (new)",
+            "src/dashanan/infrastructure/migration_runner.py (new schema-list entry)"
+          ],
+          "candidates": [
+            {
+              "agent": "database-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.9,
+                "skill_coverage": 0.85
+              },
+              "score": 0.875,
+              "above_threshold": true,
+              "evidence": "Same persona routed to SPRINT5-CAND-002-DEV (connection pooling) -- schema design, least-privilege role grants, and repository-adapter authorship are this persona's own named core responsibilities. rdbms-core and database-schema-migration-core (this item's schema-first nature makes the migration skill a closer fit here than for SPRINT5-CAND-002) both apply directly."
+            },
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.75,
+                "skill_coverage": 0.7
+              },
+              "score": 0.725,
+              "above_threshold": true,
+              "evidence": "Above threshold -- this agent authored EntityMemoryRepository (Shape A) originally and is the closest fit for matching SqlEntityMemoryRepository's interface to it precisely. Scored below database-engineer because the schema/role-grant half of this item's work is the more specialized half, per the design doc's own emphasis (Sections 3-5)."
+            }
+          ],
+          "primary_candidate": "database-engineer",
+          "margin": 0.15,
+          "margin_note": "python-backend-engineer retained as a named consult given its prior authorship of entity_memory_repository.py -- the interface-compatibility table (design doc Section 6) is exactly the kind of cross-check that agent's own prior context makes it well-placed to verify."
+        },
+        {
+          "sub_task_id": "SPRINT5-CAND-003-QA",
+          "title": "Real-Postgres integration test proving SqlEntityMemoryRepository's erase_entity return-value shape matches Shape A byte-for-byte, and the role-grant boundary is correctly scoped",
+          "files": [
+            "A new or extended file under tests/integration/"
+          ],
+          "candidates": [
+            {
+              "agent": "integration-testing-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.8,
+                "skill_coverage": 0.75
+              },
+              "score": 0.775,
+              "above_threshold": true,
+              "evidence": "Same rationale as SPRINT5-CAND-001-QA/SPRINT5-CAND-002-QA -- real-Postgres/interface-parity and privilege-boundary testing is this persona's named core responsibility."
             }
           ],
           "primary_candidate": "integration-testing-engineer",

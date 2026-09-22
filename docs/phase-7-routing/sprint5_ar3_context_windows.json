@@ -1,7 +1,7 @@
 {
   "document_id": "AR3-CONTEXT-WINDOWS-SPRINT5-20260922-01",
-  "version": "1.6.0",
-  "version_note": "1.6.0 (2026-09-22, consensus-agent round-2 propagation sweep): connection-pooling-design.md advanced from v2.5 to v2.6 (Change-Log-table-ordering-only fix, no content change) in the same generation as the 1.5.0 pass's own citation bump, but that pass's own output was left one version behind by the time it finished -- bumped this file's own top-level depends_on and all DASH-STORY-028 sub-tasks' sources.design_doc_full/files_to_read_or_modify citations from v2.5 to v2.6 in place. No section content or context_budget_tokens value changed. 1.5.0 (2026-09-22, solution-architect, consensus-agent review remediation on the DASH-STORY-028-LOADTEST sub-task -- fixes 2 and 3 of 5): (fix 2) summary.sub_tasks_with_pii_exclusion_applied was still 6 after the 1.4.0 pass added the new DASH-STORY-028-LOADTEST context window (which itself correctly carries pii_exclusion_applied: true) -- all 7 context_windows entries now carry pii_exclusion_applied: true, so the summary count was an arithmetic miscount, not a disclosed exclusion; corrected 6 to 7. (fix 3) connection-pooling-design.md advanced from v2.4 to v2.5 in the same 1.4.0-generation pass (the load-test-prerequisite correction itself), but this file's own top-level depends_on and every DASH-STORY-028 sub-task's sources.design_doc_full/files_to_read_or_modify citations were left at the stale v2.4 -- bumped all of them to v2.5 in place (depends_on; DASH-STORY-028-DEV, -QA, -REVIEW sources.design_doc_full; -REVIEW's Section 7.1 and Section 5.1/5.1.1 files_to_read_or_modify entries). No context_budget_tokens value changed by this pass -- v2.4 to v2.5 added no new section requiring additional reading (Section 4/8's PROVISIONAL/BLOCKED wording change is already the DASH-STORY-028-LOADTEST window's own subject, not new reading for DEV/QA/REVIEW). 1.4.0 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction): added a new context-window entry for DASH-STORY-028-LOADTEST (performance-testing-engineer, 6000 tokens) -- a new lightweight sub-task blocking DASH-STORY-028-DEV, producing real load-test numbers for connection-pooling-design.md Section 4 before that section's formula-derived pool_min/pool_max defaults are treated as final. Propagated from backlog_draft.json v1.4.1, sprint5_sprint_plan.json v1.3.0, sprint5_ar1_assignments.json v1.10.0, and sprint5_implementation_execution_plan.json v1.11.0. 1.3.0 (2026-09-22, solution-architect, consensus-agent review remediation -- 4 BLOCKER findings on v2.3's Section 5.1 circuit breaker): raised DASH-STORY-028-REVIEW's context_budget_tokens from 6500 to 7500 for AC-028-REVIEW-5's independent breaker verification (added to sprint5_ar1_assignments.json in this pass), adding Section 5.1/5.1.1's spec text and the post-DEV breaker code as two new files_to_read_or_modify entries. Bumped design_doc_full citations from v2.3 to v2.4 across all three DASH-STORY-028 context windows (DEV, QA, REVIEW), and corrected DASH-STORY-028-REVIEW's own internal v2.2/v2.3 inconsistency in place: its files_to_read_or_modify Section 7.1 entry still cited v2.2 two lines after sources.design_doc_full had already moved to v2.3 -- both fields now cite v2.4. Updated summary.total_context_budget_tokens from 58000 to 59000. 1.2.0 (2026-09-22, solution-architect, user-decision resolution -- SP5-DEC-102 circuit-breaker item): connection-pooling-design.md v2.3 adds a mandatory circuit breaker (Section 5.1) closing HLD.md ADR-020's documented exception. Raised DASH-STORY-028-DEV's context_budget_tokens from 9500 to 12500 and DASH-STORY-028-QA's from 9000 to 11500, added HLD.md Section 6/8/5 as required files_to_read_or_modify entries for both (the vector-store breaker pattern and the existing ring-buffer utility this sub-task's breaker must mirror/reuse), and bumped design_doc_full citations from v2.2 to v2.3 across all three DASH-STORY-028 context windows (DEV, QA, and REVIEW's citation for currency, though REVIEW's own budget is unchanged). Updated summary.total_context_budget_tokens from 52500 to 58000. 1.1.0 (2026-09-22, consensus-agent round-5 re-review remediation -- stale citation, solution-architect): DASH-STORY-028-REVIEW's context window had no citation of AC-028-REVIEW-4 (added to sprint5_ar1_assignments.json in its own 1.3.0 pass) and its files_to_read_or_modify list named no fallback-test file for that AC. Fixed alongside the same-round decision-ownership fix (sprint5_ar1_assignments.json v1.4.0 / sprint5_implementation_execution_plan.json v1.5.0): the POOLING_ENABLED flag is DEFERRED for DASH-STORY-028, so no fallback-test file exists to cite -- added a sources.cross_reference note stating this explicitly, and a files_to_read_or_modify entry pointing the reviewer at Section 7.1's code-revert procedure (the actual DEV-independent artifact AC-028-REVIEW-4's deferred branch is verified against) instead of a nonexistent test file.",
+  "version": "1.11.0",
+  "version_note": "1.11.0 (2026-09-22, solution-architect round-8 review remediation on DASH-STORY-029): summary.total_context_budget_tokens_note's own running arithmetic-history narrative ended at the 59000->65000 entry and never recorded the final 65000->85500 jump (round 7's DASH-STORY-029 windows addition) -- the numeric total field itself was already correct, only the audit-trail note was incomplete. Appended the missing entry. No numeric field changed. 1.10.0 (2026-09-22, solution-architect round-7 review remediation on DASH-STORY-029): the top-level summary block was never updated when the three DASH-STORY-029 context windows were added back in 1.7.0 -- sub_tasks_total stayed 7 with 10 actual context_windows entries present, total_context_budget_tokens stayed 65000 against a real sum of 85500 (65000 + 9000 + 6500 + 5000), and the three DASH-STORY-029 windows had no pii_exclusion_applied field at all, breaking this file's own established convention (every other window carries it). Added pii_exclusion_applied: true to all three DASH-STORY-029 windows (each's own pii_note already confirms no real PII value enters context -- schema-only, pseudonymized fixtures, or review-output-only) and corrected sub_tasks_total to 10, total_context_budget_tokens to 85500, and sub_tasks_with_pii_exclusion_applied to 10. No individual window's own context_budget_tokens value changed. 1.9.0 (2026-09-22, solution-architect round-6 review remediation on DASH-STORY-029): zone5-shape-b-storage-design.md advanced v2->v3 (round 5's bare citation-scope fix) but the bump was never propagated -- all three DASH-STORY-029 windows' sources.design_doc_full citations were left at the stale v2; bumped to v3. No context_budget_tokens value changed. 1.8.0 (2026-09-22, solution-architect round-3 review remediation on DASH-STORY-029): zone5-shape-b-storage-design.md advanced from v1 to v2 (Section 2's subject_id convention claim corrected) -- all three DASH-STORY-029 windows' sources.design_doc_full citations were left at the stale v1; bumped to v2. No context_budget_tokens value changed. 1.7.0 (2026-09-22, solution-architect, user-directed scope pull-forward): added 3 new context windows (DASH-STORY-029-DEV 9000t, DASH-STORY-029-QA 6500t, DASH-STORY-029-REVIEW 5000t) for the new Zone 5 Shape B storage story. No change to any DASH-STORY-027/028 context window. 1.6.0 (2026-09-22, consensus-agent round-2 propagation sweep): connection-pooling-design.md advanced from v2.5 to v2.6 (Change-Log-table-ordering-only fix, no content change) in the same generation as the 1.5.0 pass's own citation bump, but that pass's own output was left one version behind by the time it finished -- bumped this file's own top-level depends_on and all DASH-STORY-028 sub-tasks' sources.design_doc_full/files_to_read_or_modify citations from v2.5 to v2.6 in place. No section content or context_budget_tokens value changed. 1.5.0 (2026-09-22, solution-architect, consensus-agent review remediation on the DASH-STORY-028-LOADTEST sub-task -- fixes 2 and 3 of 5): (fix 2) summary.sub_tasks_with_pii_exclusion_applied was still 6 after the 1.4.0 pass added the new DASH-STORY-028-LOADTEST context window (which itself correctly carries pii_exclusion_applied: true) -- all 7 context_windows entries now carry pii_exclusion_applied: true, so the summary count was an arithmetic miscount, not a disclosed exclusion; corrected 6 to 7. (fix 3) connection-pooling-design.md advanced from v2.4 to v2.5 in the same 1.4.0-generation pass (the load-test-prerequisite correction itself), but this file's own top-level depends_on and every DASH-STORY-028 sub-task's sources.design_doc_full/files_to_read_or_modify citations were left at the stale v2.4 -- bumped all of them to v2.5 in place (depends_on; DASH-STORY-028-DEV, -QA, -REVIEW sources.design_doc_full; -REVIEW's Section 7.1 and Section 5.1/5.1.1 files_to_read_or_modify entries). No context_budget_tokens value changed by this pass -- v2.4 to v2.5 added no new section requiring additional reading (Section 4/8's PROVISIONAL/BLOCKED wording change is already the DASH-STORY-028-LOADTEST window's own subject, not new reading for DEV/QA/REVIEW). 1.4.0 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction): added a new context-window entry for DASH-STORY-028-LOADTEST (performance-testing-engineer, 6000 tokens) -- a new lightweight sub-task blocking DASH-STORY-028-DEV, producing real load-test numbers for connection-pooling-design.md Section 4 before that section's formula-derived pool_min/pool_max defaults are treated as final. Propagated from backlog_draft.json v1.4.1, sprint5_sprint_plan.json v1.3.0, sprint5_ar1_assignments.json v1.10.0, and sprint5_implementation_execution_plan.json v1.11.0. 1.3.0 (2026-09-22, solution-architect, consensus-agent review remediation -- 4 BLOCKER findings on v2.3's Section 5.1 circuit breaker): raised DASH-STORY-028-REVIEW's context_budget_tokens from 6500 to 7500 for AC-028-REVIEW-5's independent breaker verification (added to sprint5_ar1_assignments.json in this pass), adding Section 5.1/5.1.1's spec text and the post-DEV breaker code as two new files_to_read_or_modify entries. Bumped design_doc_full citations from v2.3 to v2.4 across all three DASH-STORY-028 context windows (DEV, QA, REVIEW), and corrected DASH-STORY-028-REVIEW's own internal v2.2/v2.3 inconsistency in place: its files_to_read_or_modify Section 7.1 entry still cited v2.2 two lines after sources.design_doc_full had already moved to v2.3 -- both fields now cite v2.4. Updated summary.total_context_budget_tokens from 58000 to 59000. 1.2.0 (2026-09-22, solution-architect, user-decision resolution -- SP5-DEC-102 circuit-breaker item): connection-pooling-design.md v2.3 adds a mandatory circuit breaker (Section 5.1) closing HLD.md ADR-020's documented exception. Raised DASH-STORY-028-DEV's context_budget_tokens from 9500 to 12500 and DASH-STORY-028-QA's from 9000 to 11500, added HLD.md Section 6/8/5 as required files_to_read_or_modify entries for both (the vector-store breaker pattern and the existing ring-buffer utility this sub-task's breaker must mirror/reuse), and bumped design_doc_full citations from v2.2 to v2.3 across all three DASH-STORY-028 context windows (DEV, QA, and REVIEW's citation for currency, though REVIEW's own budget is unchanged). Updated summary.total_context_budget_tokens from 52500 to 58000. 1.1.0 (2026-09-22, consensus-agent round-5 re-review remediation -- stale citation, solution-architect): DASH-STORY-028-REVIEW's context window had no citation of AC-028-REVIEW-4 (added to sprint5_ar1_assignments.json in its own 1.3.0 pass) and its files_to_read_or_modify list named no fallback-test file for that AC. Fixed alongside the same-round decision-ownership fix (sprint5_ar1_assignments.json v1.4.0 / sprint5_implementation_execution_plan.json v1.5.0): the POOLING_ENABLED flag is DEFERRED for DASH-STORY-028, so no fallback-test file exists to cite -- added a sources.cross_reference note stating this explicitly, and a files_to_read_or_modify entry pointing the reviewer at Section 7.1's code-revert procedure (the actual DEV-independent artifact AC-028-REVIEW-4's deferred branch is verified against) instead of a nonexistent test file.",
   "author": "orchestrator-agent",
   "phase": "Phase 7 - Agent-Task Routing (AR.3 per-sub-task context window design, Sprint 5)",
   "date": "2026-09-22",
@@ -367,13 +367,124 @@
       },
       "pii_exclusion_applied": true,
       "pii_note": "This sub-task never touches application data -- it drives raw connection acquisition/release against an empty or migration-only Postgres instance, measuring connection-level timing only."
+    },
+    {
+      "sub_task_id": "DASH-STORY-029-DEV",
+      "story_id": "DASH-STORY-029",
+      "assigned_agent": "database-engineer",
+      "context_budget_tokens": 9000,
+      "context_budget_note": "Sized 2026-09-22 against DASH-STORY-028-DEV's own precedent (12500t, but that sub-task touches 3 large application files plus HLD breaker citations) -- this sub-task's own file surface is narrower (one new schema file, one new repository file, a small migration-runner edit) but the repository file must be checked line-by-line against entity_memory_repository.py's real signatures for interface parity, which is why this budget exceeds a purely schema-only story like DASH-STORY-003's own original scope.",
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/zone5-shape-b-storage-design.md v3 (entire document -- Section 3 schema, Section 4 append-only decision, Section 5 role extension, Section 6 interface-compatibility table, Section 7 migration wiring, Section 8 open items)",
+        "files_to_read_or_modify": [
+          {
+            "file": "src/dashanan/infrastructure/entity_memory_repository.py",
+            "line_ranges": [
+              "entire file"
+            ],
+            "why": "The Shape A adapter this sub-task's SqlEntityMemoryRepository must match method-for-method (write_attribute, erase_entity, register_alias, resolve_alias_prefix, resolve_exact_term, get_entity, fetch) -- read in full, not excerpted, since a signature or return-shape mismatch defeats AC-029-DEV-2's own byte-for-byte parity requirement."
+          },
+          {
+            "file": "src/dashanan/infrastructure/episodic_schema.sql",
+            "line_ranges": [
+              "entire file"
+            ],
+            "why": "The precedent schema-file convention (role creation, REVOKE ALL FROM PUBLIC baseline, idempotent DO $$ blocks) this sub-task's entity_schema.sql must mirror per the design doc's own Section 2."
+          },
+          {
+            "file": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md",
+            "line_ranges": [
+              "Section 5 only"
+            ],
+            "why": "The existing dashanan_compliance_erasure_role definition this sub-task extends with a new GRANT -- must not redefine or duplicate the CREATE ROLE statement."
+          },
+          {
+            "file": "src/dashanan/infrastructure/migration_runner.py",
+            "line_ranges": [
+              "the existing per-zone schema-file list/ordering"
+            ],
+            "why": "entity_schema.sql's new entry must slot into the existing ordering convention, including the role-existence ordering constraint the design doc's Section 7 flags as an open question."
+          }
+        ]
+      },
+      "pii_note": "Zone 5 stores real per-tenant attribute values at runtime -- entity_memory_repository.py's own PII NOTE applies identically to this sub-task's Shape B adapter. No example row values or seed data in the schema file itself.",
+      "pii_exclusion_applied": true,
+      "thinking_level": "MEDIUM",
+      "temperature": 0.0
+    },
+    {
+      "sub_task_id": "DASH-STORY-029-QA",
+      "story_id": "DASH-STORY-029",
+      "assigned_agent": "integration-testing-engineer",
+      "context_budget_tokens": 6500,
+      "context_budget_note": "Sized against DASH-STORY-028-QA's own precedent, scaled down for this story's narrower single-zone surface (vs. DASH-STORY-028-QA's 5-repository-surface concurrency test).",
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/zone5-shape-b-storage-design.md v3 (entire document)",
+        "files_to_read_or_modify": [
+          {
+            "file": "tests/integration/test_api_real_postgres_e2e_dash3.py",
+            "line_ranges": [
+              "entire file (style precedent only, not modified)"
+            ],
+            "why": "The real-Postgres integration test style this sub-task's own new/extended test file must mirror, per every prior Sprint 5 QA sub-task's own must_not_deviate constraint."
+          },
+          {
+            "file": "src/dashanan/infrastructure/sql_entity_memory_repository.py",
+            "line_ranges": [
+              "entire file, once DASH-STORY-029-DEV lands"
+            ],
+            "why": "The implementation under test."
+          },
+          {
+            "file": "src/dashanan/infrastructure/entity_memory_repository.py",
+            "line_ranges": [
+              "entire file"
+            ],
+            "why": "The Shape A reference implementation AC-029-QA-1's parity fixture must be run against identically."
+          }
+        ]
+      },
+      "pii_note": "No real PII in test fixtures -- pseudonymized placeholders only, per rules/01-common-standards.md.",
+      "pii_exclusion_applied": true,
+      "thinking_level": "LOW",
+      "temperature": 0.0
+    },
+    {
+      "sub_task_id": "DASH-STORY-029-REVIEW",
+      "story_id": "DASH-STORY-029",
+      "assigned_agent": "consensus-agent",
+      "context_budget_tokens": 5000,
+      "context_budget_note": "Sized against DASH-STORY-028-REVIEW's own precedent (7500t for a materially larger DI-refactor review) -- this review's scope is narrower (one schema file, one repository file, one role-grant extension), so the budget is scaled down accordingly.",
+      "sources": {
+        "design_doc_full": "docs/phase-1.5-design/zone5-shape-b-storage-design.md v3 (entire document, Section 8 open items especially)",
+        "files_to_read_or_modify": [
+          {
+            "file": "src/dashanan/infrastructure/entity_schema.sql",
+            "line_ranges": [
+              "entire file, once DASH-STORY-029-DEV lands"
+            ],
+            "why": "The shipped schema under review, checked against the design doc's Section 3/5 exactly."
+          },
+          {
+            "file": "src/dashanan/infrastructure/sql_entity_memory_repository.py",
+            "line_ranges": [
+              "entire file, once DASH-STORY-029-DEV lands"
+            ],
+            "why": "The shipped repository under review, checked against the design doc's Section 6 interface-compatibility table."
+          }
+        ]
+      },
+      "pii_note": "Review output only -- no PII handling of its own.",
+      "pii_exclusion_applied": true,
+      "thinking_level": "LOW",
+      "temperature": 0.0
     }
   ],
   "summary": {
-    "sub_tasks_total": 7,
-    "total_context_budget_tokens": 65000,
-    "total_context_budget_tokens_note": "Updated 2026-09-22, six times: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files); then from 42500 to 48500 (round-2 adversarial re-review of connection-pooling-design.md v2, solution-architect: DASH-STORY-028-DEV 6000->9500, DASH-STORY-028-QA 5000->6500, DASH-STORY-028-REVIEW 4000->5000, a further +6000 to account for the wider per-request DI refactor scope across api/composition.py and api/app.py); then from 48500 to 52500 (consensus-agent APPROVED_WITH_CONDITIONS review, INFO finding 2, solution-architect remediation: DASH-STORY-028-QA 6500->9000, DASH-STORY-028-REVIEW 5000->6500, a further +4000, this time backed by measured `wc -w` token estimates on the design doc and test-precedent file rather than a qualitative judgment call); then from 52500 to 58000 (2026-09-22, user-decision resolution, solution-architect: DASH-STORY-028-DEV 9500->12500 [+3000], DASH-STORY-028-QA 9000->11500 [+2500], a further +5500 for the new mandatory circuit breaker -- both windows now cite HLD.md Section 6/8's vector-store breaker pattern as required reading to mirror it for Postgres); then from 58000 to 59000 (2026-09-22, consensus-agent review, BLOCKER fix 2 of 4: DASH-STORY-028-REVIEW 6500->7500, +1000, for AC-028-REVIEW-5's independent breaker verification). 35500+3500+3500+6000+4000+5500+1000=59000. then from 59000 to 65000 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction: new DASH-STORY-028-LOADTEST sub-task, +6000, a small standalone window scoped only to connection-pooling-design.md Section 4/8, docker-compose.yml's postgres service, and pyproject.toml's dependency convention).",
-    "sub_tasks_with_pii_exclusion_applied": 7,
+    "sub_tasks_total": 10,
+    "total_context_budget_tokens": 85500,
+    "total_context_budget_tokens_note": "Updated 2026-09-22, six times: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files); then from 42500 to 48500 (round-2 adversarial re-review of connection-pooling-design.md v2, solution-architect: DASH-STORY-028-DEV 6000->9500, DASH-STORY-028-QA 5000->6500, DASH-STORY-028-REVIEW 4000->5000, a further +6000 to account for the wider per-request DI refactor scope across api/composition.py and api/app.py); then from 48500 to 52500 (consensus-agent APPROVED_WITH_CONDITIONS review, INFO finding 2, solution-architect remediation: DASH-STORY-028-QA 6500->9000, DASH-STORY-028-REVIEW 5000->6500, a further +4000, this time backed by measured `wc -w` token estimates on the design doc and test-precedent file rather than a qualitative judgment call); then from 52500 to 58000 (2026-09-22, user-decision resolution, solution-architect: DASH-STORY-028-DEV 9500->12500 [+3000], DASH-STORY-028-QA 9000->11500 [+2500], a further +5500 for the new mandatory circuit breaker -- both windows now cite HLD.md Section 6/8's vector-store breaker pattern as required reading to mirror it for Postgres); then from 58000 to 59000 (2026-09-22, consensus-agent review, BLOCKER fix 2 of 4: DASH-STORY-028-REVIEW 6500->7500, +1000, for AC-028-REVIEW-5's independent breaker verification). 35500+3500+3500+6000+4000+5500+1000=59000. then from 59000 to 65000 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction: new DASH-STORY-028-LOADTEST sub-task, +6000, a small standalone window scoped only to connection-pooling-design.md Section 4/8, docker-compose.yml's postgres service, and pyproject.toml's dependency convention); then from 65000 to 85500 (2026-09-22, solution-architect, user-directed scope pull-forward: DASH-STORY-029's three new windows added, DEV 9000 + QA 6500 + REVIEW 5000 = +20500 -- this final jump was itself never recorded in this note until round 8's own review remediation caught the omission).",
+    "sub_tasks_with_pii_exclusion_applied": 10,
     "design_doc_included_in_full_for_every_sub_task": true,
     "note_on_security_clearance": "DASH-STORY-027-DEV and DASH-STORY-027-REVIEW are the first Sprint 5 sub-tasks with a narrow, ID-level (not payload-level) security clearance, reflecting the P1 gate. All other Sprint 5 sub-tasks follow the standard Sprints 1-4 posture (no PII, no clearance needed)."
   }

@@ -1,7 +1,7 @@
 {
   "document_id": "AR1-ASSIGNMENTS-SPRINT5-20260922-01",
-  "version": "1.12.0",
-  "version_note": "1.12.0 (2026-09-22, consensus-agent round-2 propagation sweep): this file was never in scope for the v2.3->v2.4->v2.5->v2.6 connection-pooling-design.md citation bumps applied to sprint5_implementation_execution_plan.json and sprint5_ar3_context_windows.json across multiple prior rounds, and was left materially stale (depends_on at v2.4, structural_note at v2.2) despite this file's own 1.9.0 entry explicitly claiming responsibility for self-maintaining this citation. Bumped both fields to v2.6 (the design doc's current version: 2-round solution-architect review, mandatory circuit breaker, Retry-After/error-code disambiguation, load-test prerequisite, Change-Log-ordering fix). No AC, story-point, or sub-task content changed. 1.11.0 (2026-09-22, solution-architect, consensus-agent review remediation on the DASH-STORY-028-LOADTEST sub-task -- fixes 1 and 5 of 5): (fix 1, BLOCKER) DASH-STORY-028-LOADTEST had no defined failure/escalation clause -- AC-028-LOADTEST-1..3 only covered the happy-path 'done' state, with no statement of what counts as harness failure (e.g. the docker-compose.yml Postgres container is unreachable), whether performance-testing-engineer gets a bounded retry, or where an ambiguous/non-converging result (no clear knee in the latency curve, contradictory repeated-run results) escalates. Added a new failure_and_escalation_policy field to the DASH-STORY-028-LOADTEST sub_task: harness failures get a bounded k=2 retry (matching sprint5_implementation_execution_plan.json retry_policy.k=2, this bundle's standing convention reused verbatim from Sprint 1-4); an ambiguous/non-converging result is NOT a k=2 retry candidate (the harness worked, the interpretation didn't converge) and instead escalates first to database-engineer (already named as this sub-task's own consult_agents entry, and connection-pooling-design.md Section 4's own sizing-formula author) to interpret the raw numbers, then, if still unresolved, to escalation_target: user (Piyush Makhija) -- the same escalation_target sprint5_implementation_execution_plan.json's base retry_policy already names, reused here rather than inventing a second escalation path. (fix 5, INFO) DASH-STORY-028's story-level logging_note still read 'Depends on nothing else in Sprint 5 or prior sprints' with no mention of the new within-story DASH-STORY-028-LOADTEST prerequisite this same revision's own dependency_integrity_check.sprint_5_edges already records (DASH-STORY-028-DEV depends_on [DASH-STORY-028-LOADTEST]) -- the narrative logging_note field had lagged the authoritative edge list. Appended one clarifying sentence, mirroring backlog_draft.json's loadtest_prerequisite_note field's own reasoning (the LOADTEST edge is a new, not pre-existing, within-story dependency, so it does not contradict the 'no dependency on any existing story' claim, and the cross-story parallel-development claim relative to DASH-STORY-027 still holds). 1.10.0 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction): added a new DASH-STORY-028-LOADTEST sub-task to DASH-STORY-028's assignment (assigned performance-testing-engineer, consult database-engineer) -- a lightweight sub-task, not a standalone story (reasoning in backlog_draft.json's DASH-STORY-028.prerequisite_sub_task), producing real k6/locust/pgbench-style load-test numbers against the actual docker-compose.yml Postgres container before DASH-STORY-028-DEV starts. dependency_integrity_check.sprint_5_edges gains DASH-STORY-028-LOADTEST: [] and DASH-STORY-028-DEV now depends_on [DASH-STORY-028-LOADTEST]. Propagated from backlog_draft.json v1.4.1 and sprint5_sprint_plan.json v1.3.0. 1.9.0 (2026-09-22, solution-architect, consensus-agent review remediation -- 4 BLOCKER findings on v2.3's Section 5.1 circuit breaker): consensus-agent's review of the new circuit-breaker design found and required fixes for 4 issues, all BLOCKER. (1) connection-pooling-design.md's Section 5.1 OPEN-state 503 reused the exact same response shape as Section 5's PoolTimeout 503 with no distinguishing Retry-After value or error code -- fixed via the design doc's new Section 5.1.1 (breaker-OPEN now carries error.code=POSTGRES_UNAVAILABLE and a dynamically-computed Retry-After; PoolTimeout given error.code=POOL_EXHAUSTED for symmetry), reflected here in AC-028-DEV-4, AC-028-QA-4, and a new DASH-STORY-028-DEV must_not_deviate item. (2) DASH-STORY-028-REVIEW's 4 ACs had zero coverage of the breaker itself despite it being 8 of the story's 21 SP and this bundle's own established precedent (AC-028-REVIEW-3) requiring independent verification of correctness-critical self-certified Dev/QA claims -- added AC-028-REVIEW-5 (failure taxonomy, thresholds/backoff, and the new Retry-After/error-code disambiguation, all independently verified) and extended the sub-task's deliverable text (item 6). (3)/(4) stale/inconsistent v2.2 design-doc citations are fixed in sprint5_implementation_execution_plan.json and sprint5_ar3_context_windows.json respectively, not in this file. Bumped this file's depends_on citation of connection-pooling-design.md from v2.3 to v2.4. DASH-STORY-028's story_points (21, Dev 13/QA 5/Review 3) are NOT re-estimated by this pass: AC-028-REVIEW-5 verifies already-built behavior (the breaker itself, plus this revision's disambiguation) using the same review methodology and access AC-028-REVIEW-3 already applies to the DI refactor, not a qualitatively new review discipline or a new source-code surface for Dev/QA to build beyond what AC-028-DEV-4/AC-028-QA-4 already scope -- judged not to materially change Review's own effort at this story's scale. 1.8.0 (2026-09-22, solution-architect, user-decision resolution -- SP5-DEC-102 circuit-breaker item): connection-pooling-design.md v2.3 adds a mandatory circuit breaker in front of pooled Postgres connection acquisition (Section 5.1), closing HLD.md ADR-020's previously-disclosed 'Documented exception' per the user's decision to require the breaker now rather than defer it. Added AC-028-DEV-4 (implement the breaker: CLOSED/OPEN/HALF_OPEN state machine, HLD Section 5's ring-buffer utility reused, Postgres-specific failure predicate, HLD Section 8-mirrored thresholds) and AC-028-QA-4 (test all three state transitions plus the OPEN-state fail-fast-without-pool-acquisition behavior and a negative query-error-does-not-trip-breaker case) to DASH-STORY-028-DEV/QA's acceptance_criteria, extended both sub-tasks' deliverable/files text, and added two must_not_deviate items to DASH-STORY-028-DEV (reuse the existing ring-buffer utility, do not trip on query-level errors or PoolTimeout). Re-estimated DASH-STORY-028's story_points from 13 SP to 21 SP (Dev 13/QA 5/Review 3, next Fibonacci value per backlog_draft.json's estimation_method), propagated to backlog_draft.json and sprint5_sprint_plan.json's total_story_points. Bumped this file's depends_on citation of connection-pooling-design.md from v2.2 to v2.3. DASH-STORY-028-REVIEW's own acceptance_criteria are unchanged by this pass (not asked to re-scope the Review sub-task's ACs); the breaker's correctness is verified by AC-028-DEV-4/AC-028-QA-4, and AC-028-REVIEW-1/2's existing 'no zone repository code changed'/'no overclaimed atomicity' checks are unaffected. 1.7.0 (2026-09-22, consensus-agent review remediation -- CRITICAL propagation miss): the 1.6.0 pass changed DASH-STORY-027-REVIEW's P1 gate from BLOCKING to NON-BLOCKING ADVISORY per SP5-DEC-101, but never stated this file's own copy of the AC-027-REVIEW-1 (OAQ-10 legal-sufficiency) carve-out -- that a FAIL specifically on AC-027-REVIEW-1 still escalates immediately to the user with no Dev/QA retry authorized, REGARDLESS of the blocking/non-blocking posture change, since it is a legal question, not an engineering one. This carve-out already existed in sprint5_implementation_execution_plan.json's retry_policy.retry_class_addendum/review_prompt text, but this file is the AC/must-not-deviate source-of-record every prompt cites, and it silently omitted the carve-out. Added it to p1_security_override.applied_after_criteria_evaluation.effect_applied and to DASH-STORY-027-REVIEW's p1_trigger_evaluation/logging_note, mirroring the IEP's existing language. No other field changed. 1.6.0 (2026-09-22, user-decision resolution): SP5-DEC-101 marked RESOLVED -- the user chose to change DASH-STORY-027's P1 maker-checker gate from BLOCKING to NON-BLOCKING ADVISORY, aligning it with Sprint 4's own posture for its equivalent P1 override (DASH-STORY-026-REVIEW), rather than leaving DASH-STORY-027 as the sole BLOCKING exception. The review itself (india-crypto-regulatory-specialist, genuinely distinct from the Dev agent, all four AC-027-REVIEW-1..4 points) is unchanged in substance -- only the effect of a REJECTED verdict changes, from a story-closure/Dev-proceeding stop condition to a disclosed follow-up risk, mirroring DASH-STORY-028-REVIEW's existing non-blocking disposition. Updated p1_security_override.applied_after_criteria_evaluation.effect_applied, DASH-STORY-027-REVIEW's deliverable/title/p1_trigger_evaluation/logging_note, and summary.p1_flagged_stories/open_user_decisions (SP5-DEC-101) accordingly; propagated to sprint5_implementation_execution_plan.json and sprint5_ir1_agent_flags.json in the same pass. 1.5.0 (2026-09-22, user-decision resolution): SP5-DEC-102 marked SUPERSEDED -- the user chose not to authorize the Phase C gate yet, instead resolving connection-pooling-design.md's open items (load test required for pool sizing, full circuit breaker required) and pulling Zone 5 Shape B storage into Sprint 5 scope now as new story DASH-STORY-029. 1.4.0 (2026-09-22, consensus-agent round-5 re-review remediation -- decision-ownership gap for AC-028-REVIEW-4): AC-028-REVIEW-4 (added in 1.3.0) requires the Review sub-task to confirm EITHER the POOLING_ENABLED gate is implemented and tested OR it is explicitly deferred with Section 7.1's revert procedure confirmed accurate -- but no sub-task's scope actually decided which branch applies: DASH-STORY-028-DEV's deliverable never mentioned the flag (neither building it nor deferring it), and DASH-STORY-028-QA's ACs never tested a fallback path. solution-architect call: DEFER, per connection-pooling-design.md v2.2 Section 7.1's own framing of POOLING_ENABLED as the 'recommended mechanism' with a named fallback ('if the flag is judged out of scope for the initial implementation') -- this story is scoped as a wiring refactor of existing connection construction (composition_root.py + api/composition.py + api/app.py DI plumbing), not new runtime-feature work, and the flag would add a second, permanently-live code path (env-var branch, dual startup wiring, its own test) that is out of proportion to that scope; Section 7.1's ordered three-file code-revert procedure is already a real, sufficient rollback path requiring no flag. Added one sentence to DASH-STORY-028-DEV's deliverable (below) stating POOLING_ENABLED is explicitly out of scope for this story, so AC-028-REVIEW-4's deferred branch applies. 1.3.0 (2026-09-22, consensus-agent round-4 re-review remediation): connection-pooling-design.md v2.2's Section 9 DoD bullet on Section 7.1's rollback path (POOLING_ENABLED gate implemented+tested, or deferred with the code-revert procedure confirmed accurate) had no corresponding acceptance criterion anywhere in this bundle, unlike the doc's other v2.2 disclosures which were already propagated -- added AC-028-REVIEW-4 to DASH-STORY-028-REVIEW's acceptance_criteria and extended its deliverable text (item 5) to require this check before the story closes. 1.2.0 (2026-09-22, consensus-agent round-3 re-review remediation, items 2-3 of 4): bumped every stale 'v2.0'/'v1' citation of docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md to v2.2 (depends_on, structural_note, SP5-DEC-102) (item 2); added AC-027-DEV-4 and AC-027-QA-3 covering the design doc's Section 7 durability mechanism (write-ahead marker before Zone 8 key-destroy, finalize-retry recovery sweep, bounded k=2/backoff item-level retry, terminal FAILED-state escalation) that DASH-STORY-027-DEV/QA had no acceptance criteria for despite it taking 3 consensus-agent review rounds to design; updated both sub-tasks' deliverable text to explicitly scope this durability/recovery work, not only the step-6 index cleanup previously named (item 3). 1.1.0 (2026-09-22, consensus-agent failure-mode/retry/rollback/escalation review remediation): clarified methodology_reuse_note's 0.75 assignment threshold as deliberately distinct from sprint5_ar0_routing_index.json's separate 0.70 candidate-screening threshold, and corrected AR1-S5-G1's gap text to state the real, clarified routing conclusion (both candidates clear AR.0's 0.70 screening threshold but neither clears AR.1's 0.75 assignment threshold -- a genuine gap under the threshold that actually governs assignment) (finding 4).",
+  "version": "1.14.0",
+  "version_note": "1.14.0 (2026-09-22, solution-architect, adversarial-review remediation -- fix 3 of 3): DASH-STORY-027-DEV's must_not_deviate still read 'Does not attempt Zone 4/5 erasure -- explicitly out of scope pending the separate FR-011-ZONE-4-5-SHAPE-B prerequisite', which is now stale on two counts -- that stub was narrowed the same day (backlog_draft.json v1.5.0) to FR-011-ZONE-4-SHAPE-B (Zone 4 only), and Zone 5's own prerequisite is no longer a stub at all, it is DASH-STORY-029, in-flight this same sprint. Corrected the must_not_deviate text to state Zone 4 remains out of scope pending FR-011-ZONE-4-SHAPE-B (durability-only, not yet built) while Zone 5's prerequisite is tracked as DASH-STORY-029 (Sprint 5, in-flight, not yet shipped) -- DASH-STORY-027's own cascade still does not reach Zone 5 until 029 ships; this is a citation correction only, DASH-STORY-027's own scope, story points, and acceptance criteria are unchanged. Propagated the same correction into sprint5_implementation_execution_plan.json's DASH-STORY-027-DEV prompt body. 1.13.0 (2026-09-22, solution-architect, user-directed scope pull-forward): added DASH-STORY-029 (Zone 5 Shape B storage) to assignments -- DEV/QA assigned to database-engineer/integration-testing-engineer (same routing shape as DASH-STORY-028), REVIEW assigned to consensus-agent as a non-blocking advisory gate (p1_security_override criterion 2 considered and NOT triggered -- SqlEntityMemoryRepository implements the existing ZoneRepository port's contract, it does not modify it). Added the DASH-STORY-029-DEV/QA/REVIEW edges to dependency_integrity_check.sprint_5_edges (linear Dev->QA->Review, no cross-story edges), updated cross_story_edges/cycle_detection/assignment_induced_deadlock text accordingly, and updated summary counts (stories_total 2->3, sub_tasks_total 7->10, sub_tasks_assigned 7->10, below_threshold_assignments 1->2, distinct_implementing_agents 6->7, p1_considered_not_triggered gains DASH-STORY-029). No change to DASH-STORY-027 or DASH-STORY-028's own assignments. Propagated from backlog_draft.json v1.5.0 and sprint5_ar0_routing_index.json v1.4.0's new SPRINT5-CAND-003. 1.12.0 (2026-09-22, consensus-agent round-2 propagation sweep): this file was never in scope for the v2.3->v2.4->v2.5->v2.6 connection-pooling-design.md citation bumps applied to sprint5_implementation_execution_plan.json and sprint5_ar3_context_windows.json across multiple prior rounds, and was left materially stale (depends_on at v2.4, structural_note at v2.2) despite this file's own 1.9.0 entry explicitly claiming responsibility for self-maintaining this citation. Bumped both fields to v2.6 (the design doc's current version: 2-round solution-architect review, mandatory circuit breaker, Retry-After/error-code disambiguation, load-test prerequisite, Change-Log-ordering fix). No AC, story-point, or sub-task content changed. 1.11.0 (2026-09-22, solution-architect, consensus-agent review remediation on the DASH-STORY-028-LOADTEST sub-task -- fixes 1 and 5 of 5): (fix 1, BLOCKER) DASH-STORY-028-LOADTEST had no defined failure/escalation clause -- AC-028-LOADTEST-1..3 only covered the happy-path 'done' state, with no statement of what counts as harness failure (e.g. the docker-compose.yml Postgres container is unreachable), whether performance-testing-engineer gets a bounded retry, or where an ambiguous/non-converging result (no clear knee in the latency curve, contradictory repeated-run results) escalates. Added a new failure_and_escalation_policy field to the DASH-STORY-028-LOADTEST sub_task: harness failures get a bounded k=2 retry (matching sprint5_implementation_execution_plan.json retry_policy.k=2, this bundle's standing convention reused verbatim from Sprint 1-4); an ambiguous/non-converging result is NOT a k=2 retry candidate (the harness worked, the interpretation didn't converge) and instead escalates first to database-engineer (already named as this sub-task's own consult_agents entry, and connection-pooling-design.md Section 4's own sizing-formula author) to interpret the raw numbers, then, if still unresolved, to escalation_target: user (Piyush Makhija) -- the same escalation_target sprint5_implementation_execution_plan.json's base retry_policy already names, reused here rather than inventing a second escalation path. (fix 5, INFO) DASH-STORY-028's story-level logging_note still read 'Depends on nothing else in Sprint 5 or prior sprints' with no mention of the new within-story DASH-STORY-028-LOADTEST prerequisite this same revision's own dependency_integrity_check.sprint_5_edges already records (DASH-STORY-028-DEV depends_on [DASH-STORY-028-LOADTEST]) -- the narrative logging_note field had lagged the authoritative edge list. Appended one clarifying sentence, mirroring backlog_draft.json's loadtest_prerequisite_note field's own reasoning (the LOADTEST edge is a new, not pre-existing, within-story dependency, so it does not contradict the 'no dependency on any existing story' claim, and the cross-story parallel-development claim relative to DASH-STORY-027 still holds). 1.10.0 (2026-09-22, solution-architect, user-directed load-test-prerequisite correction): added a new DASH-STORY-028-LOADTEST sub-task to DASH-STORY-028's assignment (assigned performance-testing-engineer, consult database-engineer) -- a lightweight sub-task, not a standalone story (reasoning in backlog_draft.json's DASH-STORY-028.prerequisite_sub_task), producing real k6/locust/pgbench-style load-test numbers against the actual docker-compose.yml Postgres container before DASH-STORY-028-DEV starts. dependency_integrity_check.sprint_5_edges gains DASH-STORY-028-LOADTEST: [] and DASH-STORY-028-DEV now depends_on [DASH-STORY-028-LOADTEST]. Propagated from backlog_draft.json v1.4.1 and sprint5_sprint_plan.json v1.3.0. 1.9.0 (2026-09-22, solution-architect, consensus-agent review remediation -- 4 BLOCKER findings on v2.3's Section 5.1 circuit breaker): consensus-agent's review of the new circuit-breaker design found and required fixes for 4 issues, all BLOCKER. (1) connection-pooling-design.md's Section 5.1 OPEN-state 503 reused the exact same response shape as Section 5's PoolTimeout 503 with no distinguishing Retry-After value or error code -- fixed via the design doc's new Section 5.1.1 (breaker-OPEN now carries error.code=POSTGRES_UNAVAILABLE and a dynamically-computed Retry-After; PoolTimeout given error.code=POOL_EXHAUSTED for symmetry), reflected here in AC-028-DEV-4, AC-028-QA-4, and a new DASH-STORY-028-DEV must_not_deviate item. (2) DASH-STORY-028-REVIEW's 4 ACs had zero coverage of the breaker itself despite it being 8 of the story's 21 SP and this bundle's own established precedent (AC-028-REVIEW-3) requiring independent verification of correctness-critical self-certified Dev/QA claims -- added AC-028-REVIEW-5 (failure taxonomy, thresholds/backoff, and the new Retry-After/error-code disambiguation, all independently verified) and extended the sub-task's deliverable text (item 6). (3)/(4) stale/inconsistent v2.2 design-doc citations are fixed in sprint5_implementation_execution_plan.json and sprint5_ar3_context_windows.json respectively, not in this file. Bumped this file's depends_on citation of connection-pooling-design.md from v2.3 to v2.4. DASH-STORY-028's story_points (21, Dev 13/QA 5/Review 3) are NOT re-estimated by this pass: AC-028-REVIEW-5 verifies already-built behavior (the breaker itself, plus this revision's disambiguation) using the same review methodology and access AC-028-REVIEW-3 already applies to the DI refactor, not a qualitatively new review discipline or a new source-code surface for Dev/QA to build beyond what AC-028-DEV-4/AC-028-QA-4 already scope -- judged not to materially change Review's own effort at this story's scale. 1.8.0 (2026-09-22, solution-architect, user-decision resolution -- SP5-DEC-102 circuit-breaker item): connection-pooling-design.md v2.3 adds a mandatory circuit breaker in front of pooled Postgres connection acquisition (Section 5.1), closing HLD.md ADR-020's previously-disclosed 'Documented exception' per the user's decision to require the breaker now rather than defer it. Added AC-028-DEV-4 (implement the breaker: CLOSED/OPEN/HALF_OPEN state machine, HLD Section 5's ring-buffer utility reused, Postgres-specific failure predicate, HLD Section 8-mirrored thresholds) and AC-028-QA-4 (test all three state transitions plus the OPEN-state fail-fast-without-pool-acquisition behavior and a negative query-error-does-not-trip-breaker case) to DASH-STORY-028-DEV/QA's acceptance_criteria, extended both sub-tasks' deliverable/files text, and added two must_not_deviate items to DASH-STORY-028-DEV (reuse the existing ring-buffer utility, do not trip on query-level errors or PoolTimeout). Re-estimated DASH-STORY-028's story_points from 13 SP to 21 SP (Dev 13/QA 5/Review 3, next Fibonacci value per backlog_draft.json's estimation_method), propagated to backlog_draft.json and sprint5_sprint_plan.json's total_story_points. Bumped this file's depends_on citation of connection-pooling-design.md from v2.2 to v2.3. DASH-STORY-028-REVIEW's own acceptance_criteria are unchanged by this pass (not asked to re-scope the Review sub-task's ACs); the breaker's correctness is verified by AC-028-DEV-4/AC-028-QA-4, and AC-028-REVIEW-1/2's existing 'no zone repository code changed'/'no overclaimed atomicity' checks are unaffected. 1.7.0 (2026-09-22, consensus-agent review remediation -- CRITICAL propagation miss): the 1.6.0 pass changed DASH-STORY-027-REVIEW's P1 gate from BLOCKING to NON-BLOCKING ADVISORY per SP5-DEC-101, but never stated this file's own copy of the AC-027-REVIEW-1 (OAQ-10 legal-sufficiency) carve-out -- that a FAIL specifically on AC-027-REVIEW-1 still escalates immediately to the user with no Dev/QA retry authorized, REGARDLESS of the blocking/non-blocking posture change, since it is a legal question, not an engineering one. This carve-out already existed in sprint5_implementation_execution_plan.json's retry_policy.retry_class_addendum/review_prompt text, but this file is the AC/must-not-deviate source-of-record every prompt cites, and it silently omitted the carve-out. Added it to p1_security_override.applied_after_criteria_evaluation.effect_applied and to DASH-STORY-027-REVIEW's p1_trigger_evaluation/logging_note, mirroring the IEP's existing language. No other field changed. 1.6.0 (2026-09-22, user-decision resolution): SP5-DEC-101 marked RESOLVED -- the user chose to change DASH-STORY-027's P1 maker-checker gate from BLOCKING to NON-BLOCKING ADVISORY, aligning it with Sprint 4's own posture for its equivalent P1 override (DASH-STORY-026-REVIEW), rather than leaving DASH-STORY-027 as the sole BLOCKING exception. The review itself (india-crypto-regulatory-specialist, genuinely distinct from the Dev agent, all four AC-027-REVIEW-1..4 points) is unchanged in substance -- only the effect of a REJECTED verdict changes, from a story-closure/Dev-proceeding stop condition to a disclosed follow-up risk, mirroring DASH-STORY-028-REVIEW's existing non-blocking disposition. Updated p1_security_override.applied_after_criteria_evaluation.effect_applied, DASH-STORY-027-REVIEW's deliverable/title/p1_trigger_evaluation/logging_note, and summary.p1_flagged_stories/open_user_decisions (SP5-DEC-101) accordingly; propagated to sprint5_implementation_execution_plan.json and sprint5_ir1_agent_flags.json in the same pass. 1.5.0 (2026-09-22, user-decision resolution): SP5-DEC-102 marked SUPERSEDED -- the user chose not to authorize the Phase C gate yet, instead resolving connection-pooling-design.md's open items (load test required for pool sizing, full circuit breaker required) and pulling Zone 5 Shape B storage into Sprint 5 scope now as new story DASH-STORY-029. 1.4.0 (2026-09-22, consensus-agent round-5 re-review remediation -- decision-ownership gap for AC-028-REVIEW-4): AC-028-REVIEW-4 (added in 1.3.0) requires the Review sub-task to confirm EITHER the POOLING_ENABLED gate is implemented and tested OR it is explicitly deferred with Section 7.1's revert procedure confirmed accurate -- but no sub-task's scope actually decided which branch applies: DASH-STORY-028-DEV's deliverable never mentioned the flag (neither building it nor deferring it), and DASH-STORY-028-QA's ACs never tested a fallback path. solution-architect call: DEFER, per connection-pooling-design.md v2.2 Section 7.1's own framing of POOLING_ENABLED as the 'recommended mechanism' with a named fallback ('if the flag is judged out of scope for the initial implementation') -- this story is scoped as a wiring refactor of existing connection construction (composition_root.py + api/composition.py + api/app.py DI plumbing), not new runtime-feature work, and the flag would add a second, permanently-live code path (env-var branch, dual startup wiring, its own test) that is out of proportion to that scope; Section 7.1's ordered three-file code-revert procedure is already a real, sufficient rollback path requiring no flag. Added one sentence to DASH-STORY-028-DEV's deliverable (below) stating POOLING_ENABLED is explicitly out of scope for this story, so AC-028-REVIEW-4's deferred branch applies. 1.3.0 (2026-09-22, consensus-agent round-4 re-review remediation): connection-pooling-design.md v2.2's Section 9 DoD bullet on Section 7.1's rollback path (POOLING_ENABLED gate implemented+tested, or deferred with the code-revert procedure confirmed accurate) had no corresponding acceptance criterion anywhere in this bundle, unlike the doc's other v2.2 disclosures which were already propagated -- added AC-028-REVIEW-4 to DASH-STORY-028-REVIEW's acceptance_criteria and extended its deliverable text (item 5) to require this check before the story closes. 1.2.0 (2026-09-22, consensus-agent round-3 re-review remediation, items 2-3 of 4): bumped every stale 'v2.0'/'v1' citation of docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md to v2.2 (depends_on, structural_note, SP5-DEC-102) (item 2); added AC-027-DEV-4 and AC-027-QA-3 covering the design doc's Section 7 durability mechanism (write-ahead marker before Zone 8 key-destroy, finalize-retry recovery sweep, bounded k=2/backoff item-level retry, terminal FAILED-state escalation) that DASH-STORY-027-DEV/QA had no acceptance criteria for despite it taking 3 consensus-agent review rounds to design; updated both sub-tasks' deliverable text to explicitly scope this durability/recovery work, not only the step-6 index cleanup previously named (item 3). 1.1.0 (2026-09-22, consensus-agent failure-mode/retry/rollback/escalation review remediation): clarified methodology_reuse_note's 0.75 assignment threshold as deliberately distinct from sprint5_ar0_routing_index.json's separate 0.70 candidate-screening threshold, and corrected AR1-S5-G1's gap text to state the real, clarified routing conclusion (both candidates clear AR.0's 0.70 screening threshold but neither clears AR.1's 0.75 assignment threshold -- a genuine gap under the threshold that actually governs assignment) (finding 4).",
   "author": "orchestrator-agent",
   "phase": "Phase 7 - Agent-Task Routing (AR.1 story-to-agent assignment, Sprint 5)",
   "date": "2026-09-22",
@@ -51,6 +51,12 @@
         "reason_considered": "Touches the composition root, which builds every zone's repository.",
         "reason_not_triggered": "Does not touch Zone 7's own storage or content, does not modify the ZoneRepository PORT interface (only how connections are acquired/released before being handed to already-existing, unchanged repository constructors, per the design doc's own migration-note), and carries no cross-tenant-isolation claim (tenant scoping is unaffected, still enforced inside each repository's own queries, not by the connection-acquisition layer).",
         "advisory_action": "Non-blocking advisory review attached to DASH-STORY-028-REVIEW (consensus-agent), same posture as Sprint 4's DASH-STORY-026. Cross-reference (added 2026-09-22, consensus-agent APPROVED_WITH_CONDITIONS review of the 13 SP re-scoping, INFO finding): DASH-STORY-028-QA's own AC-028-QA-3 already runs a bounded k=2 retry-then-escalate policy (sprint5_implementation_execution_plan.json retry_policy) against exactly the same condition this override's criteria consider -- DI-wiring completeness/correctness across all 5 repository/service surfaces (Zone 2/3/5/7/8-manifest) -- and STOPS the story on a second REJECTED, unlike DASH-STORY-028-REVIEW's own non-blocking posture. AC-028-QA-3 functioning as a de facto blocking gate for DI-wiring correctness, not merely that Zone 7/ZoneRepository/cross-tenant isolation aren't touched, is what actually makes the advisory (non-blocking) posture for the Review sub-task safe at this story's larger 13 SP scope -- the reason_not_triggered text above establishes the P1 criteria don't fire, but does not by itself explain why an advisory-only Review is still safe once the refactor spans ~10 handlers/8 providers; this cross-reference closes that gap."
+      },
+      {
+        "story": "DASH-STORY-029 (Zone 5 Shape B storage)",
+        "reason_considered": "Implements the ZoneRepository/erase_entity interface against a brand-new backing store (Postgres) for a zone that also carries the DPDP compliance-role erasure adapter pattern (design doc Section 5) -- close enough to criterion 2's own wording ('touches the storage-adapter (ZoneRepository port) interface') to require an explicit evaluation rather than a silent skip.",
+        "reason_not_triggered": "SqlEntityMemoryRepository IMPLEMENTS the existing ZoneRepository port's contract; it does not MODIFY that contract's shape (same method signatures, same return types, verified by AC-029-DEV-2/AC-029-QA-1's own byte-for-byte parity requirement) -- the same distinction DASH-STORY-028's own reason_not_triggered draws between 'building a new adapter for an unchanged port' and 'changing the port itself'. Does not touch Zone 7's own storage or content, and carries no cross-tenant-isolation claim beyond what every existing zone repository already enforces via its own tenant_id-scoped queries.",
+        "advisory_action": "Non-blocking advisory review attached to DASH-STORY-029-REVIEW (consensus-agent), same posture as DASH-STORY-028-REVIEW."
       }
     ]
   },
@@ -118,7 +124,7 @@
             }
           ],
           "must_not_deviate": [
-            "Does not attempt Zone 4/5 erasure -- explicitly out of scope pending the separate FR-011-ZONE-4-5-SHAPE-B prerequisite (backlog_draft.json future_sprints_backlog)",
+            "Does not attempt Zone 4/5 erasure -- Zone 4 remains out of scope pending the separate, narrower FR-011-ZONE-4-SHAPE-B durability-only stub (backlog_draft.json future_sprints_backlog, not yet built, not erasure-motivated); Zone 5's prerequisite is now tracked as DASH-STORY-029 (Sprint 5, in-flight, not yet shipped) rather than an FR-011 stub -- this story's cascade still does not reach Zone 5 until DASH-STORY-029 ships its Shape B adapter, even though this story's own interface is already forward-compatible with it",
             "Does not modify zone8_crypto_shredding.py's existing AES-256-GCM primitives -- only adds call sites",
             "Does not modify UnifiedSubjectErasureOrchestrator's existing Zone 3/5/8 legs' own logic -- only extends it with a Zone 1 leg and a real SubjectToItemIndex implementation, per solution-architect review round 6's re-scoping",
             "Does not assert or imply OAQ-10 is resolved anywhere in code, docstrings, or API responses"
@@ -555,6 +561,188 @@
         }
       ],
       "logging_note": "Cite as AR1-S5-028. No prior GitHub issue exists for AR1-S3-G3. Depends on nothing else in Sprint 5 or prior sprints -- can be developed in parallel with DASH-STORY-027. CLARIFIED 2026-09-22 (consensus-agent review remediation, fix 5 of 5): this refers to cross-story/prior-sprint dependencies only -- within this story, DASH-STORY-028-DEV now depends on the new DASH-STORY-028-LOADTEST prerequisite sub-task (see dependency_integrity_check.sprint_5_edges above), which is new, not pre-existing, and does not touch the parallel-development claim relative to DASH-STORY-027."
+    },
+    {
+      "story_id": "DASH-STORY-029",
+      "jira_key": null,
+      "jira_key_note": "No Jira issue exists yet -- docs-only planning pass.",
+      "title": "Zone 5 (Entity) Shape B (Postgres) storage adapter",
+      "traces_to_fr": "FR-005 / HLD.md ADR-006 / new ADR-021",
+      "added": "2026-09-22 (solution-architect, user-directed scope pull-forward)",
+      "story_points": 8,
+      "gap_confirmed": "CONFIRMED by direct read of src/dashanan/infrastructure/ (directory listing) -- episodic_schema.sql, semantic_schema.sql, provenance_schema.sql, zone8_consolidation_schema.sql all exist; no entity_schema.sql exists. entity_memory_repository.py (Shape A) is the sole existing Zone 5 adapter, and its own docstring/PII note confirms it is in-process only.",
+      "sub_tasks": [
+        {
+          "sub_task_id": "DASH-STORY-029-DEV",
+          "label": "Dev",
+          "title": "Author entity_schema.sql, implement SqlEntityMemoryRepository, wire into migration_runner.py, extend dashanan_compliance_erasure_role",
+          "deliverable": "src/dashanan/infrastructure/entity_schema.sql (entity_attributes row-per-attribute table + entity_aliases table, subject_id partial index, dashanan_entity_role grants, per design doc Section 3); a GRANT DELETE extension of the existing dashanan_compliance_erasure_role (not a new role) onto both new tables (Section 5); src/dashanan/infrastructure/sql_entity_memory_repository.py implementing SqlEntityMemoryRepository with the exact same write_attribute/erase_entity/register_alias/resolve_alias_prefix/resolve_exact_term/get_entity/fetch signatures and return-value shapes as EntityMemoryRepository (Section 6's interface-compatibility table), including the new optional subject_id parameter on write_attribute and its subject_item_index write-gate population; a new migration_runner.py entry for entity_schema.sql (Section 7).",
+          "files": [
+            "src/dashanan/infrastructure/entity_schema.sql (new)",
+            "src/dashanan/infrastructure/sql_entity_memory_repository.py (new)",
+            "src/dashanan/infrastructure/migration_runner.py"
+          ],
+          "candidates": [
+            {
+              "agent": "database-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.9,
+                "skill_coverage": 0.85
+              },
+              "score": 0.875,
+              "above_threshold": true,
+              "evidence": "Carried forward from sprint5_ar0_routing_index.json SPRINT5-CAND-003-DEV -- schema design, least-privilege role grants, and repository-adapter authorship are this persona's own named core responsibilities."
+            },
+            {
+              "agent": "python-backend-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.75,
+                "skill_coverage": 0.7
+              },
+              "score": 0.725,
+              "above_threshold": true,
+              "evidence": "Carried forward -- above threshold, retained as consult given prior authorship of entity_memory_repository.py (Shape A), the interface this story's Shape B adapter must match exactly."
+            }
+          ],
+          "assigned_agent": "database-engineer",
+          "model": "sonnet",
+          "score": 0.875,
+          "runner_up": {
+            "agent": "python-backend-engineer",
+            "score": 0.725
+          },
+          "margin": 0.15,
+          "consult_agents": [
+            "python-backend-engineer"
+          ],
+          "rationale": "database-engineer's schema/role-grant expertise is the closer fit for this sub-task's dominant concern (schema shape, least-privilege grants, migration wiring); python-backend-engineer retained as consult specifically to verify the interface-compatibility table (design doc Section 6) against entity_memory_repository.py's own real signatures, given its prior authorship of that file.",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-029-DEV-1",
+              "text": "Given a Shape B deployment, When write_attribute is called for a (tenant_id, entity_id, attribute_name) triple, Then exactly one row in entity_attributes is inserted or updated via a single upsert statement -- never a whole-entity rewrite.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 3/6"
+            },
+            {
+              "ac_id": "AC-029-DEV-2",
+              "text": "Given a Shape B deployment, When erase_entity(tenant_id, entity_id) is called, Then every attribute and alias row for that entity is deleted under the dashanan_compliance_erasure_role credential, and the returned item_id tuple matches EntityMemoryRepository's own f\"{entity_id}:{attribute_name}\" convention exactly.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 5/6"
+            },
+            {
+              "ac_id": "AC-029-DEV-3",
+              "text": "Given the schema migration runs, When entity_attributes/entity_aliases privileges are inspected, Then REVOKE ALL FROM PUBLIC is in effect, dashanan_entity_role holds only the ordinary app-write grants, and dashanan_compliance_erasure_role holds only DELETE (no SELECT/INSERT/UPDATE) on both tables.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 3/5"
+            }
+          ],
+          "must_not_deviate": [
+            "Does not modify EntityMemoryRepository (Shape A) or its existing signature/behavior",
+            "Does not modify UnifiedSubjectErasureOrchestrator's existing Zone 5 call site",
+            "Does not build any Zone 4 (Procedural) schema, role, or repository -- Zone 4 is out of scope entirely",
+            "Does not create a new, Zone-5-specific compliance role -- extends the existing dashanan_compliance_erasure_role only"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S5-029-DEV."
+        },
+        {
+          "sub_task_id": "DASH-STORY-029-QA",
+          "label": "QA",
+          "title": "Real-Postgres integration test proving Shape A/Shape B erase_entity interface parity and the role-grant privilege boundary",
+          "deliverable": "A new or extended file under tests/integration/ mirroring test_api_real_postgres_e2e_dash3.py's style: a test proving write_attribute's single-row upsert guarantee; a test proving erase_entity's return-value shape matches EntityMemoryRepository's Shape A convention byte-for-byte for an identical input fixture, so UnifiedSubjectErasureOrchestrator's existing Zone 5 call site would work unchanged against either adapter; a privilege-boundary test proving dashanan_entity_role cannot perform any operation dashanan_compliance_erasure_role is scoped to (and vice versa); an alias prefix/exact-resolution parity test against the same input set the Shape A AliasTrie test suite uses.",
+          "files": [
+            "A new or extended file under tests/integration/"
+          ],
+          "candidates": [
+            {
+              "agent": "integration-testing-engineer",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.8,
+                "skill_coverage": 0.75
+              },
+              "score": 0.775,
+              "above_threshold": true,
+              "evidence": "Carried forward from sprint5_ar0_routing_index.json SPRINT5-CAND-003-QA."
+            }
+          ],
+          "assigned_agent": "integration-testing-engineer",
+          "model": "sonnet",
+          "score": 0.775,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Single above-threshold candidate.",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-029-QA-1",
+              "text": "Given the shipped SqlEntityMemoryRepository, When erase_entity is called against a fixture identical to one used against EntityMemoryRepository (Shape A), Then both return the same item_id tuple, byte-for-byte.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 6"
+            },
+            {
+              "ac_id": "AC-029-QA-2",
+              "text": "Given the shipped role grants, When a connection authenticated as dashanan_entity_role attempts a query only dashanan_compliance_erasure_role is granted (or vice versa), Then Postgres rejects it with an insufficient-privilege error.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 3/5"
+            },
+            {
+              "ac_id": "AC-029-QA-3",
+              "text": "Given the same alias set registered against both Shape A's AliasTrie and Shape B's entity_aliases table, When resolve_alias_prefix/resolve_exact_term are called with the same prefix/term, Then both adapters return the same entity_id set.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 6"
+            }
+          ],
+          "must_not_deviate": [
+            "Test style must mirror tests/integration/test_api_real_postgres_e2e_dash3.py -- real Postgres, not mocks",
+            "Does not assert resolution of any of the design doc's own Section 8 open items -- those remain disclosed, not silently tested-around"
+          ],
+          "p1_security_review": false,
+          "logging_note": "Cite as AR1-S5-029-QA. Depends on DASH-STORY-029-DEV landing first."
+        },
+        {
+          "sub_task_id": "DASH-STORY-029-REVIEW",
+          "label": "Review",
+          "title": "Non-blocking advisory review -- confirms Zone 4 stayed out of scope, the compliance-role extension rationale is disclosed, and the design doc's open items are not silently claimed resolved",
+          "deliverable": "A gate review confirming: (1) no Zone 4 (Procedural) schema, role, or repository code was introduced under this story; (2) the dashanan_compliance_erasure_role extension (Section 5) is documented as a defense-in-depth judgment call, not asserted as the only correct design; (3) EntityMemoryRepository's own Shape A behavior/signature is unchanged; (4) UnifiedSubjectErasureOrchestrator's existing Zone 5 call site required zero code changes, confirming real interface compatibility rather than an asserted one; (5) the design doc's Section 8 open items (subject_id Shape A/B signature symmetry, subject_item_index resolution reconciliation, unaudited concurrency, undecided compliance-role-creation file location, no load test yet) remain disclosed in the shipped code's own docstrings/comments, not silently dropped.",
+          "files": [
+            "Review output only -- no source files modified"
+          ],
+          "candidates": [
+            {
+              "agent": "consensus-agent",
+              "model": "sonnet",
+              "signals": {
+                "domain_match": 0.75,
+                "skill_coverage": 0.7
+              },
+              "score": 0.725,
+              "above_threshold": false,
+              "evidence": "Below this file's own 0.75 assignment threshold, same as DASH-STORY-028-REVIEW's own candidate pool -- retained as the assigned reviewer per this bundle's own established below-threshold-review-still-assigned convention (a Review gate is attached regardless of the generic-agent scoring gap, since no more specific reviewing persona exists in the library for this narrow a schema/interface-conformance check)."
+            }
+          ],
+          "assigned_agent": "consensus-agent",
+          "model": "sonnet",
+          "score": 0.725,
+          "runner_up": null,
+          "margin": null,
+          "rationale": "Same below-threshold-but-still-assigned rationale as DASH-STORY-028-REVIEW -- see that sub-task's own candidate evidence for the precedent.",
+          "acceptance_criteria": [
+            {
+              "ac_id": "AC-029-REVIEW-1",
+              "text": "Given the shipped code, When reviewed, Then confirm zero Zone 4 (Procedural) artifacts were introduced.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 1.1/Section 9"
+            },
+            {
+              "ac_id": "AC-029-REVIEW-2",
+              "text": "Given the shipped role grants, When reviewed, Then confirm the compliance-role extension's defense-in-depth rationale (not a structural requirement) is disclosed in the schema file's own comments, matching the design doc's Section 5 posture.",
+              "source": "docs/phase-1.5-design/zone5-shape-b-storage-design.md Section 5"
+            }
+          ],
+          "must_not_deviate": [
+            "Does not remediate code itself -- audits, reproduces, reports"
+          ],
+          "p1_security_review": false,
+          "p1_trigger_evaluation": "Considered and NOT triggered -- see p1_security_override.considered_and_not_triggered below. This story implements the existing ZoneRepository port for a new backing store; it does not modify the port's own contract, touch Zone 7, or touch cross-tenant isolation.",
+          "logging_note": "Cite as AR1-S5-029-REVIEW. Depends on DASH-STORY-029-DEV and DASH-STORY-029-QA both landing first."
+        }
+      ],
+      "logging_note": "Cite as AR1-S5-029. No prior GitHub issue exists. Depends on nothing else in Sprint 5 or prior sprints -- files are disjoint from both DASH-STORY-027 and DASH-STORY-028, so all three Sprint 5 stories can be developed in parallel. Non-blocking cross-reference (not a dependency edge): DASH-STORY-027's own Zone 5 cascade leg only becomes reachable in a real Shape B deployment once this story ships."
     }
   ],
   "dependency_integrity_check": {
@@ -578,11 +766,19 @@
         "DASH-STORY-028-DEV",
         "DASH-STORY-028-QA"
       ],
-      "DASH-STORY-028-LOADTEST": []
+      "DASH-STORY-028-LOADTEST": [],
+      "DASH-STORY-029-DEV": [],
+      "DASH-STORY-029-QA": [
+        "DASH-STORY-029-DEV"
+      ],
+      "DASH-STORY-029-REVIEW": [
+        "DASH-STORY-029-DEV",
+        "DASH-STORY-029-QA"
+      ]
     },
-    "cross_story_edges": "NONE -- DASH-STORY-027 and DASH-STORY-028 touch disjoint files (confirmed by both design docs' own file lists) and have no dependency on each other. Both stories' Dev sub-tasks can start in parallel. UPDATED 2026-09-22: DASH-STORY-028-DEV now also depends on the new DASH-STORY-028-LOADTEST sub-task (same story, not a cross-story edge) -- see sprint_5_edges above.",
-    "cycle_detection": "PASS - DASH-STORY-027's linear Dev -> QA -> Review chain, and DASH-STORY-028's now-extended linear chain LOADTEST -> Dev -> QA -> Review, no cross-story edges, no cycle.",
-    "assignment_induced_deadlock": "NONE. Six distinct implementing/reviewing agents across the two stories (python-backend-engineer, integration-testing-engineer, india-crypto-regulatory-specialist for DASH-STORY-027; database-engineer, integration-testing-engineer, consensus-agent for DASH-STORY-028) -- integration-testing-engineer holds a QA sub-task in both stories but this is sequential load, not a blocking dependency between the two stories.",
+    "cross_story_edges": "NONE -- DASH-STORY-027, DASH-STORY-028, and DASH-STORY-029 all touch disjoint files (confirmed by all three design docs' own file lists) and have no dependency on each other. All three stories' Dev sub-tasks can start in parallel. UPDATED 2026-09-22: DASH-STORY-028-DEV now also depends on the new DASH-STORY-028-LOADTEST sub-task (same story, not a cross-story edge); DASH-STORY-029 added with a linear intra-story chain only (Dev -> QA -> Review), no cross-story edge to DASH-STORY-027 or DASH-STORY-028 -- see sprint_5_edges above.",
+    "cycle_detection": "PASS - DASH-STORY-027's linear Dev -> QA -> Review chain, DASH-STORY-028's extended linear chain LOADTEST -> Dev -> QA -> Review, and DASH-STORY-029's linear Dev -> QA -> Review chain, no cross-story edges, no cycle.",
+    "assignment_induced_deadlock": "NONE. Seven distinct implementing/reviewing agents across the three stories (python-backend-engineer, integration-testing-engineer, india-crypto-regulatory-specialist for DASH-STORY-027; database-engineer, integration-testing-engineer, performance-testing-engineer, consensus-agent for DASH-STORY-028; database-engineer, integration-testing-engineer, consensus-agent for DASH-STORY-029, all reused from prior stories) -- integration-testing-engineer holds a QA sub-task in all three stories, and database-engineer/consensus-agent are reused across DASH-STORY-028/029, but this is sequential load, not a blocking dependency between stories.",
     "unresolvable_dependency": "NONE.",
     "serialization_warning": "python-backend-engineer and integration-testing-engineer each hold sub-tasks across both stories (Dev for 027, QA for both), continuing the standing concentration pattern every prior sprint's routing files have flagged. Unlike Sprint 4, this sprint's Dev-role concentration is partially reduced: database-engineer, not python-backend-engineer, is the primary Dev candidate for DASH-STORY-028."
   },
@@ -597,12 +793,12 @@
     }
   ],
   "summary": {
-    "stories_total": 2,
-    "sub_tasks_total": 7,
-    "sub_tasks_assigned": 7,
+    "stories_total": 3,
+    "sub_tasks_total": 10,
+    "sub_tasks_assigned": 10,
     "sub_tasks_unassigned": 0,
-    "below_threshold_assignments": 1,
-    "distinct_implementing_agents": 6,
+    "below_threshold_assignments": 2,
+    "distinct_implementing_agents": 7,
     "p1_flagged_stories": [
       "DASH-STORY-027 (non-blocking advisory maker-checker, india-crypto-regulatory-specialist, see p1_security_override.applied_after_criteria_evaluation -- UPDATED 2026-09-22 per resolved SP5-DEC-101, was BLOCKING)"
     ],
@@ -610,12 +806,13 @@
       "DASH-STORY-027": "india-crypto-regulatory-specialist"
     },
     "p1_considered_not_triggered": [
-      "DASH-STORY-028 (connection pooling) - see p1_security_override.considered_and_not_triggered; advisory review attached instead"
+      "DASH-STORY-028 (connection pooling) - see p1_security_override.considered_and_not_triggered; advisory review attached instead",
+      "DASH-STORY-029 (Zone 5 Shape B storage) - see p1_security_override.considered_and_not_triggered; advisory review attached instead"
     ],
     "score_range": {
       "min": 0.725,
       "max": 0.875,
-      "mean": 0.816
+      "mean": 0.82
     },
     "open_user_decisions": [
       {
