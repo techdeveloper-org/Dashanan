@@ -297,7 +297,7 @@ class TestScenario1FullLifecycleDurability:
             "/memory/write",
             json={
                 "session_id": session_id,
-                "content": {"text": payload_text, "zone_hint": "episodic"},
+                "content": {"text": payload_text, "zone_hint": "2-episodic"},
                 "provenance": {"source_type": "user_stated", "purpose": "dash3-e2e"},
             },
             headers={**_auth("memory:write"), "Idempotency-Key": str(uuid.uuid4())},
@@ -329,6 +329,82 @@ class TestScenario1FullLifecycleDurability:
         read_response = client.get(f"/items/{write_id}", headers=_auth("context:read"))
         assert read_response.status_code == 200, read_response.text
         assert read_response.json()["payload"] == payload_text
+
+
+# ---------------------------------------------------------------------------
+# Scenario 1b: GitHub #25 regression guard -- _do_write's zone_hint routing
+# normalizes through _WIRE_TO_DOMAIN_ZONE (never a bare string), so a
+# schema-compliant canonical zone_hint value actually reaches the zone it
+# names, and an unrecognized/omitted zone_hint still falls through to the
+# Zone 1 default rather than erroring.
+# ---------------------------------------------------------------------------
+
+
+class TestScenario1bZoneHintCanonicalWireValueRouting:
+    def test_canonical_4_procedural_zone_hint_reaches_the_procedural_branch(
+        self, client: TestClient
+    ) -> None:
+        """GitHub #25 regression guard.
+
+        Before the fix, _do_write compared zone_hint against the bare
+        string "procedural" -- the real OpenAPI ZoneId wire value is
+        "4-procedural", so a schema-compliant client's write silently fell
+        through to the Zone 1 default instead of reaching the Procedural
+        repository. No existing test exercised this branch at all
+        (canonical or bare) before this test was added.
+        """
+        task_signature_hash = f"tsh-{uuid.uuid4().hex[:12]}"
+        write_response = client.post(
+            "/memory/write",
+            json={
+                "session_id": f"s-{uuid.uuid4().hex[:8]}",
+                "content": {
+                    "text": "procedural-step-sequence",
+                    "zone_hint": "4-procedural",
+                    "task_signature_hash": task_signature_hash,
+                },
+                "provenance": {"source_type": "user_stated", "purpose": "dash3-e2e-gh25"},
+            },
+            headers={**_auth("memory:write"), "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert write_response.status_code == 202, write_response.text
+
+        # _do_write's Procedural branch (app.py) sets item_id =
+        # task_signature_hash, not write_id -- the write_id is a fresh
+        # UUID minted for every request but is only used as the Procedural
+        # branch's item_id for the Episodic/Working branches, never this
+        # one. Read back by the real item_id this branch actually uses.
+        read_response = client.get(
+            f"/items/{task_signature_hash}", headers=_auth("context:read")
+        )
+        assert read_response.status_code == 200, read_response.text
+        assert read_response.json()["source_zone"] == "4-procedural", (
+            "a canonical zone_hint of '4-procedural' must route to the Procedural "
+            "repository, not silently fall through to Zone 1 (GitHub #25)"
+        )
+
+    def test_omitted_zone_hint_still_falls_through_to_zone1_default(
+        self, client: TestClient
+    ) -> None:
+        """The normalization fix must not turn an unrecognized/omitted zone_hint
+        into a hard error -- _WIRE_TO_DOMAIN_ZONE.get(None-derived "working")
+        returns None, which must still fall through to the existing Zone 1
+        default exactly as it did before this fix."""
+        write_response = client.post(
+            "/memory/write",
+            json={
+                "session_id": f"s-{uuid.uuid4().hex[:8]}",
+                "content": {"text": "no-zone-hint-supplied"},
+                "provenance": {"source_type": "user_stated", "purpose": "dash3-e2e-gh25"},
+            },
+            headers={**_auth("memory:write"), "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert write_response.status_code == 202, write_response.text
+        write_id = write_response.json()["write_id"]
+
+        read_response = client.get(f"/items/{write_id}", headers=_auth("context:read"))
+        assert read_response.status_code == 200, read_response.text
+        assert read_response.json()["source_zone"] == "1-working"
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +675,7 @@ class TestScenario5ConcurrentWritesSharedIdempotencyKey:
                     "/memory/write",
                     json={
                         "session_id": session_id,
-                        "content": {"text": f"adversarial-write-{index}", "zone_hint": "episodic"},
+                        "content": {"text": f"adversarial-write-{index}", "zone_hint": "2-episodic"},
                         "provenance": {"source_type": "user_stated", "purpose": "dash3-e2e-adversarial"},
                     },
                     headers={

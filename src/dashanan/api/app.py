@@ -542,8 +542,20 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         token_count = max(1, len(text.split()))
         zone_hint = body.content.zone_hint or "working"
 
+        # GitHub #25: never compare zone_hint against a bare string -- the
+        # OpenAPI ZoneId enum's real wire values are prefixed
+        # ("4-procedural", "2-episodic"), and a schema-compliant client
+        # sending one would never have matched a bare "procedural"/
+        # "episodic" comparison. Normalize via the existing
+        # _WIRE_TO_DOMAIN_ZONE map instead, exactly as
+        # _zone3_5_routing_gate_triggered already does above. zone_hint
+        # itself (the raw wire string) is still used unchanged for the
+        # error message/log field below -- only the branch comparison
+        # changes.
+        zone_hint_domain = _WIRE_TO_DOMAIN_ZONE.get(zone_hint)
+
         try:
-            if zone_hint == "procedural" and body.content.task_signature_hash:
+            if zone_hint_domain is ZoneId.PROCEDURAL and body.content.task_signature_hash:
                 from dashanan.domain.procedure import Procedure
 
                 procedure = Procedure(
@@ -557,7 +569,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
                 ctx.procedural_repository.commit(procedure)
                 item_id = body.content.task_signature_hash
                 source_zone = ZoneId.PROCEDURAL
-            elif zone_hint == "episodic" and ctx.postgres_available and ctx.episodic_repository is not None:
+            elif zone_hint_domain is ZoneId.EPISODIC and ctx.postgres_available and ctx.episodic_repository is not None:
                 from dashanan.domain.episode import Episode, EpisodeState
 
                 item_id = write_id
