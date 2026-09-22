@@ -20,11 +20,13 @@ citation/consistency check and `b` is an atomic-fact check, each in `[0,1]`.
 
 ## Rule-of-three statistical floor
 
-- AC count: **updated 2026-09-22 per solution-architect review round 7 finding 3** (was stale at
-  15 -- round 6 added AC-027-REVIEW-4 without this file being updated). AC-027-DEV-1/2/3 = 3,
-  AC-027-QA-1/2 = 2, AC-027-REVIEW-1/2/3/4 = 4, AC-028 equivalents (DEV-1/2/3, QA-1/2, REVIEW-1/2)
-  = 3+2+2 = 7 — total unique AC IDs across `sprint5_ar1_assignments.json` = 3+2+4+7 = **16**.
-  Rule-of-three floor at n=16: `3/16 = 0.1875 -> sqrt(0.8125 x 0.8125) = 0.8125`.
+- AC count: **updated 2026-09-22, FINAL** (was stale at 16 -- a consensus-agent-driven review loop
+  on `connection-pooling-design.md` added `AC-028-QA-3` and `AC-028-REVIEW-3`/`AC-028-REVIEW-4`
+  after this file's own round-7 refresh, without this file being updated). AC-027-DEV-1/2/3 = 3,
+  AC-027-QA-1/2 = 2, AC-027-REVIEW-1/2/3/4 = 4 (subtotal 9); AC-028-DEV-1/2/3 = 3,
+  AC-028-QA-1/2/3 = 3, AC-028-REVIEW-1/2/3/4 = 4 (subtotal 10) — total unique AC IDs across
+  `sprint5_ar1_assignments.json` = 9+10 = **19**.
+  Rule-of-three floor at n=19: `3/19 = 0.1579 -> 1 - 0.1579 = 0.8421`.
 - `RS = 1.00` clears this floor.
 
 ## Why this RS figure carries LESS evidentiary weight than Sprint 1-4's own RS=1.00 figures
