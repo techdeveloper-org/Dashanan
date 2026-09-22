@@ -36,22 +36,23 @@ it:
 1. **No paired-detector Phase C gate ran.** `a` and `b` above are this session's own single-pass
    self-check, not a dispatched `hallucination-detector` (NLI/FactScore) + `context-faithfulness-
    engineer` (RAGAS) census. See `sprint5-phase-c-gate-results.md`'s own honest-disclosure section.
-2. **Both underlying design docs remain NOT IMPLEMENTATION-READY, though their review history now
-   differs.** Updated 2026-09-22 per solution-architect review round 7 finding 3 (was stale --
-   originally claimed both docs had "each been through exactly one authoring pass," no longer
-   true for one of them): `connection-pooling-design.md` is still v1, one authoring pass, no
-   review rounds. `dpdp-crypto-shredding-full-erasure-design.md` is now v2.0, having been through
-   10 documented solution-architect review rounds (updated 2026-09-22, round 10 -- Change Log
-   v1.1-v1.4, v2.0, plus 4 further rounds not yet given their own Change Log rows in the design
-   doc itself) -- including one
-   MAJOR correction (round 6) to a previously false "what ships today" baseline. This is real,
-   substantial review history, closer in kind to `fr013-predicate-schema-design.md`'s own 7-round
-   precedent than a single-pass draft -- but it is still marked DRAFT, not IMPLEMENTATION-READY,
-   because round 7 itself (which verified round 6's fix) still returned APPROVE WITH CHANGES, not
-   a clean APPROVE. `RS=1.00` here certifies that THIS BUNDLE is internally consistent with THOSE
-   DESIGN DOCS AS THEY CURRENTLY STAND — it does NOT certify that either design is
-   implementation-ready. Those are two different claims, and conflating them would overstate this
-   bundle's readiness.
+2. **Both underlying design docs remain formally NOT IMPLEMENTATION-READY, though both now have
+   real, dedicated review history.** UPDATED 2026-09-22, FINAL (was: "connection-pooling-design.md
+   is still v1, one authoring pass, no review rounds" -- stale after that doc's own dedicated
+   2-round adversarial solution-architect review): `connection-pooling-design.md` is now v2.1,
+   having been through its own dedicated 2-round review (round 1 found a real defect in its
+   migration description and a missing Zone 8 scope; round 2 verified the fix and caught 2 further
+   issues, both fixed; final verdict APPROVE). `dpdp-crypto-shredding-full-erasure-design.md` is
+   v2.2, having been through 13 solution-architect rounds AND a separate 4-round consensus-agent
+   failure-mode/retry/rollback/escalation review, both ending in clean APPROVE. Neither doc is
+   formally marked IMPLEMENTATION-READY in its own Status line — that label is reserved for a doc
+   that has also cleared a real dispatched Phase C hallucination/faithfulness gate, which has not
+   run for either — but both have now had genuine adversarial review depth, closer in kind to
+   `fr013-predicate-schema-design.md`'s own 7-round precedent than a single-pass draft. `RS=1.00`
+   here certifies that THIS BUNDLE is internally consistent with THOSE DESIGN DOCS AS THEY
+   CURRENTLY STAND — it does NOT certify that either design is implementation-ready, since neither
+   has cleared a real Phase C gate. Those are two different claims, and conflating them would
+   overstate this bundle's readiness.
 3. **No Jira issues or GitHub issues exist yet for either story**, unlike every Sprint 1-4 item,
    which had at least a real Jira epic/story or a live GitHub issue as external grounding.
 
@@ -62,14 +63,11 @@ RS=1.00 figures.** Recommend, before this bundle is treated as execution-ready f
 dispatch:
 1. A real Phase C gate (dispatched `hallucination-detector` + `context-faithfulness-engineer`),
    per `sprint5-phase-c-gate-results.md`'s own recommendation.
-2. UPDATED 2026-09-22 per solution-architect review round 8 (was: "at least one independent review
-   round on each of the two v1 DRAFT design docs" -- stale/self-contradicting given item 2 in
-   this same file's own "Why this RS figure..." section above, which correctly says the DPDP doc
-   is v2.0 with 10 rounds behind it). Remaining: at least one independent review round on
-   connection-pooling-design.md (still v1, unreviewed); a clean, non-"APPROVE WITH CHANGES"
-   review round on dpdp-crypto-shredding-full-erasure-design.md (round 8 itself was still APPROVE
-   WITH CHANGES) before either is marked IMPLEMENTATION-READY, given the regulatory sensitivity of
-   DASH-STORY-027 in particular.
+2. UPDATED 2026-09-22, FINAL: both design docs have now cleared their own dedicated review loops
+   with a final clean APPROVE (connection-pooling-design.md v2.1; dpdp-crypto-shredding-full-
+   erasure-design.md v2.2). This item is resolved -- remaining before either is formally marked
+   IMPLEMENTATION-READY is a real dispatched Phase C gate (item 1 above), not a further design
+   review round.
 3. Resolution of the six open user decisions raised across this Sprint 5 bundle (SP5-DEC-001
    through 004 in `sprint5_ar0_routing_index.json`; SP5-DEC-101/102 in `sprint5_ar1_assignments.json`).
 

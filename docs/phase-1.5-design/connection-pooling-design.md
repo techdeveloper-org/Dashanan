@@ -1,10 +1,10 @@
 # Connection Pooling Design — Closing AR1-S3-G3 (Composition Root)
 
-Status: DRAFT — pending user review. No implementation files have been modified.
-Related: `src/dashanan/infrastructure/composition_root.py`, `docs/phase-1-architecture/HLD.md`
-Section 6 (circuit-breaker precedent), `docs/phase-1.5-api/fr013-predicate-schema-design.md`
-Section 6 (the exact wording AR1-S3-G3 is cited by, carried forward here verbatim), FR-015
-(Shape B deployment infra).
+Status: DRAFT v2.1 — pending user review. No implementation files have been modified.
+Related: `src/dashanan/infrastructure/composition_root.py`, `src/dashanan/api/composition.py`,
+`src/dashanan/api/app.py`, `docs/phase-1-architecture/HLD.md` Section 6 (circuit-breaker
+precedent), `docs/phase-1.5-api/fr013-predicate-schema-design.md` Section 6 (the exact wording
+AR1-S3-G3 is cited by, carried forward here verbatim), FR-015 (Shape B deployment infra).
 
 Persona grounding: written from a `database-engineer` lens (`claude-global-library/agents/
 database-engineer/agent.md` — schema/connection-pooling/performance ownership), applying that
@@ -38,6 +38,21 @@ criterion), and re-cited from Sprint 4 onward — including this design doc's ow
 `fr013-predicate-schema-design.md` Section 6 — as shorthand for the specific limitation: *"one
 shared `psycopg.Connection`, no cross-zone transaction coordination."* This document closes that
 specific, narrower limitation.
+
+**Scope correction (v2): the shared-connection surface is larger than Zone 2/3/5/7.**
+`src/dashanan/api/composition.py`'s own module docstring (lines 38-45) states plainly that the
+single `psycopg.Connection` `build_postgres_connection()` opens "is reused across Zone
+2/3/7/8-manifest" for this deployment shape. Verified against `composition.py:145-253`
+(`build_app_context`): that one connection is threaded not only into
+`build_provenance_repository`, `build_episodic_repository`,
+`build_conflict_aware_semantic_repository`, and `build_conflict_aware_entity_memory_repository`,
+but also into `SqlManifestRepository` (`composition.py:223`), `Zone8ConsolidationStore`
+(`composition.py:224`), `Zone8SubjectKeyedArchiver` (`composition.py:227`), and
+`SubjectErasureCascadeService` (`composition.py:232`) — the Zone 8 manifest/consolidation/
+crypto-shredding surface. Prior drafts of this document scoped the problem (and Section 7's
+migration table) to the Zone 2/3/5/7 repository builders only; that omitted a real quarter of the
+connection-sharing surface this design is meant to close. This revision brings all four Zone 8
+components into Section 1's problem statement and Section 7's migration table.
 
 ---
 
@@ -73,28 +88,70 @@ Two options were weighed:
   exception), scoped to a FastAPI dependency.
 
 **Decision: (b), acquire-per-request.** This is the only option that actually resolves the
-contended-shared-connection problem AR1-S3-G3 names. Concretely:
+contended-shared-connection problem AR1-S3-G3 names.
 
-- The composition root's `build_postgres_connection()` factory is replaced by a new
-  `build_postgres_connection_pool(settings, env) -> psycopg_pool.ConnectionPool` that constructs
-  the pool once at application startup (long-lived, matching the pool's own intended lifecycle —
-  pools are meant to be created once and reused, not per-request).
-- A new FastAPI dependency (e.g. `get_pooled_connection`) wraps `pool.connection()` as a
-  generator-style dependency: `with pool.connection() as conn: yield conn`. FastAPI's dependency
-  system already runs generator dependencies' teardown (the code after `yield`) after the response
-  is sent, which is exactly checkout/checkin semantics — no new lifecycle mechanism is needed
-  beyond what FastAPI already provides.
-- `build_provenance_repository`, `build_episodic_repository`,
-  `build_conflict_aware_semantic_repository`, and `build_conflict_aware_entity_memory_repository`
-  keep their existing signatures — each still takes a `connection: <Zone>SqlConnection` parameter
-  typed against the minimal DB-API 2.0 `SqlConnection` Protocol. What changes is *only* how the
-  request-handling layer (`api/app.py` / `api/composition.py`) obtains the connection object it
-  passes to these builders: today it's the one process-lifetime connection; after this change,
-  it's the per-request connection the pooled dependency yields.
-- This means **zero downstream repository code changes** (`SqlProvenanceRepository`,
-  `SqlEpisodicRepository`, `SqlSemanticRepository` etc. never see a pool, only a connection
-  conforming to the same Protocol they already depend on) — see Section 6's migration note for
-  the precise boundary.
+**Correction (v2): this is a larger refactor than "swap the connection source," because the
+repository/service objects are built once at startup, not once per request.** Verified against
+`src/dashanan/api/composition.py:145-253` (`build_app_context`) and
+`src/dashanan/api/app.py:127-140` (`create_app`): `build_app_context()` runs exactly **once**, at
+application startup, and calls every one of `build_provenance_repository`,
+`build_episodic_repository`, `build_conflict_aware_semantic_repository`,
+`build_conflict_aware_entity_memory_repository`, `SqlManifestRepository`,
+`Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, and `SubjectErasureCascadeService`
+exactly once, passing each the one process-lifetime connection. The resulting objects are stored
+as fixed fields on `AppContext` (`ctx.provenance_repository`, `ctx.semantic_repository`,
+`ctx.episodic_repository`, `ctx.conflict_aware_entity_repository`, `ctx.subject_erasure_service`,
+and the Zone 8 manifest/consolidation/archiver equivalents), and every route handler in
+`app.py` references them directly as **closure variables** — confirmed at `app.py:302,305` (`ctx.
+provenance_repository`), `:420,449,482,498` (`ctx.semantic_repository` /
+`ctx.conflict_aware_entity_repository`), `:572,588` (`ctx.episodic_repository`), and `:878,885`
+(`ctx.subject_erasure_service`). There is no per-request call site anywhere in this codebase that
+re-invokes these builders — the earlier claim in this document (v1) that "call sites change their
+connection source, not their call shape" was **false**: today there is no per-request call site
+to change the connection source *of*.
+
+Correctly implementing acquire-per-request pooling therefore requires two changes together, not
+one:
+
+- **Move construction, not just the connection.** `build_provenance_repository`,
+  `build_episodic_repository`, `build_conflict_aware_semantic_repository`,
+  `build_conflict_aware_entity_memory_repository`, `SqlManifestRepository`,
+  `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, and `SubjectErasureCascadeService` must
+  be called on the **per-request path**, not inside startup-time `build_app_context`. Each keeps
+  its existing constructor signature (still takes a `connection: <Zone>SqlConnection` typed
+  against the minimal DB-API 2.0 `SqlConnection` Protocol) — what moves is *when and where* that
+  constructor call happens, from once at startup to once per request.
+- **Replace closure-variable access with FastAPI dependency injection.** A new
+  `get_pooled_connection` FastAPI dependency wraps `pool.connection(timeout=...)` as a
+  generator-style dependency (`with pool.connection() as conn: yield conn`); FastAPI's dependency
+  system already runs generator dependencies' teardown after the response is sent, giving
+  checkout/checkin semantics for free. On top of it, one FastAPI dependency per repository/service
+  (e.g. `get_provenance_repository(conn: SqlConnection = Depends(get_pooled_connection)) ->
+  ProvenanceRepository: return build_provenance_repository(connection=conn, ...)`) constructs the
+  repository fresh, once per request, from the per-request connection. Every route handler that
+  currently reads `ctx.<repository>` as a closure variable (the ~10 handlers at the `app.py`
+  line numbers listed above) is rewritten to instead take the repository as a parameter via
+  `Depends(get_<repository>)`. `AppContext` retains only what is genuinely process-lifetime
+  (settings, the pool itself, feature flags) — it stops holding the repository/service instances.
+- `AppContext.postgres_available`-style guard checks (e.g. `app.py:302`'s
+  `if not ctx.postgres_available or ctx.provenance_repository is None`) are re-expressed as
+  `Depends(...)` dependencies that raise the equivalent `503`/`not-configured` response when the
+  pool was never constructed, preserving today's degrade-gracefully-without-Postgres behavior —
+  this design does not remove that guard, only relocates it to the dependency layer.
+
+This means the migration is confined to `composition_root.py` (pool factory), `api/composition.py`
+(dependency provider functions replacing `build_app_context`'s repository-construction calls),
+and `api/app.py` (route handler signatures gaining `Depends(...)` parameters in place of `ctx.*`
+closure reads) — **zero changes to the repository/service classes themselves**
+(`SqlProvenanceRepository`, `SqlEpisodicRepository`, `SqlSemanticRepository`,
+`ConflictAware*Repository`, `SqlManifestRepository`, `Zone8ConsolidationStore`,
+`Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService` never see a pool, only a connection
+conforming to the same Protocol they already depend on) — but it is materially more than a
+connection-source swap at the call sites: roughly ten route handlers in `app.py` change from
+closure-variable reads to dependency-injected parameters, and the corresponding builder calls
+move out of startup-time `build_app_context` into new per-request dependency-provider functions.
+See Section 6's migration note for the repository-class boundary that *does* stay unchanged, and
+Section 7's migration table for the corrected per-file breakdown.
 
 ---
 
@@ -203,9 +260,9 @@ uses it that way. That logic does not exist today and this document does not add
 |---|---|
 | `pyproject.toml` | Add `psycopg[pool]>=3.2,<4.0` (the `psycopg_pool` extra of the same psycopg 3.x package already depended on — not a new unrelated package — matching the existing `psycopg[binary]` dependency-comment convention explaining *why* each dependency was added). |
 | `composition_root.py` | Add `build_postgres_connection_pool(settings, env) -> psycopg_pool.ConnectionPool`, constructed once at app startup. The existing `build_postgres_connection()` single-connection factory can remain (e.g. for the migration runner's own short-lived startup connection, or test fixtures that want a bare connection with no pool) — it is not deleted, only no longer used as the API host's per-request connection source. |
-| `api/composition.py` (or equivalent app-startup wiring) | Construct the pool once (`AppContext`-lifetime), expose a FastAPI dependency that checks out/in a connection per request via `pool.connection(timeout=...)`. |
-| `api/app.py` route handlers | Replace direct references to a single shared connection object with the new pooled-connection dependency, threaded into the same `build_provenance_repository`/etc. calls that already exist — call sites change their connection *source*, not their call shape. |
-| `SqlProvenanceRepository`, `SqlEpisodicRepository`, `SqlSemanticRepository`, `ConflictAware*Repository` | **No changes.** Each already depends only on the minimal DB-API 2.0 `SqlConnection` Protocol (`.cursor()`), which a pool-checked-out `psycopg.Connection` satisfies identically to the single long-lived connection it satisfied before. This is the whole point of the existing Protocol-based typing — it already decouples "what a repository needs from a connection" from "how that connection was obtained," so this migration is confined to the composition root and the request-handling boundary. |
+| `api/composition.py` | **Corrected (v2).** `build_app_context()` (`composition.py:145-253`) stops calling `build_provenance_repository`, `build_episodic_repository`, `build_conflict_aware_semantic_repository`, `build_conflict_aware_entity_memory_repository`, `SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, and `SubjectErasureCascadeService` at startup. `AppContext` is constructed once at startup holding only the pool (via `build_postgres_connection_pool`) and settings/flags — no repository/service fields. New per-request FastAPI dependency-provider functions are added (e.g. `get_provenance_repository`, `get_semantic_repository`, `get_episodic_repository`, `get_conflict_aware_entity_repository`, `get_manifest_repository`, `get_zone8_consolidation_store`, `get_zone8_archiver`, `get_subject_erasure_service`), each depending on `get_pooled_connection` (which itself does `with pool.connection(timeout=...) as conn: yield conn`) and calling the corresponding existing builder function per request with that connection. |
+| `api/app.py` route handlers | **Corrected (v2).** This is not a connection-source swap at unchanged call sites — the call sites themselves move. The ~10 handlers currently reading `ctx.provenance_repository` (`app.py:302,305`), `ctx.semantic_repository`/`ctx.conflict_aware_entity_repository` (`app.py:420,449,482,498`), `ctx.episodic_repository` (`app.py:572,588`), and `ctx.subject_erasure_service` (`app.py:878,885`) as closure variables are rewritten to receive the repository/service as a parameter via `Depends(get_<repository>)` from `api/composition.py`'s new dependency providers. The existing `ctx.postgres_available`-guarded not-configured branches are re-expressed as the equivalent condition inside the dependency (raising the same `503`/not-configured response) rather than an `if ctx.x is None` check inside the handler body. |
+| `SqlProvenanceRepository`, `SqlEpisodicRepository`, `SqlSemanticRepository`, `ConflictAware*Repository`, `SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService` | **No changes.** Each already depends only on the minimal DB-API 2.0 `SqlConnection` Protocol (`.cursor()`) or on repository instances built from one, which a pool-checked-out `psycopg.Connection` satisfies identically to the single long-lived connection it satisfied before. This is the whole point of the existing Protocol-based typing — it already decouples "what a repository needs from a connection" from "how that connection was obtained," so this migration is confined to the composition root, the new per-request dependency providers, and the route-handler signatures that consume them. This row now explicitly includes the Zone 8 manifest/consolidation/crypto-shredding/erasure-cascade classes identified in Section 1's v2 scope correction — they were omitted from this table in v1. |
 | `docker-compose.yml` | No required changes (Postgres's own `max_connections=100` default already covers the recommended `pool_max=20` starting point with headroom); optionally document the recommended pool env vars alongside the other Shape B settings in `.env.example`. |
 | `HLD.md` | Add a new ADR (Section 8 below drafts its content) documenting the pooling model, sizing rationale, and failure/backpressure behavior — closing the "no ADR for connection pooling" gap this document's Section 1 identified. |
 
@@ -219,8 +276,9 @@ uses.
 
 Unlike `fr013-predicate-schema-design.md` (which reached IMPLEMENTATION-READY after seven
 review rounds resolving every open question against this codebase's own existing precedents),
-this document has not yet been through a review round, and carries three genuinely open items
-that a review pass should resolve before implementation:
+this document has now been through one dedicated adversarial review round (2026-09-22, see the
+Change Log), which resolved item 3 below in place. Two genuinely open items remain that a further
+review pass should resolve before implementation:
 
 1. **Pool sizing is a reasoned estimate, not measured.** Section 4's `pool_min=2, pool_max=20`
    is derived from a formula, not from load-test data — no load test exists for this codebase
@@ -229,12 +287,21 @@ that a review pass should resolve before implementation:
 2. **Whether Postgres access should also get a full circuit breaker** (beyond the pool's own
    bounded-timeout fail-fast behavior) is flagged in Section 5 as explicitly separate and
    unresolved — needs an explicit accept/defer decision.
-3. **The exact FastAPI dependency-injection wiring point** (Section 3/7) is described at the
+3. ~~**The exact FastAPI dependency-injection wiring point** (Section 3/7) is described at the
    component level, not verified line-by-line against `api/composition.py`'s and `api/app.py`'s
-   real current structure the way `fr013-predicate-schema-design.md` verified every one of its
-   claims against real line numbers — a review round should re-verify Section 3 and Section 7
-   against the actual current file contents before this is marked IMPLEMENTATION-READY, matching
-   this project's own established rigor for design docs that gate real implementation.
+   real current structure...~~ **Resolved in v2.** A dedicated adversarial review round (2026-09-22)
+   verified Section 3/7 against `composition.py:145-253` (`build_app_context`) and
+   `app.py:127-140` (`create_app`) line-by-line, found the v1 description factually wrong
+   (repository builders run once at startup, not per request — there was no per-request call site
+   to "change the connection source of"), and Section 3/7 have been rewritten in place to describe
+   the real required refactor: repository/service construction moves from startup-time
+   `build_app_context` into per-request FastAPI `Depends(...)` providers, and every route handler
+   currently closing over `ctx.<repository>` is rewritten to receive it via dependency injection.
+   The same review found four Zone 8 components (`SqlManifestRepository`,
+   `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`) sharing
+   the same connection per `composition.py`'s own docstring but previously out of this document's
+   scope; Section 1 and Section 7 now include them. This item is closed — it is not carried
+   forward as still-open.
 
 ---
 
@@ -258,6 +325,14 @@ that a review pass should resolve before implementation:
       Section 5's 14-case test matrix after pooling lands, confirming no behavior regression.
 - [ ] Real load-test numbers replace Section 4's formula-derived defaults, or the defaults are
       explicitly accepted as-is by the user/reviewer.
+- [ ] The per-request repository/service construction path (Section 3/7) is verified wired
+      correctly for **all** of Zone 2 (episodic), Zone 3 (semantic), Zone 5 (conflict-aware entity),
+      Zone 7 (provenance), and Zone 8-manifest (`SqlManifestRepository`,
+      `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`) —
+      not only the Zone 2/3/5/7 subset this document named before its v2 scope correction. Verified
+      by confirming `api/composition.py` has a per-request `Depends(...)` provider for each of the
+      eight builders/classes listed in Section 7's migration table, and that `api/app.py` has zero
+      remaining `ctx.<repository>`/`ctx.<service>` closure-variable reads for any of them.
 
 ---
 
@@ -265,4 +340,6 @@ that a review pass should resolve before implementation:
 
 | Date | Change |
 |---|---|
-| 2026-09-22 | v1 (this revision): Initial design. Confirmed the API host is synchronous (plain `def` route handlers) from `api/app.py`, settling the `ConnectionPool` vs `AsyncConnectionPool` choice from evidence rather than preference. Recommended acquire-per-request via a FastAPI generator dependency over app-lifetime connection holding, since only acquire-per-request actually resolves the shared-connection contention AR1-S3-G3 names. Derived a pool-sizing formula from Postgres's default `max_connections=100` and FastAPI's default threadpool ceiling. Mapped pool exhaustion to the existing NFR-014/AC-021 503+Retry-After convention rather than inventing a new one. Explicitly restated (not contradicted) Sprint 4's existing partial-reporting contract and the still-separate cross-zone-atomicity gap. Marked DRAFT, not IMPLEMENTATION-READY, pending a review round per Section 8's three open items — no review round has run yet. |
+| 2026-09-22 | v1: Initial design. Confirmed the API host is synchronous (plain `def` route handlers) from `api/app.py`, settling the `ConnectionPool` vs `AsyncConnectionPool` choice from evidence rather than preference. Recommended acquire-per-request via a FastAPI generator dependency over app-lifetime connection holding, since only acquire-per-request actually resolves the shared-connection contention AR1-S3-G3 names. Derived a pool-sizing formula from Postgres's default `max_connections=100` and FastAPI's default threadpool ceiling. Mapped pool exhaustion to the existing NFR-014/AC-021 503+Retry-After convention rather than inventing a new one. Explicitly restated (not contradicted) Sprint 4's existing partial-reporting contract and the still-separate cross-zone-atomicity gap. Marked DRAFT, not IMPLEMENTATION-READY, pending a review round per Section 8's three open items — no review round has run yet. |
+| 2026-09-22 | v2 (`solution-architect`): First dedicated adversarial deep-dive review of this document (prior review rounds only touched it as a side-effect of reviewing other stories) found and fixed a real defect verified against source: v1's Section 3/7 claimed call sites "change their connection source, not their call shape," implying the zone-repository builders are called per-request today. Verified against `api/composition.py:145-253` (`build_app_context`) and `api/app.py:127-140` (`create_app`) that this is **false** — every builder runs exactly once at startup, results are stored as fixed `AppContext` fields, and ~10 route handlers reference them as closure variables (`app.py:302,305,420,449,482,498,572,588,878,885`); there is no per-request call site to swap a connection source at. Rewrote Section 3 and Section 7's `api/app.py`/`api/composition.py` rows to describe the real required refactor: move repository/service construction out of startup-time `build_app_context` into per-request FastAPI `Depends(...)` providers, and rewrite the affected route handlers to receive their repository via dependency injection instead of a closure read. Extended Section 1's problem statement and Section 7's migration table to include Zone 8's connection-sharing surface (`SqlManifestRepository`, `Zone8ConsolidationStore`, `Zone8SubjectKeyedArchiver`, `SubjectErasureCascadeService`), confirmed via `composition.py`'s own docstring (lines 38-45, "reused across Zone 2/3/7/8-manifest") and never previously in scope. Added a new Definition-of-Done item (Section 9) requiring the per-request wiring to be verified for all of Zone 2/3/5/7/8-manifest, not only the previously-named subset. Resolved Section 8's former open item 3 (DI wiring point not line-verified) in place — closed, not carried forward as open; Section 8's two remaining open items (pool sizing unmeasured, circuit-breaker-vs-Postgres decision) are unaffected by this revision. Companion fixes in the same review, tracked outside this file: `sprint5_ar1_assignments.json` AC-028-REVIEW-1 was scoped too narrowly to catch this class of defect (checked only zone repository code, not the `api/app.py`+`api/composition.py` wiring layer) — added AC-028-REVIEW-3 requiring the reviewer to confirm the per-request DI refactor covers both files correctly; propagated into `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-REVIEW dispatch prompt. Still DRAFT, not IMPLEMENTATION-READY, pending the two remaining Section 8 open items. |
+| 2026-09-22 | v2.1 (`solution-architect`, round-2 adversarial re-review): Fixed a zone-number/repository-name mispairing in Section 9's DoD item introduced by the v2 fix pass — it read "Zone 2 (provenance), Zone 3 (conflict-aware entity/semantic), Zone 5 (episodic), Zone 7 (conflict-aware semantic)," which scrambled the mapping. Verified the real mapping against `src/dashanan/domain/zone.py`'s `ZoneId` enum and `src/dashanan/api/app.py:80-89`'s `_WIRE_TO_DOMAIN_ZONE` table: Zone 2 = episodic, Zone 3 = semantic, Zone 5 = entity, Zone 7 = provenance. Section 9's DoD item now reads "Zone 2 (episodic), Zone 3 (semantic), Zone 5 (conflict-aware entity), Zone 7 (provenance)," correctly pairing `episodic_repository` with Zone 2, `semantic_repository` with Zone 3, `conflict_aware_entity_repository` with Zone 5, and `provenance_repository` with Zone 7. No other section of this document repeats the scrambled pairing. Also, DASH-STORY-028's story-point estimate (8 SP) was found not to reflect this doc's own v2-corrected, wider refactor scope -- re-estimated to 13 SP in the routing bundle (tracked outside this file). |

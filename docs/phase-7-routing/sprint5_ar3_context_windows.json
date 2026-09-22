@@ -7,8 +7,8 @@
   "correlation_id": "DASH-PH7-AR3-SPRINT5-20260922",
   "depends_on": [
     "docs/phase-7-routing/sprint5_ar1_assignments.json v1.0.0",
-    "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (DRAFT, bumped 2026-09-22 per solution-architect review round 8, was stale at v1)",
-    "docs/phase-1.5-design/connection-pooling-design.md v1 (DRAFT)"
+    "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.2 (DRAFT, bumped 2026-09-22 per solution-architect review round 8, was stale at v1)",
+    "docs/phase-1.5-design/connection-pooling-design.md v2.1 (DRAFT, bumped 2026-09-22 after its own dedicated 2-round adversarial solution-architect review, was stale at v1)"
   ],
   "methodology_reuse_note": "Same per-sub-task context-window method Sprint 3/4 used: sources are the exact file/section citations each sub-task's own AR.1 record or design doc names, never invented additions. Both Sprint 5 design docs are DRAFT rather than IMPLEMENTATION-READY, so 'the entire design doc' is included in full for every sub-task exactly as Sprint 4 did for its own single design doc -- there is no reduced excerpt to select from a draft that has not yet been trimmed by review rounds.",
   "classification_model": {
@@ -24,7 +24,7 @@
       "context_budget_tokens": 15000,
       "context_budget_note": "Raised from 11500 to 15000 on 2026-09-22 per solution-architect review round 6's major re-scoping: 4 real prior-art files (subject_erasure_cascade.py, zone8_crypto_shredding_store.py, unified_subject_erasure_orchestrator.py, sql_zone8_subject_index_repository.py) that round 1-5 never cited must now be read in full, since this sub-task WIRES/EXTENDS them rather than building from scratch. This is the largest context window in the bundle; a judgment-call estimate, not independently token-counted.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document -- single source of truth for this sub-task, DRAFT status means every section including the disclosed open items is load-bearing)",
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.2 (entire document -- single source of truth for this sub-task, DRAFT status means every section including the disclosed open items is load-bearing)",
         "files_to_read_or_modify": [
           {"file": "src/dashanan/application/unified_subject_erasure_orchestrator.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per solution-architect review round 6: the real, already-built orchestrator this sub-task wires into app.py and extends with a Zone 1 leg + a real SubjectToItemIndex. This is now the primary file this sub-task modifies, not dpdp_erasure_cascade.py."},
           {"file": "src/dashanan/application/subject_erasure_cascade.py", "line_ranges": ["full file"], "why": "Added 2026-09-22 per round 6: the existing, live, Zone-8-only service the eraseSubject endpoint currently calls directly -- must understand its exact job-tracking contract (SubjectErasureJob/SubjectErasureJobStore) before wiring the orchestrator alongside/in place of it without regressing it (AC-027-DEV-2)."},
@@ -52,7 +52,7 @@
       "assigned_agent": "integration-testing-engineer",
       "context_budget_tokens": 6000,
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document -- bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.2 (entire document -- bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
         "files_to_read_or_modify": [
           {"file": "tests/integration/test_api_real_postgres_e2e_dash3.py", "line_ranges": ["full file"], "why": "Style precedent -- real Postgres, real TestClient, not mocks."},
           {"file": "(post-DEV) the new subject_item_index table/migration and endpoint handlers", "line_ranges": ["shipped, not pre-change"], "why": "The live target under test."}
@@ -71,7 +71,7 @@
       "assigned_agent": "india-crypto-regulatory-specialist",
       "context_budget_tokens": 6500,
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.0 (entire document, including its own explicit Section 1 major correction, Section on OAQ-10, and the Zone 7 boundary proposal -- all are the specific subject of this P1 review; bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
+        "design_doc_full": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md v2.2 (entire document, including its own explicit Section 1 major correction, Section on OAQ-10, and the Zone 7 boundary proposal -- all are the specific subject of this P1 review; bumped 2026-09-22 per solution-architect review round 7 finding 2, was stale at v1)",
         "files_to_read_or_modify": [
           {"file": "HLD.md Section 10 (DPDP-1..6), OAQ-10", "line_ranges": ["full section"], "why": "The authoritative statement of what OAQ-10 asks and why it remains unresolved -- this review's central check."},
           {"file": "(post-DEV/QA) shipped Zone 7 audit-record code and the QA sub-task's own test results", "line_ranges": ["shipped, not pre-change"], "why": "AC-027-REVIEW-2's requirement to confirm the Zone 7 record contains no erased PII."}
@@ -88,12 +88,14 @@
       "sub_task_id": "DASH-STORY-028-DEV",
       "story_id": "DASH-STORY-028",
       "assigned_agent": "database-engineer",
-      "context_budget_tokens": 6000,
+      "context_budget_tokens": 9500,
+      "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 6000 to 9500: the design doc's v2 fix pass established this sub-task touches ~10 route handlers in api/app.py plus ~8 new per-request Depends(...) provider functions in api/composition.py, not just composition_root.py's single factory function -- both files must now be read in full (not excerpted) to correctly locate every ctx.<repository>/ctx.<service> closure-variable read across Zone 2/3/5/7/8-manifest, and the v2.1 design doc itself is materially longer than the v1 doc this budget was originally sized against.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
         "files_to_read_or_modify": [
           {"file": "src/dashanan/infrastructure/composition_root.py", "line_ranges": ["build_postgres_connection and every zone repository builder that currently receives its single connection object"], "why": "The sole factory this sub-task replaces, and every downstream call site that must keep working against the SqlConnection Protocol unchanged."},
-          {"file": "src/dashanan/api/", "line_ranges": ["existing FastAPI app/router setup, to determine where a new per-request connection-acquisition dependency is wired in"], "why": "The design doc's own acquire-per-request decision needs a concrete FastAPI dependency-injection point."},
+          {"file": "src/dashanan/api/composition.py", "line_ranges": ["build_app_context (lines ~145-253) -- the 8 builder calls it currently makes at startup, all of which move to per-request Depends(...) providers"], "why": "This is where startup-time construction is replaced with ~8 new per-request FastAPI dependency-provider functions, per connection-pooling-design.md v2 Section 3/7."},
+          {"file": "src/dashanan/api/app.py", "line_ranges": ["the ~10 route handlers currently reading ctx.provenance_repository (302,305), ctx.semantic_repository/ctx.conflict_aware_entity_repository (420,449,482,498), ctx.episodic_repository (572,588), ctx.subject_erasure_service (878,885)"], "why": "Each of these closure-variable reads must be rewritten to receive its repository/service via Depends(get_<repository>) instead, per the design doc's v2-corrected Section 3/7."},
           {"file": "pyproject.toml", "line_ranges": ["dependencies list and its existing 'why we added this dependency' comment convention"], "why": "psycopg_pool must be added following this project's own documented-dependency-addition convention."}
         ],
         "domain_files_cited_across_review_rounds": [],
@@ -107,12 +109,13 @@
       "sub_task_id": "DASH-STORY-028-QA",
       "story_id": "DASH-STORY-028",
       "assigned_agent": "integration-testing-engineer",
-      "context_budget_tokens": 5000,
+      "context_budget_tokens": 6500,
+      "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 5000 to 6500: AC-028-QA-3 now requires coverage across all 5 repository/service surfaces (Zone 2/3/5/7/8-manifest), not a generic 2-zone concurrency check, which needs more of the shipped composition.py/app.py wiring in context to write per-surface assertions.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
         "files_to_read_or_modify": [
           {"file": "tests/integration/test_api_real_postgres_e2e_dash3.py", "line_ranges": ["full file"], "why": "Style precedent."},
-          {"file": "(post-DEV) the new pool factory and FastAPI dependency", "line_ranges": ["shipped, not pre-change"], "why": "The live target under test for both the concurrency and pool-exhaustion cases."}
+          {"file": "(post-DEV) the new pool factory and per-request FastAPI dependency providers", "line_ranges": ["shipped, not pre-change -- api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers"], "why": "The live target under test for the concurrency, pool-exhaustion, and per-surface DI-wiring-verification cases across all of Zone 2/3/5/7/8-manifest."}
         ],
         "domain_files_cited_across_review_rounds": [],
         "github_issues": [],
@@ -126,11 +129,13 @@
       "sub_task_id": "DASH-STORY-028-REVIEW",
       "story_id": "DASH-STORY-028",
       "assigned_agent": "consensus-agent",
-      "context_budget_tokens": 4000,
+      "context_budget_tokens": 5000,
+      "context_budget_note": "RAISED 2026-09-22 (round-2 adversarial re-review, solution-architect) from 4000 to 5000: AC-028-REVIEW-3 already requires verifying the per-request DI wiring across api/composition.py and api/app.py, not only that zone repository classes are unchanged -- this budget now names both files explicitly so the reviewer isn't scoped only to composition_root.py.",
       "sources": {
-        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v1 (entire document)",
+        "design_doc_full": "docs/phase-1.5-design/connection-pooling-design.md v2.1 (entire document)",
         "files_to_read_or_modify": [
-          {"file": "(post-DEV) shipped composition_root.py changes and every zone repository's own unchanged constructor", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-1's requirement to confirm no zone repository code changed."}
+          {"file": "(post-DEV) shipped composition_root.py changes and every zone repository's own unchanged constructor", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-1's requirement to confirm no zone repository code changed."},
+          {"file": "(post-DEV) shipped api/composition.py's ~8 new Depends(...) providers and api/app.py's ~10 rewritten route handlers", "line_ranges": ["shipped, not pre-change"], "why": "AC-028-REVIEW-3's requirement to confirm the per-request DI refactor is correctly wired end to end across both files for all of Zone 2/3/5/7/8-manifest, not only that zone repository code is unchanged."}
         ],
         "domain_files_cited_across_review_rounds": [],
         "github_issues": [],
@@ -143,8 +148,8 @@
   ],
   "summary": {
     "sub_tasks_total": 6,
-    "total_context_budget_tokens": 42500,
-    "total_context_budget_tokens_note": "Updated 2026-09-22, twice: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files). 35500+3500+3500=42500.",
+    "total_context_budget_tokens": 48500,
+    "total_context_budget_tokens_note": "Updated 2026-09-22, three times: first from 35500 to 39000 (round 3, DASH-STORY-027-DEV 8000->11500); then from 39000 to 42500 (round 6, DASH-STORY-027-DEV 11500->15000, a further +3500 for 4 newly-cited real prior-art files); then from 42500 to 48500 (round-2 adversarial re-review of connection-pooling-design.md v2, solution-architect: DASH-STORY-028-DEV 6000->9500, DASH-STORY-028-QA 5000->6500, DASH-STORY-028-REVIEW 4000->5000, a further +6000 to account for the wider per-request DI refactor scope across api/composition.py and api/app.py). 35500+3500+3500+6000=48500.",
     "sub_tasks_with_pii_exclusion_applied": 6,
     "design_doc_included_in_full_for_every_sub_task": true,
     "note_on_security_clearance": "DASH-STORY-027-DEV and DASH-STORY-027-REVIEW are the first Sprint 5 sub-tasks with a narrow, ID-level (not payload-level) security clearance, reflecting the P1 gate. All other Sprint 5 sub-tasks follow the standard Sprints 1-4 posture (no PII, no clearance needed)."
