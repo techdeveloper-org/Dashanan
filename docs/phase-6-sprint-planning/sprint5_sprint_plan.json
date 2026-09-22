@@ -7,8 +7,8 @@
   "scope_note": "DOCS-ONLY per explicit user instruction: no source code was changed to produce this file or any Sprint 5 bundle file. No Jira issues were created for DASH-STORY-027/028 (jira_key left null throughout, same pre-dispatch convention DASH-STORY-026 used). This plan closes the two remaining disclosed gaps behind Dashanan's ~25-30% shortfall against its SRS v1 target-state: AC-013 (full DPDP crypto-shredding erasure) and AR1-S3-G3 (API host connection pooling).",
   "locked_scope_frs_or_gaps": ["AC-013", "AR1-S3-G3"],
   "story_list": ["DASH-STORY-027", "DASH-STORY-028"],
-  "total_story_points": 16,
-  "total_story_points_note": "UPDATED 2026-09-22 per solution-architect review round 8 (was 21 = 13+8, stale after round 6 re-scoped DASH-STORY-027 from 13 SP to 8 SP): current total is 16 = 8 (DASH-STORY-027) + 8 (DASH-STORY-028), matching backlog_draft.json and sprint5_ar1_assignments.json.",
+  "total_story_points": 21,
+  "total_story_points_note": "UPDATED 2026-09-22 (was 16 = 8+8, stale after a consensus-agent review found DASH-STORY-027-DEV/QA lacked acceptance criteria for the Section 7 write-ahead-marker/recovery-sweep durability mechanism -- a solution-architect fix pass added AC-027-DEV-4/AC-027-QA-3 and re-estimated DASH-STORY-027 from 8 SP back to 13 SP, Dev/QA/Review split 9/3/1, to reflect that real added scope): current total is 21 = 13 (DASH-STORY-027) + 8 (DASH-STORY-028), matching backlog_draft.json and sprint5_ar1_assignments.json. (Coincidentally the same numeric total as the original pre-round-6 estimate, but for a different, now-correct reason -- this is not a reversion of round 6's re-scoping, which remains valid; it reflects new scope the consensus-agent review legitimately added on top of the wire-and-extend design.)",
   "gap_to_story_map": {
     "AC-013": "DASH-STORY-027",
     "AR1-S3-G3": "DASH-STORY-028"
@@ -52,7 +52,7 @@
     }
   ],
   "notes": [
-    "Story point estimates (8 + 8 = 16, updated 2026-09-22 per solution-architect review round 6/8 -- DASH-STORY-027 was originally 13 SP, re-estimated to 8 SP when round 6 found it was a wire-and-extend task, not a from-scratch build) follow this project's existing Fibonacci/70-20-10 Dev-QA-Review split convention (backlog_draft.json estimation_method).",
+    "Story point estimates (13 + 8 = 21, updated 2026-09-22: DASH-STORY-027 was originally 13 SP, re-estimated to 8 SP when solution-architect round 6 found it was a wire-and-extend task rather than a from-scratch build, then re-estimated back to 13 SP after a consensus-agent review found the wire-and-extend scope still needed a real write-ahead-marker/recovery-sweep durability mechanism that was previously undercounted) follow this project's existing Fibonacci/70-20-10 Dev-QA-Review split convention (backlog_draft.json estimation_method).",
     "Neither story has a GitHub issue yet -- AR1-S3-G3 was raised inline in sprint3_ar1_assignments.json's routing_gaps, not as its own GitHub issue; AC-013's gap has no GitHub issue either (DASH-STORY-020's own Review sub-task text is the closest prior tracking artifact). Opening GitHub issues for both, per this project's Section 5 issue-first convention, is a Phase B pre-dispatch action, not performed by this docs-only pass."
   ]
 }

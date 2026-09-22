@@ -1,7 +1,8 @@
 {
-  "superseded_note_2026_09_22": "SPRINT5-CAND-001 (DASH-STORY-027)'s file list, scoring evidence, and 'v1, DRAFT' design-doc citations below describe the PRE-ROUND-6 scope -- solution-architect review round 6 found the DPDP design doc's original baseline false (the eraseSubject endpoint was already wired, Zone-8-only, and a separate UnifiedSubjectErasureOrchestrator already existed but wasn't composed in) and re-scoped the story from 'build from scratch' to 'wire and extend' (13 SP -> 8 SP). This AR.0 file's own text was never rewritten to match (round 8 finding), since sprint5_ar1_assignments.json's own AR.1 record is the binding, superseding assignment for Phase B dispatch purposes -- but a reader of THIS file alone would get the old, disproven framing with no warning until this note. See sprint5_ar1_assignments.json and docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (now v2.0) for the current, correct scope. SPRINT5-CAND-002 (DASH-STORY-028) is unaffected and remains accurate as written.",
+  "superseded_note_2026_09_22": "SPRINT5-CAND-001 (DASH-STORY-027)'s file list, scoring evidence, and 'v1, DRAFT' design-doc citations below describe the PRE-ROUND-6 scope -- solution-architect review round 6 found the DPDP design doc's original baseline false (the eraseSubject endpoint was already wired, Zone-8-only, and a separate UnifiedSubjectErasureOrchestrator already existed but wasn't composed in) and re-scoped the story from 'build from scratch' to 'wire and extend' (13 SP -> 8 SP). This AR.0 file's own text was never rewritten to match (round 8 finding), since sprint5_ar1_assignments.json's own AR.1 record is the binding, superseding assignment for Phase B dispatch purposes -- but a reader of THIS file alone would get the old, disproven framing with no warning until this note. See sprint5_ar1_assignments.json and docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (now v2.2, bumped 2026-09-22 for the same version-citation-currency reason this note already exists for -- the design doc advanced through v2.1 and v2.2 via the consensus-agent failure-mode/retry/rollback/escalation review and its round-2 re-review after this note was first written at the v2.0 citation) for the current, correct scope. SPRINT5-CAND-002 (DASH-STORY-028) is unaffected and remains accurate as written.",
   "document_id": "AR0-ROUTING-INDEX-SPRINT5-20260922-01",
-  "version": "1.0.0",
+  "version": "1.2.0",
+  "version_note": "1.2.0 (2026-09-22, consensus-agent round-3 re-review remediation, item 2 of 4): bumped every stale 'v1, DRAFT'/'v2.0' citation of docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md to v2.2 (superseded_note_2026_09_22, source_of_truth.design_docs, SPRINT5-CAND-001's own source field, SP5-DEC-004) so a reader of this file alone is not told the design doc is two review rounds behind its real state -- connection-pooling-design.md citations are intentionally left at v1 (that doc genuinely has not been reviewed). 1.1.0 (2026-09-22, consensus-agent failure-mode/retry/rollback/escalation review remediation): renamed 'assignment_threshold' to 'candidate_screening_threshold' and added candidate_screening_threshold_renamed_note clarifying the field is AR.0's own screening threshold, distinct from sprint5_ar1_assignments.json's separate 0.75 assignment threshold (finding 4); added owner/due_date to SP5-DEC-001..004 (finding 6).",
   "author": "orchestrator-agent (Squad pattern, lead_agent infra-squad-lead per patterns.json Pattern 2 'Enterprise Full-Stack')",
   "phase": "Phase 7 - Agent-Task Routing (AR.0 routing index, Sprint 5 planning)",
   "date": "2026-09-22",
@@ -23,7 +24,7 @@
     }
   },
   "source_of_truth": {
-    "design_docs": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT) and docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT), both read in full this session.",
+    "design_docs": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT at the time this file was first authored this session; now v2.2, bumped 2026-09-22 as a version-citation-currency fix -- the doc advanced through v2.1/v2.2 via the consensus-agent failure-mode/retry/rollback/escalation review and its round-2 re-review after this citation was written) and docs/phase-1.5-design/connection-pooling-design.md (v1, DRAFT, unchanged -- has not been through any review round), both read in full this session.",
     "prior_disclosure": "AC-013's shortfall: sprint3_ar1_assignments.json DASH-STORY-025's own disposition ('the crypto-shredding mechanism gap (AC-013)... is out of this story's scope'), CHANGELOG.md's 'Known gaps' section (pre-2026-09-22 edit), README.md's prior status callout. AR1-S3-G3: sprint3_ar1_assignments.json routing_gaps (HIGH severity, raised but never itself promoted to a story), restated in fr013-predicate-schema-design.md Section 6 and CHANGELOG.md.",
     "srs": "SRS.md AC-013 (verbatim, §4). No SRS AC directly names connection pooling; AR1-S3-G3 is a routing-gap-level finding, not an SRS-numbered item, consistent with how it has been tracked since Sprint 3.",
     "hld": "HLD.md Section 10 (DPDP-1..6, OAQ-10), ADR-006, ADR-009 for DASH-STORY-027. No existing HLD ADR for connection pooling -- confirmed absent by direct read; DASH-STORY-028's design doc is the first architectural documentation of this concern.",
@@ -59,8 +60,9 @@
     ],
     "formula": "score = 0.5*domain_match + 0.5*skill_coverage",
     "reduced_model_disclosure": "Same reduced 2-signal model sprint3_ar0_routing_index.json/sprint4_ar0_routing_index.json used, reused here for the same narrow-scope reason Sprint 4 gave: with each story's file list already scoped by its own design doc, hld_component_ownership and tech_stack_fit would not discriminate between candidates any differently than domain_match already does.",
-    "assignment_threshold": 0.70,
-    "threshold_source": "Reused unchanged from Sprint 3/4's own choice.",
+    "candidate_screening_threshold": 0.70,
+    "candidate_screening_threshold_renamed_note": "RENAMED 2026-09-22 (consensus-agent failure-mode review finding 4; field was previously called 'assignment_threshold' at this same 0.70 value). This field name collided with sprint5_ar1_assignments.json's own, numerically different 'threshold': 0.75 field of the SAME name-adjacent meaning, creating the appearance of an unexplained inconsistency (this file: 0.70, AR.1: 0.75) when the two numbers are in fact two legitimately different thresholds for two different decisions -- an established two-threshold convention this project has used since Sprint 3 (sprint3_ar0_routing_index.json / sprint3_ar1_assignments.json), continued in Sprint 4, and continued here: THIS file's 0.70 is AR.0's own CANDIDATE-SCREENING threshold (which candidates are worth listing/scoring at all, this file's own 'above_threshold' flag); sprint5_ar1_assignments.json's 0.75 is AR.1's separate, stricter ASSIGNMENT threshold (which candidate actually gets assigned as the sub-task's owner). A candidate can legitimately clear 0.70 here (worth listing) and still not clear 0.75 in AR.1 (not assigned) -- see sprint5_ar1_assignments.json's AR1-S5-G1 for the worked example (DASH-STORY-028-REVIEW candidates at 0.725: above this file's 0.70 screening threshold, below AR.1's 0.75 assignment threshold; both numbers are correct, not a bug).",
+    "threshold_source": "Reused unchanged from Sprint 3/4's own choice for AR.0's own candidate-screening threshold specifically -- distinct from and not to be confused with AR.1's separate 0.75 assignment threshold (see candidate_screening_threshold_renamed_note above).",
     "range": "[0.0, 1.0] per signal and per composite score"
   },
   "candidate_items": [
@@ -69,7 +71,7 @@
       "story_id": "DASH-STORY-027",
       "traces_to": "AC-013",
       "title": "Full DPDP crypto-shredding erasure cascade",
-      "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT)",
+      "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md (v1, DRAFT at original authoring; now v2.2, bumped 2026-09-22 for version-citation currency -- see superseded_note_2026_09_22 above, this specific candidate item is the pre-round-6 scope superseded by sprint5_ar1_assignments.json's own binding AR.1 record)",
       "sub_tasks": [
         {
           "sub_task_id": "SPRINT5-CAND-001-DEV",
@@ -227,22 +229,30 @@
     {
       "id": "SP5-DEC-001",
       "question": "This file's D13 judgment call recommends Squad complexity (mirroring Sprint 3/4's compressed per-gap treatment) rather than Enterprise, despite DPDP regulatory exposure being a plausible Enterprise-scale signal. Confirm Squad, or override to Enterprise?",
-      "why_it_needs_a_human": "A genuine complexity-tier judgment call the decision tree marks as needing confirmation (D13), not a fact this file's own fit-scoring signals resolve."
+      "why_it_needs_a_human": "A genuine complexity-tier judgment call the decision tree marks as needing confirmation (D13), not a fact this file's own fit-scoring signals resolve.",
+      "owner": "user (Piyush Makhija)",
+      "due_date": "before this bundle is treated as execution-ready (added 2026-09-22, consensus-agent failure-mode review finding 6 -- matches sprint5_ar1_assignments.json's own SP5-DEC-102 due-date framing for the same bundle-readiness gate)"
     },
     {
       "id": "SP5-DEC-002",
       "question": "This file's D21 judgment call recommends harness-engineering does NOT fire, since Dashanan's own codebase is a deterministic backend, not an agentic/LLM runtime. Confirm, or does the team consider Dashanan's role as infrastructure FOR other agentic systems enough to warrant harness-engineering treatment of its own SDLC process?",
-      "why_it_needs_a_human": "The decision tree's own trigger condition is stack-detection-based and genuinely ambiguous for a project whose PRODUCT is memory infrastructure for agents but whose own IMPLEMENTATION is not agentic."
+      "why_it_needs_a_human": "The decision tree's own trigger condition is stack-detection-based and genuinely ambiguous for a project whose PRODUCT is memory infrastructure for agents but whose own IMPLEMENTATION is not agentic.",
+      "owner": "user (Piyush Makhija)",
+      "due_date": "before this bundle is treated as execution-ready (added 2026-09-22, consensus-agent failure-mode review finding 6) -- this is a routing-process judgment, not a per-story blocker, so it does not need to resolve before Phase B execution grouping the way SP5-DEC-101/102 do"
     },
     {
       "id": "SP5-DEC-003",
       "question": "Should graph-workflow-design-theory-engineer be dispatched (in a future, non-docs-only pass) to formally validate the AR.0->AR.1->AR.3->execution-plan->Phase C->AR.5->IR.1 chain's own DAG topology, now that it has run five times (Sprints 1-4 plus this Sprint 5 draft) without ever having been itself graph-theoretically audited?",
-      "why_it_needs_a_human": "A meta-process-quality investment decision, not something this routing pass can decide for the team."
+      "why_it_needs_a_human": "A meta-process-quality investment decision, not something this routing pass can decide for the team.",
+      "owner": "user (Piyush Makhija)",
+      "due_date": "no fixed deadline -- a meta-process investment decision, not a Sprint 5 execution blocker (added 2026-09-22, consensus-agent failure-mode review finding 6); may be deferred past this bundle without blocking Phase B dispatch"
     },
     {
       "id": "SP5-DEC-004",
-      "question": "UPDATED 2026-09-22 per solution-architect review round 9 (was: 'Both design docs are v1 DRAFT' -- stale): connection-pooling-design.md remains v1, single-pass, unreviewed. dpdp-crypto-shredding-full-erasure-design.md is now v2.0, having been through 10 documented solution-architect review rounds (including one major correction). Both still carry disclosed open items (Zone 4/5 Shape B prerequisite and the Zone 7 audit-record adoption decision for DASH-STORY-027; pool-sizing and async-vs-sync confirmation for DASH-STORY-028) and neither is marked IMPLEMENTATION-READY. Should a formal, clean (non-'APPROVE WITH CHANGES') review pass run on connection-pooling-design.md specifically (mirroring FR-013's 7 rounds before Sprint 4, and now roughly mirrored by the DPDP doc's own 8 rounds) before this Sprint 5 bundle is treated as execution-ready, or is the current single-pass draft sufficient given the narrower scope of AR1-S3-G3 relative to FR-013's own API-contract surface?",
-      "why_it_needs_a_human": "A rigor/cost tradeoff the user should decide, not an engineering fact."
+      "question": "UPDATED 2026-09-22 (this bundle's own item-2 currency fix, was: 'now v2.0, 10 documented solution-architect review rounds' -- stale): connection-pooling-design.md remains v1, single-pass, unreviewed. dpdp-crypto-shredding-full-erasure-design.md is now v2.2, having been through 10 documented solution-architect review rounds plus a consensus-agent failure-mode/retry/rollback/escalation review and its round-2 re-review (including one major correction). Both still carry disclosed open items (Zone 4/5 Shape B prerequisite and the Zone 7 audit-record adoption decision for DASH-STORY-027; pool-sizing and async-vs-sync confirmation for DASH-STORY-028) and neither is marked IMPLEMENTATION-READY. Should a formal, clean (non-'APPROVE WITH CHANGES') review pass run on connection-pooling-design.md specifically (mirroring FR-013's 7 rounds before Sprint 4, and now roughly mirrored by the DPDP doc's own 10-plus-round history) before this Sprint 5 bundle is treated as execution-ready, or is the current single-pass draft sufficient given the narrower scope of AR1-S3-G3 relative to FR-013's own API-contract surface?",
+      "why_it_needs_a_human": "A rigor/cost tradeoff the user should decide, not an engineering fact.",
+      "owner": "user (Piyush Makhija)",
+      "due_date": "before Phase B execution grouping for Sprint 5 begins (added 2026-09-22, consensus-agent failure-mode review finding 6 -- identical due-date framing to sprint5_ar1_assignments.json's own SP5-DEC-102, which is this same question restated at the AR.1 level)"
     }
   ]
 }

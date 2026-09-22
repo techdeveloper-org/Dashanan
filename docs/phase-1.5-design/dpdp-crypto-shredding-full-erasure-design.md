@@ -321,6 +321,71 @@ Proposed job shape (new application-layer component, `SubjectErasureJob`, compos
 3. After all zones except 8 succeed for all items, destroy the Zone 8 subject key (irreversible,
    last step, per Section 4).
 4. Write the Zone 7 erasure-event record (Section 6's proposed option), if adopted.
+
+**Durability guarantee for the step-3/step-4 boundary (added 2026-09-22, consensus-agent
+failure-mode review finding 2).** Step 3 (key destruction) is irreversible; step 4 (the Zone 7
+audit record of that destruction) is not yet durable at the moment step 3 fires. A crash between
+the two leaves an undetectable gap: data is gone, and nothing records that it happened. This
+design adopts the same durability pattern `ADR-010` (HLD.md Section on Provenance durability —
+write-ahead journal / Outbox pattern) already uses for the ordinary write path, applied here in
+reverse order relative to a normal write:
+- **Before** step 3 fires, the job durably appends an "erasure in progress" marker to the same
+  local append-only journal ADR-010 already fsyncs to (`{subject_id, zone: 8, cascade_job_id,
+  status: "key_destroy_in_progress", intended_at}`), fsynced before step 3 is invoked. This marker
+  is the durability barrier, exactly as ADR-010's write-ahead entry is the durability barrier for
+  an ordinary write — the marker exists whether or not step 3 or step 4 ever completes.
+- Step 3 (key destroy) executes.
+- **After** step 3 succeeds, step 4 finalizes: the marker is confirmed/promoted into the real Zone
+  7 erasure-event record (Section 6's proposed option) and the journal entry is marked drained,
+  mirroring the relay's own drain-and-acknowledge semantics.
+- If the process crashes between step 3 and step 4's finalize, the journal still holds the
+  "in_progress" marker. On restart, the job recovery sweep (mirroring the existing provenance
+  relay's own backlog-drain behavior on recovery, HLD.md Section 8.4) checks Zone 8's key store to
+  determine which of two states the marker is in, and handles each explicitly (corrected
+  2026-09-22, consensus-agent failure-mode/retry/rollback/escalation round-2 re-review finding 1 —
+  the prior version of this rule only covered the confirmed-complete case and left the
+  unconfirmed case with no route out, see below):
+  - **Key store CONFIRMS destruction already executed.** The sweep retries ONLY the finalize
+    (step 4). Step 3 must never be re-attempted in this state — there is nothing left to destroy.
+  - **Key store does NOT yet confirm destruction** (the crash landed before or during step 3
+    itself, or the confirmation call is transiently unavailable). The sweep is ALLOWED to retry
+    step 3 itself, under the SAME bounded k=2/exponential-backoff policy already defined below for
+    item-level cascade retries. This is safe specifically because Zone 8 key-destroy is idempotent
+    (stated above: "a spurious second destroy call against an already-destroyed key is a no-op at
+    worst"). The **corrected, narrower rule** replaces the prior absolute: **step 3 must never be
+    re-attempted once the key store CONFIRMS destruction; if destruction is unconfirmed, step 3
+    may be safely retried under the bounded policy, since destroy is idempotent.** The prior
+    absolute wording ("step 3 must never be re-attempted once a marker exists") directly
+    contradicted this document's own idempotency claim and left a job with an unconfirmed marker
+    stuck in `key_destroy_in_progress` forever, with no route to a terminal state — that
+    contradiction is what this correction resolves.
+  - If the bounded retries are exhausted with destruction still unconfirmed either way (the key
+    store cannot be reached, or repeated destroy attempts fail without a clear confirm/deny), the
+    job reaches the same terminal `FAILED` state defined below for exhausted item-level retries,
+    with an explicit escalation to the named human compliance owner (the same `escalation_target`
+    used throughout this section) — it does not remain stuck in `key_destroy_in_progress`
+    indefinitely.
+- **Asymmetry, stated explicitly:** the key destruction itself (step 3) is irreversible and cannot
+  be retried or rolled back once it fires. The AUDIT of that destruction (step 4, and the marker
+  written before step 3) is fully recoverable and retriable even though the event it records is
+  not — a crash leaves a durable, detectable trace (the marker, in `status:
+  "key_destroy_in_progress"`) rather than a silent gap, and the finalize step can be safely
+  retried to completion independent of how many times it needs to run.
+- **Zone 8 `subject_item_index` row cleanup durability (resolved 2026-09-22, consensus-agent
+  failure-mode round-2 re-review finding 1 — the prior draft left this implicit).** Step 6 below
+  deletes Zone 8's `subject_item_index` rows only after its key-destroy (step 3) succeeds. This
+  delete is a SEPARATE write from the marker/finalize mechanism above — it is not automatically
+  covered by step 4's finalize merely because both happen after step 3. Resolution: the Zone 8
+  index-row delete is performed as PART OF step 4's finalize transaction (the same transaction
+  that promotes the marker into the real Zone 7 erasure-event record), not as an independent,
+  un-journaled write. If that finalize transaction itself fails partway (index rows deleted but
+  the Zone 7 record not yet written, or vice versa), the recovery sweep's finalize retry (above)
+  re-runs the whole finalize step idempotently — re-deleting already-deleted index rows is a
+  no-op, and the Zone 7 erasure-event record write must itself be idempotent (keyed on
+  `cascade_job_id`, so a retried finalize never appends a duplicate audit record). Zone 8's index
+  cleanup therefore rides along with step 4 as one atomic finalize operation, precisely so the
+  recovery sweep's existing single finalize-retry path covers both effects without needing a
+  second recovery mechanism.
 5. Job status (`GET /jobs/{job_id}`) reports per-zone success/failure counts, not just a binary
    done/not-done — mirroring FR-013's own `WriteReceipt` partial-status precedent (`207`/
    `status="partial"` pattern in `fr013-predicate-schema-design.md` §4.2 step 6) rather than a
@@ -337,10 +402,48 @@ Proposed job shape (new application-layer component, `SubjectErasureJob`, compos
    it. Zone 8's index rows are deleted only after its key-destroy (step 3) succeeds, consistent
    with the "last, irreversible" ordering.
 
-**Not resolved here:** exact retry policy for a partially-failed cascade (does the whole job
-re-run, or only the failed items?), and whether an in-flight erasure job blocks new writes for
-that `subject_id` during its run (a write racing an in-progress erasure could re-populate an
-item the cascade already passed). Both are real concurrency questions; flagged, not designed.
+**Retry policy for a partially-failed cascade (resolved 2026-09-22, consensus-agent failure-mode
+review finding 1 — this was previously left as "not resolved here", which for a DPDP erasure
+story means an item can be stuck indefinitely in "erasure attempted, not completed," exactly the
+failure this story exists to prevent).**
+
+- **Only failed items re-run, never the whole job.** Step 2's per-item, per-zone fail-safe
+  isolation already means successful legs are done and durably reflected (their `subject_item_index`
+  rows are already deleted, step 6); re-running a zone or the whole job would re-attempt
+  already-erased items for no benefit and, for Zone 2's compliance-role delete adapter, would be an
+  avoidable extra privileged operation against rows that no longer exist. Retry scope is exactly
+  the set of `(zone_id, item_id)` pairs whose `subject_item_index` row is still present after step
+  2 (step 6's own "kept for retry visibility" rows are the retry work list, not merely a diagnostic
+  artifact).
+- **Bounded retry count with backoff: this engagement's existing k=2 bounded-retry convention
+  (reused from the Dev/QA/Review sub-task retry policy, `sprint5_implementation_execution_plan.json`
+  `retry_policy`) is adopted for a partially-failed cascade's own item-level retries, with one
+  compliance-specific addition: unlike the k=2 Dev/QA retry (which re-dispatches an agent
+  immediately), a cascade item retry runs on an exponential backoff (base 30s, doubling, capped at
+  10 minutes between attempts) because a per-item erasure failure here is far more likely to be a
+  transient storage/lock contention issue than an engineering defect, and hammering a Postgres
+  compliance-role connection or the Zone 8 key store immediately after a failure risks compounding
+  the same transient condition. k=2 (not a higher bound) is kept rather than justifying a larger
+  number for this job specifically: a compliance-critical erasure that still fails after 2 backed-off
+  attempts is a signal worth a human compliance owner's attention sooner, not a signal to keep
+  quietly retrying — matching this project's own general posture (`retry_policy` for review
+  verdicts) that persistent failure escalates rather than loops indefinitely.
+- **Explicit terminal state.** After the 2 retries are exhausted for any item, the job's own status
+  transitions to a terminal `FAILED` state (not left `IN_PROGRESS` indefinitely) with the specific
+  failed `(zone_id, item_id)` pairs and their last error visible via `GET /jobs/{job_id}`'s existing
+  per-zone success/failure reporting (step 5) — the partial-erasure state is never silently hidden.
+  A job reaching terminal `FAILED` is escalated to a named human compliance owner (the same
+  `escalation_target` this project's `retry_policy` already names for a second REJECTED verdict,
+  reused here for the same reason: this is no longer an engineering-remediable condition once
+  bounded retries are exhausted) rather than left open with no defined path out. The job does NOT
+  auto-close or report success while any item remains in this terminal-failed state; a subject with
+  a terminal-`FAILED` erasure job is a DPDP compliance incident, not a background task to leave
+  running.
+
+**Still not resolved here:** whether an in-flight erasure job blocks new writes for that
+`subject_id` during its run (a write racing an in-progress erasure could re-populate an item the
+cascade already passed). This is a real concurrency question, independent of the retry policy above;
+flagged, not designed.
 
 ---
 
@@ -388,3 +491,5 @@ scored implementation-ready the way FR-013's design eventually was.
 | 2026-09-22 | v1.3 (solution-architect review round 4, finding 11): Rewrote Section 4's "Consequence" paragraph and Section 7's job-order text (steps 1-2) to explicitly distinguish the GENERAL future-8-zone-cascade ordering principle (which legitimately lists Zones 1/3/4/5/2) from THIS STORY's own actual iteration scope (Zones 1/3/2 only, plus Zone 6 first and Zone 8 last) -- the prior wording could be read as claiming this story's own job touches Zone 4/5, contradicting Section 2's own scoping and the bundle-wide must_not_deviate guarantee. |
 | 2026-09-22 | v1.4 (solution-architect review round 5, finding 14): Added these Change Log rows themselves -- rounds 1-4's fixes to this document had not been logged here, unlike `fr013-predicate-schema-design.md`'s own 7-row review-round Change Log precedent this project otherwise follows. No further content change; documentation-currency fix only. |
 | 2026-09-22 | v2.0 (solution-architect review round 6, MAJOR): Corrected a false "what ships today" baseline in Section 1 -- `DELETE /tenants/{tenant_id}/subjects/{subject_id}` IS already wired (not contract-only), and three already-built, already-real modules (`subject_erasure_cascade.py`, `zone8_crypto_shredding_store.py`, `unified_subject_erasure_orchestrator.py`) were never read or cited by v1-v1.4, causing this document to propose rebuilding work that already exists rather than wiring/extending it. Section 1 now documents the real current state; Sections 2-7 each carry a 2026-09-22 correction note reframing their proposals against that real state (Section 3's index becomes a concrete `SubjectToItemIndex` implementation, not new architecture; Section 4's zone-by-zone mechanisms are confirmed-built, not proposed; Section 7's job design already exists twice and needs wiring, not designing). Story re-scoped and re-estimated accordingly in `backlog_draft.json`/`sprint5_ar1_assignments.json` (see those files' own 2026-09-22 round-6 correction notes). Still DRAFT, not IMPLEMENTATION-READY -- this correction narrows the remaining gap, it does not close it. |
+| 2026-09-22 | v2.1 (consensus-agent failure-mode/retry/rollback/escalation review, REJECTED verdict remediation): Section 7 finding 1 -- replaced "not resolved here: exact retry policy" with a concrete policy (only failed items re-run; bounded k=2 retry with exponential backoff, base 30s/cap 10min; explicit terminal `FAILED` state visible via `GET /jobs/{job_id}`, escalated to a named human compliance owner rather than left open indefinitely). Section 7 finding 2 -- added an explicit durability guarantee for the step-3 (irreversible Zone 8 key destroy) / step-4 (Zone 7 audit record) boundary, reusing ADR-010's write-ahead-journal/outbox pattern (marker written before step 3, confirmed/finalized after), so a crash between the two leaves a durable, detectable trace instead of a silent gap; documented the asymmetry that key destruction itself is irreversible while the audit of it is fully recoverable/retriable. Both fixes close real gaps a separate consensus-agent review lens found that the architecture-conformance review rounds 1-9 above had not caught. |
+| 2026-09-22 | v2.2 (consensus-agent failure-mode/retry/rollback/escalation round-2 re-review, verdict upgraded REJECT -> APPROVE WITH CHANGES, finding 1 -- the last remaining substantive gap): Section 7's recovery-sweep rule previously covered only the case where step 3 (Zone 8 key destroy) is CONFIRMED complete after a crash, and separately stated step 3 "must never be re-attempted once a marker exists" -- an absolute that, read together with the doc's own idempotency claim ("a spurious second destroy call against an already-destroyed key is a no-op at worst"), left a crash landing before/during step 3 with an unconfirmed marker stuck in `key_destroy_in_progress` forever, with no route to the terminal `FAILED` state. Fixed by narrowing the rule: step 3 must never be re-attempted once the key store CONFIRMS destruction; if unconfirmed, step 3 may be safely retried under the same bounded k=2/backoff policy, since destroy is idempotent -- and after those retries are exhausted with no confirmation either way, the job now reaches the same terminal `FAILED` state (v2.1's fix) with explicit escalation, rather than staying stuck indefinitely. Also resolved, per the same finding, whether step 6's Zone 8 `subject_item_index` row cleanup is covered by the same recoverable finalize (step 4) mechanism: it is -- the index-row delete is now stated explicitly as part of step 4's finalize transaction, idempotent on retry, rather than left as an implicit, separately-durable write. |
