@@ -258,15 +258,20 @@ either way here.
 
 ---
 
-## 6. Zone 7 audit-log-preservation boundary — status: still `[NEEDS INPUT]`
+## 6. Zone 7 audit-log-preservation boundary — status: `ADOPTED AS WORKING ASSUMPTION (2026-09-22, user decision)`
 
-This is carried forward, not resolved. `dpdp-retention-policy.md`'s own text already states the
-exact shape of the open question: how does Zone 7 record "an erasure occurred for subject X"
-without retaining the erased PII itself?
+**UPDATE 2026-09-22 (user decision):** the option below is now adopted as a working assumption for
+implementation purposes. The underlying legal question — whether a `source_type: erasure_event`
+record referencing `subject_id` is itself "retained personal data" under DPDP — is NOT resolved by
+this decision and remains a tracked follow-up, same posture as OAQ-10 (Section 8). This is an
+engineering scoping decision (build against this shape), not a legal determination.
 
-This design proposes one concrete option for review, without claiming it is decided:
+`dpdp-retention-policy.md`'s own text already states the exact shape of the open question: how
+does Zone 7 record "an erasure occurred for subject X" without retaining the erased PII itself?
 
-**Option (proposed, not adopted):** on cascade completion, write a new Zone 7 provenance record
+This design proposes one concrete option, now adopted as a working assumption:
+
+**Option (adopted as working assumption, not legally confirmed):** on cascade completion, write a new Zone 7 provenance record
 whose `source_type` is a new literal (e.g. `"erasure_event"`) and whose content field holds only
 `{subject_id, erased_zones: [...], erased_at, cascade_job_id}` — structural metadata already
 established as non-PII by this codebase's own classification (item/tenant/job identifiers, not
@@ -493,3 +498,4 @@ scored implementation-ready the way FR-013's design eventually was.
 | 2026-09-22 | v2.0 (solution-architect review round 6, MAJOR): Corrected a false "what ships today" baseline in Section 1 -- `DELETE /tenants/{tenant_id}/subjects/{subject_id}` IS already wired (not contract-only), and three already-built, already-real modules (`subject_erasure_cascade.py`, `zone8_crypto_shredding_store.py`, `unified_subject_erasure_orchestrator.py`) were never read or cited by v1-v1.4, causing this document to propose rebuilding work that already exists rather than wiring/extending it. Section 1 now documents the real current state; Sections 2-7 each carry a 2026-09-22 correction note reframing their proposals against that real state (Section 3's index becomes a concrete `SubjectToItemIndex` implementation, not new architecture; Section 4's zone-by-zone mechanisms are confirmed-built, not proposed; Section 7's job design already exists twice and needs wiring, not designing). Story re-scoped and re-estimated accordingly in `backlog_draft.json`/`sprint5_ar1_assignments.json` (see those files' own 2026-09-22 round-6 correction notes). Still DRAFT, not IMPLEMENTATION-READY -- this correction narrows the remaining gap, it does not close it. |
 | 2026-09-22 | v2.1 (consensus-agent failure-mode/retry/rollback/escalation review, REJECTED verdict remediation): Section 7 finding 1 -- replaced "not resolved here: exact retry policy" with a concrete policy (only failed items re-run; bounded k=2 retry with exponential backoff, base 30s/cap 10min; explicit terminal `FAILED` state visible via `GET /jobs/{job_id}`, escalated to a named human compliance owner rather than left open indefinitely). Section 7 finding 2 -- added an explicit durability guarantee for the step-3 (irreversible Zone 8 key destroy) / step-4 (Zone 7 audit record) boundary, reusing ADR-010's write-ahead-journal/outbox pattern (marker written before step 3, confirmed/finalized after), so a crash between the two leaves a durable, detectable trace instead of a silent gap; documented the asymmetry that key destruction itself is irreversible while the audit of it is fully recoverable/retriable. Both fixes close real gaps a separate consensus-agent review lens found that the architecture-conformance review rounds 1-9 above had not caught. |
 | 2026-09-22 | v2.2 (consensus-agent failure-mode/retry/rollback/escalation round-2 re-review, verdict upgraded REJECT -> APPROVE WITH CHANGES, finding 1 -- the last remaining substantive gap): Section 7's recovery-sweep rule previously covered only the case where step 3 (Zone 8 key destroy) is CONFIRMED complete after a crash, and separately stated step 3 "must never be re-attempted once a marker exists" -- an absolute that, read together with the doc's own idempotency claim ("a spurious second destroy call against an already-destroyed key is a no-op at worst"), left a crash landing before/during step 3 with an unconfirmed marker stuck in `key_destroy_in_progress` forever, with no route to the terminal `FAILED` state. Fixed by narrowing the rule: step 3 must never be re-attempted once the key store CONFIRMS destruction; if unconfirmed, step 3 may be safely retried under the same bounded k=2/backoff policy, since destroy is idempotent -- and after those retries are exhausted with no confirmation either way, the job now reaches the same terminal `FAILED` state (v2.1's fix) with explicit escalation, rather than staying stuck indefinitely. Also resolved, per the same finding, whether step 6's Zone 8 `subject_item_index` row cleanup is covered by the same recoverable finalize (step 4) mechanism: it is -- the index-row delete is now stated explicitly as part of step 4's finalize transaction, idempotent on retry, rather than left as an implicit, separately-durable write. |
+| 2026-09-22 | v2.3 (user decision): Section 6's Zone 7 audit-record status changed from `[NEEDS INPUT]` to `ADOPTED AS WORKING ASSUMPTION` -- the user chose to build against the proposed non-PII `erasure_event` record shape now, with legal confirmation of whether it constitutes retained personal data tracked as a follow-up, same posture as OAQ-10 (Section 8). This is an engineering scoping decision, not a legal determination; the underlying legal question remains open. |
