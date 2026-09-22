@@ -54,7 +54,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (connection pooling) received a clean **APPROVE** as early as round 4 and needed no further
   changes through round 12. See `docs/phase-8-alignment/sprint5_ir1_agent_flags.json`'s
   `resolution_note_2026_09_22` for the fullest available round-by-round account (itself subject to
-  the same one-round-behind citation lag by nature, not by omission).
+  the same one-round-behind citation lag by nature, not by omission). A user-requested final
+  round-13 solution-architect confirmation pass then gave a genuine final sign-off (both stories
+  APPROVE), backed by fresh direct reads of `app.py`, `unified_subject_erasure_orchestrator.py`,
+  `composition_root.py`, and a `psycopg_pool` grep confirming nothing had been silently
+  implemented ahead of this docs-only convention. **Separately, a 4-round `consensus-agent` review
+  — a different lens (failure modes, retry policies, rollback scope, escalation paths) than
+  solution-architect's architecture-conformance rounds — then REJECTED DASH-STORY-027 in its own
+  round 1**, finding 6 real gaps none of the 13 architecture rounds were scoped to catch: no retry
+  policy for a partially-failed DPDP erasure cascade; a non-atomic Zone 8 key-destroy vs. Zone 7
+  audit-record write (a crash between them could destroy data with no audit trail); a uniform
+  retry policy that couldn't distinguish engineering-remediable failures from OAQ-10-adjacent
+  legal-judgment failures; an AR.0/AR.1 assignment-threshold inconsistency; a blocking-semantics
+  contradiction on DASH-STORY-028's review gate; and 4 open user decisions missing an owner/
+  due_date. Rounds 2-4 fixed each in turn: the DPDP design doc (now v2.2) gained a concrete
+  write-ahead-marker + atomic-finalize + bounded-retry + terminal-FAILED-escalation design for
+  the Zone 8/Zone 7 durability gap, with a two-branch recovery sweep (confirmed vs. unconfirmed
+  destruction) resolving an idempotency contradiction caught in round 2; the execution plan's
+  `retry_policy` now distinguishes engineering-remediable from compliance/legal-judgment REJECTED
+  verdicts; new `AC-027-DEV-4`/`AC-027-QA-3` cover the durability mechanism, which — being real
+  added scope, not documentation — pushed DASH-STORY-027 back to **13 SP** (sprint total 21 SP),
+  a coincidental match to the pre-round-6 number for an unrelated reason (round 6's "wire, don't
+  rebuild" re-scoping finding remains valid; this is new scope added on top of it). Round 4 gave a
+  final clean **APPROVE**, no blockers, for both stories. See `docs/phase-8-alignment/
+  sprint5_ir1_agent_flags.json`'s `execution_readiness` block for the current, up-to-date
+  blocker list (six open user decisions plus a still-missing real Phase C gate — no remaining
+  DPDP-design-quality blocker from either review loop).
 - FR-013 predicate/subject_scope/retrieval_context_hash wire schema (GitHub #23) — designed,
   7 independently-reviewed revisions, v7 at 9.8/10, IMPLEMENTATION-READY
   (`docs/phase-1.5-api/fr013-predicate-schema-design.md`) — is now wired into the real write path:
