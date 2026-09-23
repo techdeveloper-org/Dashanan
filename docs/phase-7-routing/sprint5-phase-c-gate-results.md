@@ -7,9 +7,14 @@ pooling), covering `sprint5_ar0_routing_index.json`, `sprint5_ar1_assignments.js
 `docs/phase-1.5-design/connection-pooling-design.md`.
 
 **Scope note (added 2026-09-23):** DASH-STORY-029 (Zone 5 Shape B storage) was pulled into Sprint 5
-scope AFTER this Phase C self-check was produced, so it is NOT covered by the PASS verdict below —
-it requires its own separate Phase C coverage before being treated as execution-ready alongside
-027/028.
+scope AFTER this Phase C self-check was originally produced. **UPDATED 2026-09-23 (this addendum):**
+DASH-STORY-029 now has its own dedicated self-check subsection below ("DASH-STORY-029 self-check
+(ADDED 2026-09-23)") — the original DASH-STORY-027/028-only self-check text immediately below this
+note is left exactly as first written, per this file's own convention of not deleting superseded
+text. Even with this addendum, no story in this bundle has yet had a REAL dispatched Phase C gate —
+see the new "Real Phase C Gate (dispatched)" section further below for that separate, genuine
+dispatch and its own verdict, which is what actually closes the gap this file's own Recommendation
+section (below) has called for since 2026-09-22.
 
 **Post-hoc update (2026-09-22, solution-architect review round 6) — this file's own "everything
 else checked and found accurate" claim below was WRONG on one major point.** A genuinely dispatched
@@ -82,12 +87,126 @@ between the two stories.
 factual defect.** No fabricated agent, file path, or requirement citation found in this pass's own
 review. This is NOT the same evidentiary standard as Sprint 1-4's actual paired-detector gate.
 
-## Recommendation
+## DASH-STORY-029 self-check (ADDED 2026-09-23)
+
+**Scope:** DASH-STORY-029 (Zone 5 Shape B storage), covering the same four Sprint 5 Phase 7 files
+plus `docs/phase-1.5-design/zone5-shape-b-storage-design.md` (v4, DRAFT).
+
+Every file-path/line-range/method-name citation for DASH-STORY-029 across `sprint5_ar1_assignments.json`
+(sub_tasks DASH-STORY-029-DEV/QA/REVIEW, AC-029-DEV-1..3/QA-1..3/REVIEW-1..2),
+`sprint5_ar0_routing_index.json`'s `SPRINT5-CAND-003` entry, `sprint5_ar3_context_windows.json`'s
+DASH-STORY-029 windows, and `sprint5_implementation_execution_plan.json`'s DASH-STORY-029 prompts
+was re-opened against real source this pass directly read:
+
+- `src/dashanan/infrastructure/entity_memory_repository.py` — directly read; confirmed
+  `write_attribute` (line 166), `erase_entity` (line 242), `resolve_alias_prefix` (line 346), and
+  `resolve_exact_term` (line 360) are real methods with the signatures AC-029-DEV-1/2 and
+  AC-029-QA-1/3 describe as the Shape A interface `SqlEntityMemoryRepository` must match.
+- `docs/phase-1.5-design/zone5-shape-b-storage-design.md` — directly read in full; confirmed
+  Sections 1-9 all exist and contain the content cited (Section 3 schema/role grants, Section 4
+  append-only analysis, Section 5 compliance-role extension pattern, Section 6
+  interface-compatibility table, Section 8's 5 disclosed open items, Section 9 DoD table). No
+  citation traced to a non-existent section or a claim the section doesn't actually make.
+- `sprint5_ar1_assignments.json`'s DASH-STORY-029 `p1_security_override.considered_and_not_triggered`
+  entry and `failure_and_escalation_policy` field (lines 644-673) were cross-checked against each
+  other for internal consistency (the non-blocking REVIEW posture is re-justified by the
+  `failure_and_escalation_policy`'s own compliance-role escalation class, not silently assumed) —
+  consistent, no contradiction found.
+
+**Self-check verdict: PASS.** No fabricated agent, file path, method name, or design-doc section
+found for DASH-STORY-029 in this pass's own review. Same evidentiary-weight caveat as the
+DASH-STORY-027/028 self-check above applies unchanged — this is NOT the same standard as a real
+dispatched Phase C gate.
+
+## Real Phase C Gate (dispatched) — 2026-09-23
+
+**This is the genuine article the self-check sections above have called for since 2026-09-22.** Two
+separate `hallucination-detector` and `context-faithfulness-engineer` personas were dispatched via
+the Agent tool, each independently reading the full three-story Sprint 5 bundle (all four Phase 7
+JSON files plus all three Phase 1.5 design docs) and verifying a targeted sample of the bundle's
+highest-stakes claims against the real cited source files in `src/dashanan/` and
+`docs/phase-1.5-api/openapi.yaml`. Neither agent had access to the other's reasoning or to this
+session's own prior self-checks above — each ran cold against the real files.
+
+**Honesty disclosure (per both agents' own mandatory reporting requirement):** neither agent could
+run a real NLI/RAGAS/SummaC/BERTScore/FactScore pipeline in this environment — no such pipeline
+exists here. Every numeric field in both agents' own Output Format reports is explicitly marked
+`N/A — not computed`, with a qualitative claim-by-claim entailment/grounding judgment substituted
+in its place. This is disclosed plainly rather than presenting a fabricated-but-plausible-looking
+score, per this plan's own hard requirement.
+
+### hallucination-detector's report (summary)
+
+Sampled 12 of the bundle's highest-load-bearing claims (interface signatures, "what ships today"
+baselines, security/privilege-boundary claims) against real source files, each verified at exact
+file:line (e.g. `app.py:864` for the `eraseSubject` handler wiring, `zone2_capacity_backstop_sweep.py:190`
+for the `Zone2EvictionPort` Protocol claim underlying the P1-override reasoning,
+`semantic_schema.sql:22-28` for the Zone 3 append-only-trigger-absence claim). **Taxonomy result:
+`none_detected` for all 12 sampled claims — no intrinsic, extrinsic, factual, or faithfulness
+hallucination found.** Severity: LOW-to-NONE. No CRITICAL/HIGH finding; nothing requiring escalation.
+Action recommendation: `monitor`. Scope caveat disclosed by the agent itself: this was a targeted,
+evidence-focused sample, not exhaustive line-by-line coverage of the bundle's hundreds of narrative
+version-bookkeeping sentences — the three design docs' own internal claims (pool-sizing formula,
+durability-boundary mechanism, interface-compatibility table) and `docker-compose.yml`'s Postgres
+service definition were named as the highest-value NEXT targets for a future, deeper pass, not
+checked in this one.
+
+### context-faithfulness-engineer's report (summary)
+
+Independently checked 14 load-bearing narrative claims (a partially overlapping but not identical
+set to the hallucination-detector's 12 — including the subtle DASH-STORY-029 constructor-typing
+coupling risk at `unified_subject_erasure_orchestrator.py:143`, and cross-checking all three design
+docs' own version headers against every citation of them across AR.0/AR.1/AR.3/execution-plan).
+**Result: every one of the 14 claims checked is genuinely grounded in its real cited source — zero
+unfaithful claims found.** The agent explicitly noted this is unusual given the bundle's own
+extensive self-correction history (multiple prior rounds that found and fixed real false claims,
+e.g. the pre-round-6 "eraseSubject is contract-only" error and the pre-v4 zone5 "subject_id
+convention" error) — the versions actually cited throughout the bundle today appear to have
+converged to an accurate end state.
+
+**One LOW-severity note (not blocking, not a demonstrated defect):** `sprint5_implementation_execution_plan.json`'s
+scope_note claims the dpdp design doc went through "13 solution-architect adversarial rounds," but
+that doc's own Change Log table only explicitly enumerates rounds 1/2/4/5/6 by number before
+consensus-agent rounds take over at v2.1+. The agent could not independently confirm the exact count
+"13" from the design doc's own Change Log alone. This is NOT a contradiction (unlogged clean rounds
+that changed nothing are consistent with this project's own stated convention of only logging rounds
+that produced a fix) — it is disclosed as an unverifiable-but-not-false figure, per the bundle's own
+established practice of disclosing rather than silently asserting precision it cannot independently
+confirm. No correction is made to the "13 rounds" figure, since the finding does not show it to be
+wrong.
+
+### Disagreement check
+
+The two agents' claim sets overlapped on 8 of the bundle's most load-bearing citations (the
+`eraseSubject` wiring, the `Zone2EvictionPort` distinction, the `EntityMemoryRepository` interface,
+the `composition_root.py` no-pooling-today baseline, the design-doc version citations, and others).
+**No disagreement was found between the two agents on any claim** — both independently reached the
+same "genuinely grounded" verdict on every overlapping claim, and neither flagged a CRITICAL/HIGH
+finding the other did not also fail to find.
+
+### Combined real-gate verdict
+
+**PASS.** Zero CRITICAL/HIGH findings from either dispatched agent. One disclosed LOW-severity,
+unverifiable-but-not-contradicted note (the "13 rounds" figure). No `must_not_deviate` item or
+security/legal-adjacent claim (DPDP/erasure, Zone 7/8 crypto-shredding, compliance-role privilege
+grants) was found unfaithful or fabricated by either agent — no escalation to the user is triggered
+by this gate, per the pre-dispatch failure/escalation policy this gate was run under. Both agents'
+own disclosed scope caveats (targeted high-stakes sampling, not exhaustive line-by-line coverage of
+every narrative sentence in a multi-thousand-line bundle) are carried forward honestly rather than
+implying a completeness this pass did not actually achieve.
+
+This supersedes the "no real gate has run" framing in the self-check sections above and in
+`sprint5-ar5-rs-computation.md`'s own evidentiary-weight caveats — see that file's own dated update
+for the corresponding change to its RS figure's evidentiary characterization.
+
+## Recommendation (historical — superseded by the Real Phase C Gate above, retained per this file's
+own append-only convention)
 
 Before this bundle is treated as execution-ready for a future Phase B dispatch, run the real Phase
 C gate this project's own convention calls for: dispatch `hallucination-detector` and
 `context-faithfulness-engineer` (via the Agent tool, genuinely, not this session's own self-check)
 against the full six-file Sprint 5 bundle, the same way Sprint 4's own gap was eventually closed.
-This recommendation is carried forward into `sprint5-ar5-rs-computation.md`'s own Verdict section
-and `sprint5_ir1_agent_flags.json`'s `execution_readiness` block, so it is not lost between
-artifacts.
+**UPDATED 2026-09-23: this recommendation is now fulfilled — see "Real Phase C Gate (dispatched)"
+above.** The remaining gap before Phase B dispatch is explicit user authorization itself, not a
+missing gate; see `sprint5_ir1_agent_flags.json`'s `execution_readiness` block for the current,
+narrowed blocker list.
