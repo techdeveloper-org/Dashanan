@@ -6,6 +6,11 @@ pooling), covering `sprint5_ar0_routing_index.json`, `sprint5_ar1_assignments.js
 `docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md`, and
 `docs/phase-1.5-design/connection-pooling-design.md`.
 
+**Scope note (added 2026-09-23):** DASH-STORY-029 (Zone 5 Shape B storage) was pulled into Sprint 5
+scope AFTER this Phase C self-check was produced, so it is NOT covered by the PASS verdict below —
+it requires its own separate Phase C coverage before being treated as execution-ready alongside
+027/028.
+
 **Post-hoc update (2026-09-22, solution-architect review round 6) — this file's own "everything
 else checked and found accurate" claim below was WRONG on one major point.** A genuinely dispatched
 solution-architect review (round 6, after this self-check was written) found that the DPDP design
@@ -50,13 +55,17 @@ research-agent reports and direct file reads earlier in this conversation for `d
 originally noted (2026-09-22, before round 6): `sprint5_ar1_assignments.json`'s `DASH-STORY-027`
 `story_points: 13` and its `sub_task_sp_sum` (8+3+2=13) were internally consistent but had no
 design-doc-review-round history behind them, a first-pass estimate against a v1 DRAFT design.
-**UPDATED 2026-09-22 per solution-architect review round 8**: that original 13 SP figure no longer
-exists -- round 6 re-scoped DASH-STORY-027 from "build from scratch" (13 SP) to "wire and extend
-already-built prior art" (8 SP, sub_task_sp_sum 5+2+1=8) after finding the design doc's own "what
-ships today" baseline was false. The CURRENT estimate (8 SP) now has substantial review history
-behind it -- 8 documented solution-architect rounds against the design doc it's estimated from,
-v2.0 -- closer to Sprint 4's FR-013 precedent than the original single-pass estimate this
-paragraph originally flagged as provisional.
+**UPDATED 2026-09-23, FINAL (was: "8 SP", "v2.0" -- both stale)**: round 6 re-scoped DASH-STORY-027
+from "build from scratch" (13 SP) to "wire and extend already-built prior art" (8 SP,
+sub_task_sp_sum 5+2+1=8) after finding the design doc's own "what ships today" baseline was false.
+That 8 SP figure was itself later superseded: a consensus-agent review found the wire-and-extend
+scope still needed a real write-ahead-marker/recovery-sweep durability mechanism (Section 7) that
+had been undercounted, and DASH-STORY-027 was re-estimated back to **13 SP** (sub_task_sp_sum
+5+3+4=... see `sprint5_ar1_assignments.json`'s own `story_points_note` for the exact split and
+history: 13→8→13). The CURRENT estimate (13 SP) now has substantial review history behind it --
+13 documented solution-architect rounds plus a separate 4-round consensus-agent review, against the
+design doc it's estimated from, now **v2.3** -- closer to Sprint 4's FR-013 precedent than the
+original single-pass estimate this paragraph originally flagged as provisional.
 
 **Everything else checked and found accurate:** every agent name cited across the six Sprint 5
 files was independently re-confirmed to exist at `claude-global-library/agents/{name}/agent.md`

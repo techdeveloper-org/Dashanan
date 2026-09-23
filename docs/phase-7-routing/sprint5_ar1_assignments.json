@@ -120,7 +120,7 @@
             {
               "ac_id": "AC-027-DEV-4",
               "text": "Given the Zone 8 key-destroy (step 3) is irreversible and its Zone 7 audit finalize (step 4) is not yet durable at the moment step 3 fires, When the cascade reaches Zone 8, Then a write-ahead 'erasure in progress' marker is durably appended (fsynced) before step 3 is invoked, step 4 finalizes by promoting that marker into the real Zone 7 erasure-event record and deleting Zone 8's subject_item_index rows in the SAME finalize transaction, and a job recovery sweep runs on restart to check Zone 8's key store and either retry the finalize only (destruction CONFIRMED) or safely retry step 3 itself under the bounded k=2/exponential-backoff policy (destruction UNCONFIRMED, since key-destroy is idempotent), reaching a terminal FAILED state with escalation to the named human compliance owner if retries are exhausted with destruction still unconfirmed. This is not the happy path alone -- the marker write, the finalize-retry recovery sweep, and the terminal FAILED escalation must all actually be built.",
-              "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 7, 'Durability guarantee for the step-3/step-4 boundary' (v2.1/v2.2)"
+              "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 7, 'Durability guarantee for the step-3/step-4 boundary' (v2.3)"
             }
           ],
           "must_not_deviate": [
@@ -173,7 +173,7 @@
             {
               "ac_id": "AC-027-QA-3",
               "text": "Given the Zone 8 step-3/step-4 durability boundary, When a crash is simulated after the write-ahead marker is written but before Zone 8 destruction is confirmed, Then the recovery sweep on restart retries and successfully completes, producing a finalized Zone 7 record and a cleaned-up subject_item_index row, in a separate test from: Given the bounded k=2 retries are exhausted with destruction still unconfirmed, When the job status is polled, Then it has reached the terminal FAILED state with the specific failed (zone_id, item_id) pairs visible via GET /jobs/{job_id} and an escalation to the named human compliance owner recorded -- not left IN_PROGRESS indefinitely.",
-              "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 7, 'Durability guarantee for the step-3/step-4 boundary' and 'Explicit terminal state' (v2.1/v2.2)"
+              "source": "docs/phase-1.5-design/dpdp-crypto-shredding-full-erasure-design.md Section 7, 'Durability guarantee for the step-3/step-4 boundary' and 'Explicit terminal state' (v2.3)"
             }
           ],
           "must_not_deviate": [
@@ -268,7 +268,7 @@
       "title": "Real connection pooling for the API host composition root (closes AR1-S3-G3)",
       "traces_to_gap": "AR1-S3-G3",
       "story_points": 21,
-      "story_points_note": "RE-ESTIMATED 2026-09-22 (solution-architect, user-decision resolution) from 13 SP to 21 SP (next Fibonacci value, backlog_draft.json's own estimation_method): connection-pooling-design.md v2.3 adds a mandatory full circuit breaker in front of pooled Postgres connection acquisition (Section 5.1), closing HLD.md ADR-020's previously-disclosed 'Documented exception' per the user's decision to require the breaker rather than defer or re-affirm it unnecessary. This is real, nontrivial added Dev/QA scope beyond the prior 13 SP wiring-refactor estimate: a new state machine (CLOSED/OPEN/HALF_OPEN) wrapping get_pooled_connection, a Postgres-specific failure predicate distinguishing connect-establishment failures from ordinary query errors and from PoolTimeout, the same count-based ring-buffer breaker utility HLD Section 5 already mandates reused (not reinvented) with Postgres-specific thresholds mirrored from HLD Section 8's vector-store breaker, and new tests proving all three state transitions plus the OPEN-state fail-fast-without-pool-acquisition behavior. Sub-task split reweighted from Dev 13 / QA 5 / Review 3 (sum 21), following this project's Fibonacci/70-20-10-ish Dev-QA-Review convention (13/21=~62%, 5/21=~24%, 3/21=~14%, the same rounding-to-nearest-Fibonacci shape DASH-STORY-027's own re-estimates and the prior 8/3/2 split used).",
+      "story_points_note": "RE-ESTIMATED 2026-09-22 (solution-architect, user-decision resolution) from 13 SP to 21 SP (next Fibonacci value, backlog_draft.json's own estimation_method): connection-pooling-design.md (now v2.6) added a mandatory full circuit breaker in front of pooled Postgres connection acquisition (Section 5.1), closing HLD.md ADR-020's previously-disclosed 'Documented exception' per the user's decision to require the breaker rather than defer or re-affirm it unnecessary. This is real, nontrivial added Dev/QA scope beyond the prior 13 SP wiring-refactor estimate: a new state machine (CLOSED/OPEN/HALF_OPEN) wrapping get_pooled_connection, a Postgres-specific failure predicate distinguishing connect-establishment failures from ordinary query errors and from PoolTimeout, the same count-based ring-buffer breaker utility HLD Section 5 already mandates reused (not reinvented) with Postgres-specific thresholds mirrored from HLD Section 8's vector-store breaker, and new tests proving all three state transitions plus the OPEN-state fail-fast-without-pool-acquisition behavior. Sub-task split reweighted from Dev 13 / QA 5 / Review 3 (sum 21), following this project's Fibonacci/70-20-10-ish Dev-QA-Review convention (13/21=~62%, 5/21=~24%, 3/21=~14%, the same rounding-to-nearest-Fibonacci shape DASH-STORY-027's own re-estimates and the prior 8/3/2 split used).",
       "gap_confirmed": "CONFIRMED by direct read of src/dashanan/infrastructure/composition_root.py's build_postgres_connection -- a single psycopg.Connection is constructed once and shared across every zone repository builder; no psycopg_pool import exists anywhere in the codebase.",
       "sub_tasks": [
         {
@@ -321,12 +321,12 @@
             {
               "ac_id": "AC-028-LOADTEST-1",
               "text": "Given a load-test harness targeting docker-compose.yml's real Postgres container, When it is run at increasing concurrency levels, Then it records real connection-acquisition-latency (p50/p95/p99) and PoolTimeout/exhaustion-rate numbers at each level -- no fabricated or assumed numbers.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md Section 4/8 item 1 (v2.5)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md Section 4/8 item 1 (v2.6)"
             },
             {
               "ac_id": "AC-028-LOADTEST-2",
               "text": "Given the harness's real measured results, When Section 4's pool_min=2/pool_max=20 formula-derived defaults are compared against them, Then connection-pooling-design.md Section 4 is updated with a real, evidence-backed pool_min/pool_max recommendation (confirming or revising the formula-derived values), and Section 8 item 1 moves from BLOCKED to RESOLVED referencing this sub-task.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md Section 4/8 item 1 (v2.5)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md Section 4/8 item 1 (v2.6)"
             },
             {
               "ac_id": "AC-028-LOADTEST-3",
@@ -411,7 +411,7 @@
             {
               "ac_id": "AC-028-DEV-4",
               "text": "Given repeated Postgres connect/acquire failures, When the failure rate reaches >= 50% (or the slow-connect rate reaches >= 30% at 2x p99) over the last 20 connect attempts, Then the circuit breaker trips OPEN and every subsequent request fails fast with 503+Retry-After WITHOUT attempting pool.connection() at all; When the breaker has been OPEN for the backoff period (30s * 2^(trips-1), capped 300s), Then it transitions to HALF_OPEN and allows exactly 5 probe connection attempts through, closing back to normal operation only if all 5 succeed. The breaker reuses HLD.md Section 5's existing count-based ring-buffer breaker utility and does not trip on ordinary query-level errors or on PoolTimeout. ADDED 2026-09-22 (consensus-agent review, BLOCKER fix): the OPEN-state 503 MUST be distinguishable from Section 5's PoolTimeout 503 -- it carries error.code = POSTGRES_UNAVAILABLE (not POOL_EXHAUSTED) and a Retry-After computed as max(1, ceil(opened_at + backoff_duration - now)) (the actual remaining time until the next HALF_OPEN probe), never the PoolTimeout path's fixed ~1s value.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.4 Section 5.1/5.1.1 (user decision closing HLD.md ADR-020's documented exception; disambiguation added in v2.4 per consensus-agent BLOCKER remediation)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.6 Section 5.1/5.1.1 (user decision closing HLD.md ADR-020's documented exception; disambiguation added in v2.4 per consensus-agent BLOCKER remediation)"
             }
           ],
           "must_not_deviate": [
@@ -471,7 +471,7 @@
             {
               "ac_id": "AC-028-QA-4",
               "text": "Given the shipped Postgres circuit breaker, When the test suite is run, Then it proves all three state transitions -- CLOSED to OPEN on >= 50% connect-attempt failures (or >= 30% slow-connect rate at 2x p99) over a 20-call window, with the OPEN state confirmed to fail fast (503+Retry-After) WITHOUT calling pool.connection(); OPEN to HALF_OPEN after the documented backoff (30s * 2^(trips-1), capped 300s); and HALF_OPEN to CLOSED only when all 5 probe attempts succeed, or back to OPEN on any single probe failure -- and a negative test confirming ordinary query-level errors (e.g. IntegrityError) do not increment the breaker's failure count. ADDED 2026-09-22 (consensus-agent review, BLOCKER fix): a test asserting the OPEN-state response is distinguishable from a PoolTimeout response -- OPEN carries error.code = POSTGRES_UNAVAILABLE with a Retry-After that shrinks as the breaker's backoff window elapses (not a fixed ~1s value), while a separately-triggered PoolTimeout response carries error.code = POOL_EXHAUSTED with the existing fixed ~1s Retry-After -- both asserted side by side in the same test.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.4 Section 5.1/5.1.1 (user decision closing HLD.md ADR-020's documented exception; disambiguation added in v2.4 per consensus-agent BLOCKER remediation)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.6 Section 5.1/5.1.1 (user decision closing HLD.md ADR-020's documented exception; disambiguation added in v2.4 per consensus-agent BLOCKER remediation)"
             }
           ],
           "must_not_deviate": [
@@ -544,12 +544,12 @@
             {
               "ac_id": "AC-028-REVIEW-4",
               "text": "Given the shipped Dev sub-task, When reviewed, Then confirm Section 7.1's rollback path is real, not aspirational: either the POOLING_ENABLED env-var gate is implemented and its single-connection fallback code path is exercised by at least one test, or the flag is explicitly deferred and Section 7.1's concrete code-revert procedure is confirmed accurate against the as-shipped file layout.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.2 Section 9 DoD (consensus-agent APPROVED_WITH_CONDITIONS remediation, 2026-09-22)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.6 Section 9 DoD (consensus-agent APPROVED_WITH_CONDITIONS remediation, 2026-09-22)"
             },
             {
               "ac_id": "AC-028-REVIEW-5",
               "text": "Given the shipped Postgres circuit breaker (AC-028-DEV-4/AC-028-QA-4), When reviewed, Then independently confirm -- not merely accept Dev/QA's own self-certification -- that: (1) the breaker's failure taxonomy is implemented exactly as specified: only connection-establishment failures (connect/acquire attempts the pool itself makes) increment the ring buffer, and ordinary query-level errors (IntegrityError, constraint violations, etc.) and PoolTimeout do NOT; (2) the threshold/backoff values match Section 5.1 exactly (>= 50% failure rate or >= 30% slow-connect rate at 2x p99 over a 20-call window; 30s * 2^(trips-1) backoff capped at 300s; 5 probes, all must succeed to close); (3) the Retry-After/error-code disambiguation from Section 5.1.1 is implemented as specified -- breaker-OPEN responses carry error.code = POSTGRES_UNAVAILABLE with a dynamically-computed Retry-After (not a fixed value), and PoolTimeout responses carry the distinct error.code = POOL_EXHAUSTED with the existing fixed ~1s Retry-After, and the two are never conflated. This is the largest single scope addition in this story (8 of 21 SP) and, per this bundle's own established precedent (AC-028-REVIEW-3's independent-verification standard for the DI refactor), must not be the one piece of correctness-critical scope that ships on self-certification alone.",
-              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.4 Section 5.1/5.1.1 (consensus-agent review, BLOCKER fix: missing independent REVIEW-side verification of the breaker, 2026-09-22)"
+              "source": "docs/phase-1.5-design/connection-pooling-design.md v2.6 Section 5.1/5.1.1 (consensus-agent review, BLOCKER fix: missing independent REVIEW-side verification of the breaker, 2026-09-22)"
             }
           ],
           "must_not_deviate": [
@@ -856,7 +856,7 @@
       {
         "decision_id": "SP5-DEC-102",
         "story": "both",
-        "decision": "UPDATED 2026-09-22, FINAL: both design docs now have real, dedicated review history. connection-pooling-design.md is v2.2 (its own 2-round adversarial solution-architect review, final APPROVE). dpdp-crypto-shredding-full-erasure-design.md is v2.2 (13 solution-architect rounds plus a 4-round consensus-agent review, both clean APPROVE). Authorize proceeding to a real Phase C gate and AR.5 reliability score on the current bundle -- this is now the only remaining review-process gap for either design doc, not a design-doc review question anymore.",
+        "decision": "UPDATED 2026-09-23, FINAL: both design docs now have real, dedicated review history. connection-pooling-design.md is v2.6 (its own 2-round adversarial solution-architect review, final APPROVE, plus later circuit-breaker/load-test-prerequisite/Change-Log-ordering rounds). dpdp-crypto-shredding-full-erasure-design.md is v2.3 (13 solution-architect rounds plus a 4-round consensus-agent review, both clean APPROVE, plus a later user decision on Section 6's Zone 7 audit-record shape). Authorize proceeding to a real Phase C gate and AR.5 reliability score on the current bundle -- this is now the only remaining review-process gap for either design doc, not a design-doc review question anymore.",
         "owner": "user (Piyush Makhija)",
         "due_date": "before Phase B execution grouping for Sprint 5 begins",
         "status": "SUPERSEDED 2026-09-22 (user decision) -- the user chose NOT to authorize the Phase C gate yet. Instead: connection-pooling-design.md's disclosed open items are being resolved now (pool sizing -> real load test required, tracked as a new blocking prerequisite; circuit breaker -> full breaker now required, new Dev/QA scope) and Zone 5 Shape B storage is being pulled into Sprint 5 scope now as a new story (DASH-STORY-029), rather than tracked separately. The real Phase C gate itself remains unauthorized and unresolved -- see sprint5_ir1_agent_flags.json's execution_readiness for the current live blocker list."

@@ -3,6 +3,11 @@
 **Formula (reused unchanged from Sprint 1-4):** `RS = sqrt(a x b)`, where `a` is a
 citation/consistency check and `b` is an atomic-fact check, each in `[0,1]`.
 
+**Scope note (added 2026-09-23):** This computation covers DASH-STORY-027 and DASH-STORY-028 only.
+DASH-STORY-029 (Zone 5 Shape B storage) was pulled into Sprint 5 scope AFTER this AR.5 pass was
+produced, so it is NOT covered by the RS=1.00 figure or the rule-of-three floor below — it requires
+its own separate AR.5/Phase-C coverage before being treated as execution-ready alongside 027/028.
+
 ## Inputs
 
 - **a (citation/consistency):** `1.00`. Every score, agent name, file path, and dependency edge
@@ -20,13 +25,15 @@ citation/consistency check and `b` is an atomic-fact check, each in `[0,1]`.
 
 ## Rule-of-three statistical floor
 
-- AC count: **updated 2026-09-22, FINAL** (was stale at 16 -- a consensus-agent-driven review loop
-  on `connection-pooling-design.md` added `AC-028-QA-3` and `AC-028-REVIEW-3`/`AC-028-REVIEW-4`
-  after this file's own round-7 refresh, without this file being updated). AC-027-DEV-1/2/3 = 3,
-  AC-027-QA-1/2 = 2, AC-027-REVIEW-1/2/3/4 = 4 (subtotal 9); AC-028-DEV-1/2/3 = 3,
-  AC-028-QA-1/2/3 = 3, AC-028-REVIEW-1/2/3/4 = 4 (subtotal 10) — total unique AC IDs across
-  `sprint5_ar1_assignments.json` = 9+10 = **19**.
-  Rule-of-three floor at n=19: `3/19 = 0.1579 -> 1 - 0.1579 = 0.8421`.
+- AC count: **updated 2026-09-23, FINAL** (was stale at n=19 -- undercounted by one AC each for
+  AC-027-DEV and AC-028-DEV/QA, per a direct recount of `sprint5_ar1_assignments.json`'s current
+  `acceptance_criteria` arrays). AC-027-DEV-1/2/3/4 = 4, AC-027-QA-1/2/3 = 3,
+  AC-027-REVIEW-1/2/3/4 = 4 (subtotal 11); AC-028-DEV-1/2/3/4 = 4, AC-028-QA-1/2/3/4 = 4,
+  AC-028-REVIEW-1/2/3/4/5 = 5 (subtotal 13) — total unique AC IDs across
+  `sprint5_ar1_assignments.json`'s DASH-STORY-027/028 Dev/QA/Review sub-tasks = 11+13 = **24**. The
+  3 `AC-028-LOADTEST-*` IDs (a separate prerequisite sub-task) and DASH-STORY-029's own ACs (out of
+  this pass's scope, see note above) are excluded from this n=24 figure.
+  Rule-of-three floor at n=24: `3/24 = 0.125 -> 1 - 0.125 = 0.875`.
 - `RS = 1.00` clears this floor.
 
 ## Why this RS figure carries LESS evidentiary weight than Sprint 1-4's own RS=1.00 figures
@@ -41,12 +48,14 @@ it:
 2. **Both underlying design docs remain formally NOT IMPLEMENTATION-READY, though both now have
    real, dedicated review history.** UPDATED 2026-09-22, FINAL (was: "connection-pooling-design.md
    is still v1, one authoring pass, no review rounds" -- stale after that doc's own dedicated
-   2-round adversarial solution-architect review): `connection-pooling-design.md` is now v2.2,
+   2-round adversarial solution-architect review): `connection-pooling-design.md` is now v2.6,
    having been through its own dedicated 2-round review (round 1 found a real defect in its
    migration description and a missing Zone 8 scope; round 2 verified the fix and caught 2 further
    issues, both fixed; a third fix pass added an explicit rollback procedure per a subsequent
-   consensus-agent finding, bumping to v2.2; final verdict APPROVE). `dpdp-crypto-shredding-full-erasure-design.md` is
-   v2.2, having been through 13 solution-architect rounds AND a separate 4-round consensus-agent
+   consensus-agent finding, bumping to v2.2; further advanced by a mandatory-circuit-breaker round,
+   a Retry-After/error-code disambiguation round, a load-test-prerequisite round, and a Change-Log-
+   ordering fix; final verdict APPROVE). `dpdp-crypto-shredding-full-erasure-design.md` is
+   v2.3, having been through 13 solution-architect rounds AND a separate 4-round consensus-agent
    failure-mode/retry/rollback/escalation review, both ending in clean APPROVE. Neither doc is
    formally marked IMPLEMENTATION-READY in its own Status line — that label is reserved for a doc
    that has also cleared a real dispatched Phase C hallucination/faithfulness gate, which has not
@@ -66,13 +75,17 @@ RS=1.00 figures.** Recommend, before this bundle is treated as execution-ready f
 dispatch:
 1. A real Phase C gate (dispatched `hallucination-detector` + `context-faithfulness-engineer`),
    per `sprint5-phase-c-gate-results.md`'s own recommendation.
-2. UPDATED 2026-09-22, FINAL: both design docs have now cleared their own dedicated review loops
-   with a final clean APPROVE (connection-pooling-design.md v2.2; dpdp-crypto-shredding-full-
-   erasure-design.md v2.2). This item is resolved -- remaining before either is formally marked
+2. UPDATED 2026-09-23, FINAL: both design docs have now cleared their own dedicated review loops
+   with a final clean APPROVE (connection-pooling-design.md v2.6; dpdp-crypto-shredding-full-
+   erasure-design.md v2.3). This item is resolved -- remaining before either is formally marked
    IMPLEMENTATION-READY is a real dispatched Phase C gate (item 1 above), not a further design
    review round.
-3. Resolution of the six open user decisions raised across this Sprint 5 bundle (SP5-DEC-001
-   through 004 in `sprint5_ar0_routing_index.json`; SP5-DEC-101/102 in `sprint5_ar1_assignments.json`).
+3. UPDATED 2026-09-23: all six user decisions raised across this Sprint 5 bundle now have a
+   disposition (SP5-DEC-001/002 CONFIRMED, SP5-DEC-003 DEFERRED, SP5-DEC-004 SUPERSEDED in
+   `sprint5_ar0_routing_index.json`; SP5-DEC-101 RESOLVED, SP5-DEC-102 SUPERSEDED in
+   `sprint5_ar1_assignments.json`) -- no longer an "open decisions" item blocking dispatch. DASH-
+   STORY-029 (pulled into scope after this file was produced) still needs its own AR.5/Phase-C
+   coverage before being treated as execution-ready alongside 027/028 -- see the scope note above.
 
 This conditionality is carried forward into `sprint5_ir1_agent_flags.json`'s own
 `execution_readiness` determination.
