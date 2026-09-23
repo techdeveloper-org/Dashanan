@@ -359,6 +359,14 @@ adapter to this Shape B one. This is the same "repository swap is invisible abov
 guarantee `ZoneRepository`'s Protocol already gives every other zone (HLD Section 3, Repository
 pattern).
 
+**Caveat, corrected in Section 8 item 1 (round-6 review):** "zero code changes" above refers to the
+orchestrator's *behavior* and its `erase_entity` call site, both genuinely unchanged. It does NOT
+mean the orchestrator's source file is untouched: the constructor's `zone5_repository` type
+annotation requires one small, non-behavioral widening (concrete `EntityMemoryRepository` type ->
+a narrow local Protocol exposing only `erase_entity`) so that `mypy strict` accepts a
+`SqlEntityMemoryRepository` instance at that same call site. See Section 8 item 1 for the full
+finding, resolution, and rollback path.
+
 Concretely, `SqlEntityMemoryRepository` (new file,
 `src/dashanan/infrastructure/sql_entity_memory_repository.py`, not built by this docs-only pass)
 must implement:
@@ -424,16 +432,97 @@ statement must tolerate the role not existing yet (e.g. wrapped in the same idem
 Matching `dpdp-crypto-shredding-full-erasure-design.md`'s own posture of disclosing genuine gaps
 rather than glossing over them:
 
-1. **`write_attribute`'s new `subject_id` parameter is Shape-B-only as proposed.** Adding it only
-   to `SqlEntityMemoryRepository` and not to `EntityMemoryRepository` (Shape A) means the two
-   adapters' method signatures diverge, which `ZoneRepository`'s own Protocol may or may not
-   tolerate depending on how strictly it is typed (not verified against the Protocol's actual
-   definition by this document — a real risk this document flags rather than assumes away).
-   Whether Shape A's signature should gain the same optional `subject_id` parameter (for
-   interface symmetry, even though Shape A deployments are explicitly out of scope for the DPDP
-   compliance workflow per this codebase's own established convention,
-   `episodic_schema.sql`'s comment: *"A DPDP erasure workflow ... is explicitly OUT OF SCOPE for
-   this [Shape A] story"*) is a real design decision this document does not make.
+1. **CORRECTED 2026-09-22 (round-6 solution-architect adversarial review, consensus-agent
+   failure-mode-review finding 2 of 3): this item previously misnamed the real coupling risk.**
+   The original text here flagged a concern that `ZoneRepository`'s own Protocol "may or may not
+   tolerate" `write_attribute` gaining a new `subject_id` parameter. That framing is WRONG and is
+   corrected in place rather than silently rewritten: direct inspection of
+   `src/dashanan/domain/ports.py` confirms `ZoneRepository` (a `typing.Protocol`) declares exactly
+   one method, `fetch(query: ZoneQuery) -> list[MemoryItem]`. `write_attribute`, `erase_entity`,
+   `register_alias`, `resolve_alias_prefix`, `resolve_exact_term`, and `get_entity` are NOT part of
+   `ZoneRepository`'s contract at all — they are `EntityMemoryRepository`'s own Zone-5-specific
+   surface, sitting alongside its `ZoneRepository.fetch` implementation. `ZoneRepository` has
+   nothing to "tolerate" here; a `subject_id` parameter added to a method the Protocol never
+   declared cannot violate that Protocol.
+
+   **The REAL coupling risk, confirmed by direct inspection of
+   `src/dashanan/application/unified_subject_erasure_orchestrator.py`'s constructor:**
+   `UnifiedSubjectErasureOrchestrator.__init__` types its `zone5_repository` parameter as the
+   CONCRETE Shape A class — `zone5_repository: EntityMemoryRepository` — not as a `Protocol`. This
+   is asymmetric with the orchestrator's own `zone3_repository: SqlSemanticRepository` parameter:
+   Zone 3 has only ever had one repository implementation
+   (`src/dashanan/infrastructure/sql_semantic_repository.py` — confirmed by inspection, no Shape A
+   Semantic repository exists in this codebase), so typing that parameter to
+   `SqlSemanticRepository` concretely is not a coupling risk — there is no second Zone 3
+   implementation it would ever need to accept instead. Zone 5 is different: this document
+   proposes a SECOND, Shape B concrete class (`SqlEntityMemoryRepository`) that must be
+   substitutable for `EntityMemoryRepository` at the orchestrator's own constructor call site once
+   the composition root's Zone 5 builder is switched. Under this repo's `mypy strict = true` gate
+   (`CLAUDE.md`'s own Development Guidelines), passing a `SqlEntityMemoryRepository` instance where
+   `EntityMemoryRepository` is required type-checks ONLY if `SqlEntityMemoryRepository` is a
+   nominal subclass of `EntityMemoryRepository` (Python's structural typing does not apply here —
+   `EntityMemoryRepository` is a concrete class, not a `Protocol`, so mypy strict enforces nominal
+   (inheritance-based) compatibility, not duck typing) — a fact this design doc never disclosed
+   anywhere, including in Section 6's interface-compatibility table.
+
+   **Resolution — option (b), widen the orchestrator's constructor type annotation, NOT option
+   (a), inherit `SqlEntityMemoryRepository` from `EntityMemoryRepository`:** Inheriting a
+   Postgres-backed adapter from `EntityMemoryRepository` is not architecturally sound.
+   `EntityMemoryRepository` is not a thin base class — its own docstring documents concrete Shape
+   A implementation detail as core to its identity: an in-process `dict`-of-`dict` attribute store,
+   a per-tenant `threading.Lock` (ADR-018), a per-tenant `AliasTrie` instance, and a
+   `_tenant_locks_guard`/`_tenant_locks` bookkeeping pair that exist purely to serialize in-process
+   concurrent access — none of which `SqlEntityMemoryRepository` would use (Section 6 above already
+   establishes Postgres's own row-level locking/MVCC as the Shape B concurrency mechanism, making
+   Shape A's locks dead weight it would inherit and never call). Forcing that inheritance would
+   violate Liskov Substitution (clean-architecture skill, section 20) and the Dependency Inversion
+   Principle this codebase's own `ZoneRepository` Protocol otherwise exists to enforce (clean-
+   architecture skill, section 22) — a Shape B adapter should not need to know Shape A's storage
+   internals exist at all.
+
+   **What this document instead specifies:** `UnifiedSubjectErasureOrchestrator`'s constructor
+   requires a small, behavior-preserving type-annotation widening: `zone5_repository` changes from
+   `EntityMemoryRepository` (concrete class) to a new, narrow, LOCAL `Protocol` declared in
+   `unified_subject_erasure_orchestrator.py` itself — mirroring that same file's own established
+   pattern for `SubjectToItemIndex` (its docstring: *"a story-owned seam Protocol, not a
+   cross-cutting application port"*) — exposing exactly the one method the orchestrator actually
+   calls on `zone5_repository`: `erase_entity(tenant_id: str, entity_id: str) -> tuple[str, ...]`.
+   Call it `Zone5ErasureCapable` (name TBD at implementation time, not binding). Both
+   `EntityMemoryRepository` and `SqlEntityMemoryRepository` already satisfy this narrower Protocol
+   structurally (both implement `erase_entity` with the identical signature — Section 6's own
+   interface-compatibility table requires exactly this), so NO change to either repository class,
+   and NO change to `_run_all_legs`'s call site (`self._zone5_repository.erase_entity(...)`
+   itself, unchanged) is needed — only the constructor parameter's type annotation changes.
+
+   **This narrows this document's own Section 6/1's "zero orchestrator code changes" claim,
+   disclosed here rather than left overclaimed:** the orchestrator's *behavior* and its
+   `erase_entity` *call site* genuinely require zero changes (the original claim's substance is
+   correct), but its constructor's *type annotation* for `zone5_repository` requires one small,
+   mechanical, non-behavioral edit. AC-029-DEV-2 and the DASH-STORY-029-DEV prompt's
+   MUST-NOT-DEVIATE text are updated (`sprint5_ar1_assignments.json`,
+   `sprint5_implementation_execution_plan.json`) to scope this precisely: the orchestrator's
+   `erase_entity` call site and its Zone 3/8 legs are unchanged; the Zone 5 constructor parameter's
+   type annotation is the one explicitly-authorized exception, not a general license to modify
+   `UnifiedSubjectErasureOrchestrator`.
+
+   **Rollback path, if this Protocol-widening assumption proves wrong during implementation:** if
+   mypy strict still rejects the narrowed Protocol for some reason not anticipated here (e.g. a
+   structural-typing edge case with `runtime_checkable` Protocols this document did not test), or a
+   caller not identified by this document's own review depends on `zone5_repository`'s concrete
+   `EntityMemoryRepository` type for a reason beyond `erase_entity`, the rollback is a
+   composition-root revert: the composition root's Zone 5 builder simply continues constructing
+   `EntityMemoryRepository` (Shape A) as it does today, and `SqlEntityMemoryRepository` ships
+   un-wired (built and tested by AC-029-DEV-1/QA-1..3, but not yet composed into the orchestrator)
+   until the type-compatibility question is re-resolved — no `entity_schema.sql` down-migration is
+   required for this specific rollback path, since `entity_schema.sql` is an initial `CREATE` (per
+   this document's own Section 3 comment, "not an ALTER against production data") with no
+   production data yet to preserve or migrate away from; dropping `entity_attributes`/
+   `entity_aliases` and their grants (a plain `DROP TABLE`/implicit grant cleanup) is safe at any
+   point before Shape B is composition-root-wired, mirroring `connection-pooling-design.md`
+   Section 7.1's own POOLING_ENABLED-gate rollback precedent in spirit (a live, named revert path
+   disclosed up front) without requiring an identical feature-flag mechanism, since Zone 5 Shape B
+   here — unlike Section 7.1's already-partially-live pooling refactor — has no partially-live
+   production state to gate around.
 2. **`subject_item_index`-driven resolution vs. direct `entity_id` calls for Zone 5, reconciled or
    not.** `UnifiedSubjectErasureOrchestrator` today calls `EntityMemoryRepository.erase_entity`
    directly by `entity_id`, not via `subject_item_index` resolution — the orchestrator apparently
@@ -491,3 +580,4 @@ DPDP-erasure-reachability gap.
 | 2026-09-22 | v1 (DRAFT): Initial design for DASH-STORY-029 (Sprint 5 candidate), closing the Zone 5 Shape B storage gap `dpdp-crypto-shredding-full-erasure-design.md` Section 2 surfaced. Proposed `entity_schema.sql` (Section 3), resolved the append-only-vs-mutable question left open for a future story by the DPDP design doc's Section 5 (Section 4: Zone 5 is mutable, no append-only trigger), extended the existing `dashanan_compliance_erasure_role` to Zone 5 with an explicit defense-in-depth rationale rather than a structural requirement (Section 5), specified `SqlEntityMemoryRepository`'s required interface compatibility with `UnifiedSubjectErasureOrchestrator`'s already-built Zone 5 call site (Section 6), and disclosed 5 open items (Section 8) plus an explicit rationale for leaving Zone 4 out of scope (Section 9). Marked DRAFT, NOT IMPLEMENTATION-READY. |
 | 2026-09-22 | v2 (DRAFT, adversarial-review correction, solution-architect): Section 2's convention 2 previously claimed "`subject_id` as a nullable column on every zone table" was an EXISTING codebase convention, "independently confirmed" by inspecting `episodic_schema.sql`. FALSE, and corrected in place rather than silently rewritten: `episodic_schema.sql` has zero occurrences of `subject_id` and no subject-linkable column at all; `semantic_schema.sql` uses a domain-specific `subject_ref` field (not a generic `subject_id` column), and its own `general_facts` table explicitly documents having no such column. The only place a generic `subject_id` concept exists in this codebase's design material is the NOT-YET-BUILT `subject_item_index` table proposed in `dpdp-crypto-shredding-full-erasure-design.md` Section 3. Section 2 now labels the literal `subject_id` column on `entity_attributes` as a NEW pattern this document introduces -- extending that not-yet-built proposal and fulfilling ADR-006's real textual mandate for a subject-scoped secondary index -- rather than as an inspection-confirmed existing convention; `semantic_schema.sql`'s `subject_ref` approach is cited as the actual (domain-specific-name) precedent. No change to Section 3's `entity_schema.sql` DDL itself, Section 4-9's content, or this story's scope/story points -- this is a documentation-accuracy correction only. Still marked DRAFT, NOT IMPLEMENTATION-READY. |
 | 2026-09-22 | v3 (DRAFT, round-5 solution-architect review remediation): the header "Related:" citation block still cited `FR-011-ZONE-4-5-SHAPE-B` as the current, live stub id this story narrows -- stale, since this story's own creation narrowed that stub to `FR-011-ZONE-4-SHAPE-B` (Zone 4 durability only), making the original combined id superseded/historical rather than live. Section 1.1 already correctly framed this; the header block now carries the same "original, now-superseded" framing. No other content changed. |
+| 2026-09-22 | v4 (DRAFT, round-6 solution-architect review remediation -- consensus-agent failure-mode-review finding 2 of 3, BLOCKER): Section 8 item 1 previously misnamed the real coupling risk, claiming `ZoneRepository`'s own Protocol "may or may not tolerate" `write_attribute`'s new `subject_id` parameter -- FALSE and corrected in place: direct inspection of `src/dashanan/domain/ports.py` confirms `ZoneRepository` declares only `fetch`; `write_attribute`/`erase_entity` are not part of that Protocol at all. The REAL coupling risk, confirmed by direct inspection of `src/dashanan/application/unified_subject_erasure_orchestrator.py`: its constructor types `zone5_repository` as the CONCRETE Shape A class `EntityMemoryRepository`, not a Protocol -- asymmetric with `zone3_repository: SqlSemanticRepository` (safe there, since Zone 3 has only ever had one repository implementation; Zone 5 will have two once this story ships). Under this repo's `mypy strict = true` gate, passing `SqlEntityMemoryRepository` where `EntityMemoryRepository` is required requires nominal subclassing, which this document never disclosed. Resolved via option (b): widen the orchestrator's constructor type annotation to a new local Protocol exposing only `erase_entity` (mirroring that file's own existing `SubjectToItemIndex` story-owned-seam-Protocol pattern), NOT option (a) inheriting `SqlEntityMemoryRepository` from `EntityMemoryRepository` (architecturally unsound -- would drag in Shape A's in-process dict/lock/AliasTrie internals a Postgres adapter never uses, violating LSP). This narrows Section 6's "zero orchestrator code changes" claim to "zero behavioral/call-site changes, one type-annotation widening" -- disclosed explicitly rather than left overclaimed, and propagated to `AC-029-DEV-2` and the DASH-STORY-029-DEV prompt's MUST-NOT-DEVIATE text in `sprint5_ar1_assignments.json`/`sprint5_implementation_execution_plan.json`/`backlog_draft.json`. Added an explicit rollback path (composition-root revert to Shape A; no `entity_schema.sql` down-migration needed since it is an initial CREATE with no production data yet). Section 6 gains a caveat cross-referencing this correction. No change to Section 3's DDL, Section 4/5/7/9's content, or this story's story points (the fix is a one-line, non-behavioral type-annotation change to an already-scoped file, not new implementation surface -- see `backlog_draft.json`'s own story_points_note for the no-re-estimation rationale). Still marked DRAFT, NOT IMPLEMENTATION-READY. |
