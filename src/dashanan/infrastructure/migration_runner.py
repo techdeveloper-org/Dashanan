@@ -12,6 +12,17 @@ current schema SQL) -- get bound to real, non-default LOGIN credentials sourced
 from env config (`dashanan.infrastructure.settings`), never hardcoded in a
 committed file.
 
+`entity_schema.sql` (DASH-STORY-029-DEV, Zone 5 Shape B) is also applied here
+-- it defines its own `dashanan_entity_role` (NOLOGIN, not yet in
+`_PER_ZONE_LOGIN_MEMBER_ROLES` below; wiring it into `bind_app_login_role` is
+that role's own follow-on, out of this story's scope, mirroring how
+`dashanan_semantic_role`/`dashanan_zone8_role` each landed in their own
+schema file before being added to that tuple) and idempotently
+creates/extends the project-wide `dashanan_compliance_erasure_role`
+(`docs/phase-1.5-design/zone5-shape-b-storage-design.md` v4 Section 5,
+`dpdp-crypto-shredding-full-erasure-design.md` Section 5) with a `DELETE`
+grant on `entity_attributes`/`entity_aliases`.
+
 How each of the five named roles is actually bound to a real login credential
 (read this before changing `bind_app_login_role`):
 
@@ -91,13 +102,28 @@ _SCHEMA_DIR = Path(__file__).resolve().parent
 #   - zone8_manifest_subject_index_migration.sql: an ADD COLUMN / CREATE INDEX
 #     migration against zone8_consolidation_schema.sql's own zone8_manifest
 #     table (its own header comment) -- MUST run after that file.
+#   - entity_schema.sql: independent of every other file (its own
+#     `dashanan_compliance_erasure_role` GRANT is guarded by an idempotent
+#     `IF NOT EXISTS` role-creation check, per that file's own comment and
+#     zone5-shape-b-storage-design.md v4 Section 7/Section 8 item 4's
+#     disclosed open question about where that role's own CREATE lives) --
+#     placed after provenance_schema.sql, mirroring episodic/provenance's
+#     own "no executable dependency" precedent.
 SCHEMA_FILES: Sequence[str] = (
     "episodic_schema.sql",
     "provenance_schema.sql",
+    "entity_schema.sql",
     "semantic_schema.sql",
     "write_journal_schema.sql",
     "zone8_consolidation_schema.sql",
     "zone8_manifest_subject_index_migration.sql",
+    # DASH-STORY-027-DEV additions, both MUST run after entity_schema.sql
+    # (dashanan_compliance_erasure_role's own creation site) and after
+    # episodic_schema.sql (the trigger function
+    # episodic_compliance_erasure_migration.sql replaces):
+    "subject_item_index_schema.sql",
+    "episodic_compliance_erasure_migration.sql",
+    "zone8_erasure_markers_schema.sql",
 )
 
 # The four roles this module knows about; all NOLOGIN and the membership
@@ -113,6 +139,14 @@ _PER_ZONE_LOGIN_MEMBER_ROLES: Sequence[str] = (
     "dashanan_episodic_role",
     "dashanan_semantic_role",
     "dashanan_zone8_role",
+    # DASH-STORY-027-DEV: dashanan_subject_index_role (SubjectToItemIndex's
+    # own read/write role, subject_item_index_schema.sql) is the app's
+    # ordinary, non-compliance access path. dashanan_compliance_erasure_role
+    # is deliberately NOT added here -- it stays a separate, narrowly-scoped
+    # credential a compliance workflow authenticates as directly, never
+    # membership the ordinary app login role carries (entity_schema.sql's
+    # own Section 5 rationale, unchanged by this story).
+    "dashanan_subject_index_role",
 )
 
 

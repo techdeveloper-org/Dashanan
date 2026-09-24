@@ -139,6 +139,8 @@ class PostgresSettings:
     migration_password: str
     app_login_user: str
     app_login_password: str
+    pool_min: int = 2
+    pool_max: int = 32
 
     def migration_dsn(self, *, connect_timeout_seconds: int = 10) -> str:
         """Return a libpq keyword/value connection string for the migration role.
@@ -206,6 +208,14 @@ def load_postgres_settings_from_env(
         migration_password=_require_str(source, "DASHANAN_POSTGRES_MIGRATION_PASSWORD"),
         app_login_user=_require_str(source, "DASHANAN_POSTGRES_APP_USER"),
         app_login_password=_require_str(source, "DASHANAN_POSTGRES_APP_PASSWORD"),
+        # pool_min/pool_max: DASH-STORY-028-DEV (connection-pooling-design.md
+        # Section 4, revised by Section 4's v2.7 real load-test result --
+        # `docs/phase-1.5-design/connection-pooling-design.md`'s own
+        # `DASH-STORY-028-LOADTEST` measurement replaced the formula's
+        # provisional pool_max=20 with a measured pool_max=32). Not secrets --
+        # sensible defaults, env-overridable like host/port/database.
+        pool_min=_int_with_default(source, "DASHANAN_POSTGRES_POOL_MIN", 2),
+        pool_max=_int_with_default(source, "DASHANAN_POSTGRES_POOL_MAX", 32),
     )
 
 

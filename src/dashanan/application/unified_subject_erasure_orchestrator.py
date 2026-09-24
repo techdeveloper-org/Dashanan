@@ -76,7 +76,6 @@ from dashanan.application.subject_erasure_cascade import (
 from dashanan.domain.exceptions import DashananError
 from dashanan.domain.ports import Clock
 from dashanan.domain.subject_erasure import ErasureCascadeAccepted, SubjectErasureRequest
-from dashanan.infrastructure.entity_memory_repository import EntityMemoryRepository
 from dashanan.infrastructure.sql_semantic_repository import SqlSemanticRepository
 
 logger = logging.getLogger(__name__)
@@ -111,6 +110,113 @@ class SubjectToItemIndex(Protocol):
         ...
 
 
+@runtime_checkable
+class Zone5ErasureCapable(Protocol):
+    """The one Zone 5 method this orchestrator actually calls (DASH-STORY-029-DEV).
+
+    A story-owned seam Protocol, kept local to this module exactly like
+    `SubjectToItemIndex` above -- introduced per
+    `docs/phase-1.5-design/zone5-shape-b-storage-design.md` v4 Section 8
+    item 1 (round-6 solution-architect review finding): this constructor's
+    `zone5_repository` parameter was previously typed as the CONCRETE Shape
+    A class `EntityMemoryRepository`, which is safe only as long as Zone 5
+    has exactly one repository implementation. `SqlEntityMemoryRepository`
+    (Shape B, DASH-STORY-029-DEV) is a second, structurally (not
+    nominally) compatible implementation, and this repo's `mypy strict =
+    true` gate requires nominal subclassing against a concrete class --
+    which neither Shape A nor Shape B has any reason to do (inheriting a
+    Postgres adapter from an in-process dict/lock/AliasTrie-based class
+    would violate Liskov Substitution, per the design doc's own Section 8
+    item 1 rationale). This Protocol is the narrow, structural seam both
+    implementations already satisfy without any change to either class.
+
+    This is the ONE explicitly-authorized, non-behavioral exception to this
+    module's own "no other zone story may modify
+    `UnifiedSubjectErasureOrchestrator`" posture: the constructor's type
+    annotation widens from the concrete `EntityMemoryRepository` to this
+    Protocol; `_run_all_legs`'s own call site
+    (`self._zone5_repository.erase_entity(...)`) is unchanged, and no other
+    orchestrator logic is touched.
+    """
+
+    def erase_entity(self, tenant_id: str, entity_id: str) -> tuple[str, ...]:
+        """Erase every attribute (and, for Shape A, alias) stored for `entity_id`.
+
+        Returns the `item_id` of every row actually removed; an empty
+        tuple is a clean no-op, never an error.
+        """
+        ...
+
+
+@runtime_checkable
+class Zone1ErasureCapable(Protocol):
+    """Resolves a `subject_id` to Zone 1 items and erases them (DASH-STORY-027-DEV's own added leg).
+
+    A story-owned seam Protocol, kept local to this module exactly like
+    `SubjectToItemIndex`/`Zone5ErasureCapable` above.
+
+    HONEST GAP (never fabricated, per this story's own binding
+    instruction): `dashanan.domain.working_item.WorkingItem` -- Zone 1's
+    real, shipped owned-entity shape (`WorkingMemoryLRURepository`) --
+    carries `tenant_id`, `session_id`, and `item_id`, and NO
+    `subject_id`, `entity_id`, or any other subject-linkable reference at
+    all, the SAME structural gap this module's own docstring already
+    documents for Zone 4's `Procedure`. There is therefore no real seam
+    today through which a `subject_id`-keyed erasure could reach Zone 1's
+    actual stored data -- widening `WorkingItem`'s own schema to carry a
+    subject reference is a separate, not-yet-scoped story (the design
+    doc's own v2.3 DRAFT status covers this exact class of open item).
+    This Protocol is still added, and `NullZone1ErasureLeg` (this
+    module's own default) is still genuinely invoked on every
+    `request_erasure` call, so that: (1) the seam exists for whichever
+    future story does add a subject reference to `WorkingItem`, mirroring
+    `SubjectToItemIndex`/`NullSubjectToItemIndex`'s identical
+    "genuinely invoked, fulfils zero obligations until wired" pattern;
+    and (2) no fabricated resolution is presented as if Zone 1 erasure
+    were real today.
+    """
+
+    def erase_subject(self, tenant_id: str, subject_id: str) -> tuple[str, ...]:
+        """Erase every Zone 1 item attributed to `subject_id`.
+
+        Returns the `item_id` of every row actually removed; an empty
+        tuple is a clean no-op, never an error.
+        """
+        ...
+
+
+class NullZone1ErasureLeg:
+    """The default `Zone1ErasureCapable`: erases zero Zone 1 items for every subject.
+
+    A Null Object (python-design-patterns-core), mirroring
+    `NullSubjectToItemIndex`'s identical role -- see
+    `Zone1ErasureCapable`'s own docstring for why this is the honest
+    default rather than a fabricated resolver.
+    """
+
+    def erase_subject(self, tenant_id: str, subject_id: str) -> tuple[str, ...]:
+        """Always returns `()`: `WorkingItem` carries no subject-linkable reference yet."""
+        return ()
+
+
+@runtime_checkable
+class DurableZone8ErasureCoordinatorLike(Protocol):
+    """The one method this orchestrator calls on a `DurableZone8ErasureCoordinator` (DASH-STORY-027-DEV).
+
+    A minimal, local, structural seam -- exactly `Zone5ErasureCapable`'s
+    own precedent for depending on a concrete collaborator's shape
+    without importing its concrete type, so this module stays free to
+    compose either the plain `SubjectErasureCascadeService` (via
+    `zone8_service`) or the durability-wrapped coordinator (via
+    `zone8_durable_coordinator`) without a hard import-time dependency on
+    `dashanan.application.zone8_erasure_durability`.
+    """
+
+    def erase_subject(self, tenant_id: str, subject_id: str) -> tuple[str, ...]:
+        """Run Zone 8's durably-bounded crypto-shred; return every affected `item_id`."""
+        ...
+
+
 class NullSubjectToItemIndex:
     """The default `SubjectToItemIndex`: resolves every subject to zero items.
 
@@ -140,11 +246,13 @@ class UnifiedSubjectErasureOrchestrator:
         *,
         zone8_service: SubjectErasureCascadeService,
         zone3_repository: SqlSemanticRepository,
-        zone5_repository: EntityMemoryRepository,
+        zone5_repository: Zone5ErasureCapable,
         job_store: SubjectErasureJobStore,
         clock: Clock,
         zone2_6_cascade: object | None = None,
         subject_to_item_index: SubjectToItemIndex | None = None,
+        zone1_erasure: Zone1ErasureCapable | None = None,
+        zone8_durable_coordinator: DurableZone8ErasureCoordinatorLike | None = None,
         job_id_factory: Callable[[], str] | None = None,
     ) -> None:
         """Compose the orchestrator from its four zone-erasure collaborators.
@@ -154,8 +262,13 @@ class UnifiedSubjectErasureOrchestrator:
                 (DASH-STORY-020).
             zone3_repository: The real Zone 3 SQL adapter
                 (`delete_edges_by_subject` is this story's own addition).
-            zone5_repository: The real Zone 5 Shape A adapter
-                (`erase_entity` is this story's own addition).
+            zone5_repository: Zone 5's storage adapter -- either the Shape
+                A `EntityMemoryRepository` or the Shape B
+                `SqlEntityMemoryRepository` (DASH-STORY-029-DEV), typed
+                against the local `Zone5ErasureCapable` seam Protocol
+                (`erase_entity` is this story's own addition; the Protocol
+                widening is DASH-STORY-029-DEV's own addition -- see
+                `Zone5ErasureCapable`'s docstring).
             job_store: Tracks this orchestrator's own combined job state
                 -- a SEPARATE job from Zone 8's own internal job store
                 (`zone8_service.get_job` resolves Zone 8's own bookkeeping
@@ -170,6 +283,21 @@ class UnifiedSubjectErasureOrchestrator:
             subject_to_item_index: Resolves `subject_id` to Zone 2/6
                 `item_id`s. Defaults to `NullSubjectToItemIndex` (module
                 docstring's honest-gap rationale).
+            zone1_erasure: Zone 1's own subject-keyed erasure leg
+                (DASH-STORY-027-DEV's own addition). Defaults to
+                `NullZone1ErasureLeg` -- see `Zone1ErasureCapable`'s
+                docstring for the disclosed, honest reason no real
+                resolver exists yet.
+            zone8_durable_coordinator: When given, `DurableZone8ErasureCoordinator`
+                (`dashanan.application.zone8_erasure_durability`) drives
+                the Zone 8 leg instead of `zone8_service` directly --
+                adding the write-ahead-marker/finalize durability
+                boundary (design doc Section 7) around the SAME
+                `SubjectKeyStorePort.destroy_key` primitive
+                `zone8_service` itself calls. `None` (the default)
+                preserves this orchestrator's exact prior behaviour for
+                every existing caller/test that constructs it without
+                this parameter -- no regression.
             job_id_factory: Testing-core DI seam for deterministic
                 `job_id`s; defaults to `uuid.uuid4`.
         """
@@ -180,6 +308,8 @@ class UnifiedSubjectErasureOrchestrator:
         self._clock = clock
         self._zone2_6_cascade = zone2_6_cascade
         self._subject_to_item_index = subject_to_item_index or NullSubjectToItemIndex()
+        self._zone1_erasure = zone1_erasure or NullZone1ErasureLeg()
+        self._zone8_durable_coordinator = zone8_durable_coordinator
         self._job_id_factory = job_id_factory or (lambda: str(uuid.uuid4()))
 
     def request_erasure(self, request: SubjectErasureRequest) -> ErasureCascadeAccepted:
@@ -270,7 +400,10 @@ class UnifiedSubjectErasureOrchestrator:
         return self._job_store.get(job_id)
 
     def _run_all_legs(self, request: SubjectErasureRequest) -> tuple[str, ...]:
-        """Drive all four zone-erasure legs for `request`; return every real affected item_id."""
+        """Drive all five zone-erasure legs for `request`; return every real affected item_id."""
+        zone1_item_ids = self._zone1_erasure.erase_subject(
+            request.tenant_id, request.subject_id
+        )
         zone2_6_item_ids = self._run_zone2_6_leg(request)
         zone3_item_ids = self._zone3_repository.delete_edges_by_subject(
             request.tenant_id, request.subject_id
@@ -279,7 +412,9 @@ class UnifiedSubjectErasureOrchestrator:
             request.tenant_id, request.subject_id
         )
         zone8_item_ids = self._run_zone8_leg(request)
-        return zone2_6_item_ids + zone3_item_ids + zone5_item_ids + zone8_item_ids
+        return (
+            zone1_item_ids + zone2_6_item_ids + zone3_item_ids + zone5_item_ids + zone8_item_ids
+        )
 
     def _run_zone2_6_leg(self, request: SubjectErasureRequest) -> tuple[str, ...]:
         """Resolve `request.subject_id`'s Zone 2/6 items, fulfil each one's pending obligation."""
@@ -295,7 +430,18 @@ class UnifiedSubjectErasureOrchestrator:
         return tuple(fulfilled)
 
     def _run_zone8_leg(self, request: SubjectErasureRequest) -> tuple[str, ...]:
-        """Run Zone 8's own real crypto-shredding cascade; return its own reported item_ids."""
+        """Run Zone 8's own real crypto-shredding cascade; return its own reported item_ids.
+
+        When `zone8_durable_coordinator` was supplied at construction,
+        that coordinator drives the leg (adding the write-ahead-marker/
+        finalize durability boundary, design doc Section 7); otherwise
+        this falls back to `zone8_service` exactly as before this
+        story -- no behaviour change for any existing caller.
+        """
+        if self._zone8_durable_coordinator is not None:
+            return self._zone8_durable_coordinator.erase_subject(
+                request.tenant_id, request.subject_id
+            )
         zone8_accepted = self._zone8_service.request_erasure(request)
         zone8_job = self._zone8_service.get_job(zone8_accepted.job_id)
         if zone8_job is None:

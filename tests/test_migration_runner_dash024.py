@@ -191,7 +191,9 @@ class TestBindAppLoginRole:
         """GitHub #22 / #24: dashanan_zone8_role and dashanan_semantic_role
         both pre-existed in their own schema files but were never added to
         _PER_ZONE_LOGIN_MEMBER_ROLES, so the real app login role had no
-        grant path to either -- this asserts all four are now granted."""
+        grant path to either -- this asserts all five are now granted
+        (DASH-STORY-027-DEV adds a fifth: dashanan_subject_index_role,
+        SubjectToItemIndex's own ordinary read/write role)."""
         connection = FakeConnection(fetchone_results=[None])
 
         bind_app_login_role(connection, _SETTINGS)  # type: ignore[arg-type]
@@ -199,11 +201,12 @@ class TestBindAppLoginRole:
         grant_calls = [
             call[0] for call in connection.cursor_obj.executed if "GRANT" in call[0]
         ]
-        assert len(grant_calls) == 4
+        assert len(grant_calls) == 5
         assert any("dashanan_provenance_role" in call for call in grant_calls)
         assert any("dashanan_episodic_role" in call for call in grant_calls)
         assert any("dashanan_semantic_role" in call for call in grant_calls)
         assert any("dashanan_zone8_role" in call for call in grant_calls)
+        assert any("dashanan_subject_index_role" in call for call in grant_calls)
 
     def test_bind_should_neverGrant_dashananSchemaOwner_toAPersistentLoginRole(
         self,

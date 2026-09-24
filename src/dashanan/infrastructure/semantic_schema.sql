@@ -127,18 +127,36 @@ BEGIN
 END
 $$;
 
--- Least privilege (application-security-core): SELECT/INSERT/UPDATE only
--- -- UPDATE is granted here (unlike episodic_entries' / provenance_records'
--- SELECT/INSERT-only append-only roles) because state and score_terms are
--- ordinary in-place mutations for this zone, not new-row corrections (see
--- this file's opening comment). DELETE is never granted: a future DPDP
--- subject-scoped erasure cascade is expected to run under a separate,
--- narrowly-scoped compliance role authorized for an indexed
--- (tenant_id, subject_ref) DELETE, mirroring episodic_schema.sql's
--- identical "Zone 2 leg" note -- not by widening this application role's
--- grants.
+-- Least privilege (application-security-core): SELECT/INSERT/UPDATE, plus
+-- DELETE on semantic_edges only -- UPDATE is granted here (unlike
+-- episodic_entries' / provenance_records' SELECT/INSERT-only append-only
+-- roles) because state and score_terms are ordinary in-place mutations for
+-- this zone, not new-row corrections (see this file's opening comment).
+--
+-- SUPERSEDED 2026-09-24 (DASH-STORY-027-DEV / FIX, found by a real end-to-
+-- end erasure-cascade integration test against a real Postgres 16
+-- instance): this comment previously said DELETE would never be granted
+-- here, expecting "a future DPDP subject-scoped erasure cascade... to run
+-- under a separate, narrowly-scoped compliance role... not by widening
+-- this application role's grants." dpdp-crypto-shredding-full-erasure-
+-- design.md's own Section 4 zone-by-zone table (13 solution-architect
+-- review rounds) instead DECIDED that Zone 3 needs no append-only-style
+-- compliance-role escape hatch at all -- "Zone 3 has no append-only
+-- trigger... already uses plain delete via the orchestrator's existing
+-- SqlSemanticRepository call" -- and DASH-STORY-027-DEV wired
+-- `UnifiedSubjectErasureOrchestrator`'s Zone 3 leg through the ordinary,
+-- per-request `dashanan_semantic_role`-authenticated connection
+-- (`get_semantic_repository`), not a separate compliance-role connection.
+-- That real wiring failed with `InsufficientPrivilege: permission denied
+-- for table semantic_edges` until this grant was added -- this file's
+-- original narrower-scope comment was never updated to match the design
+-- doc's own later, reviewed decision. DELETE is scoped to `semantic_edges`
+-- only (never `general_facts`, which `delete_edges_by_subject` does not
+-- touch) -- an indexed, subject-scoped DELETE the ordinary role already
+-- has SELECT/INSERT/UPDATE reach into, not a new capability class.
 REVOKE ALL ON semantic_edges, general_facts FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE ON semantic_edges, general_facts TO dashanan_semantic_role;
+GRANT DELETE ON semantic_edges TO dashanan_semantic_role;
 
 -- dashanan_semantic_role is NOLOGIN by design: the application connects
 -- as its own LOGIN role and is GRANTed membership in this role -- never

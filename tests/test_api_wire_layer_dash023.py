@@ -13,9 +13,10 @@ ACCEPTANCE CRITERIA UNDER TEST:
   AC-023-2: the host constructs every MemoryOrchestrator/
       SqlProvenanceRepository/SqlEpisodicRepository instance through
       `composition_root.py`, never a bare constructor call.
-  AC-023-3: DELETE /v1/tenants/{id}/subjects/{subject_id} invokes the
-      real, Zone-8-only SubjectErasureCascadeService, never a stub and
-      never the wider UnifiedSubjectErasureOrchestrator.
+  AC-023-3, RE-SCOPED by DASH-STORY-027-DEV: DELETE /v1/tenants/{id}/
+      subjects/{subject_id} invokes the real, wider
+      UnifiedSubjectErasureOrchestrator (never a stub), whose own Zone 8
+      leg still calls the real SubjectErasureCascadeService internally.
 
 TEST REQUIREMENTS traceability: this module enumerates every AC as a
 test scenario (happy path, boundary, adverse) before any assertion code,
@@ -68,7 +69,7 @@ def app_context() -> AppContext:
     return build_app_context(
         tenant_credential_signing_key=_TENANT_CREDENTIAL_KEY,
         jwt_signing_key=_JWT_KEY,
-        postgres_connection=None,
+        postgres_pool=None,
     )
 
 
@@ -247,20 +248,22 @@ def test_app_module_never_imports_the_three_controlled_types_directly() -> None:
 def test_build_app_context_forwards_verify_privileges_true_to_all_four_real_builders(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-023-2 adverse (attempt-2 fix): the DSHN-55 check is inherited by construction.
+    """AC-023-2 adverse (attempt-2 fix); updated DASH-STORY-028-DEV.
 
     Spies on `composition_root.build_provenance_repository`/
     `build_episodic_repository`/`build_conflict_aware_semantic_repository`/
     `build_conflict_aware_entity_memory_repository` and asserts each is
     called with `verify_privileges=True` (composition_root's own secure
-    default) when `build_app_context` composes the real production
-    Postgres-backed branch -- never `verify_privileges=False`, which
-    would reopen DSHN-55 at this story's one new call site. A fake
-    connection double stands in for the real `psycopg.Connection` so
-    this stays a unit test (must-not-deviate item 1: no real Postgres).
+    default) -- never `verify_privileges=False`, which would reopen
+    DSHN-55. DASH-STORY-028-DEV moved these calls from `build_app_context`
+    itself to the `make_*_dependency` per-request providers, so this test
+    now drives those providers directly against a fake pool/connection
+    double (must-not-deviate item 1: no real Postgres), instead of calling
+    `build_app_context` alone.
     """
     from unittest.mock import MagicMock
 
+    from dashanan.api import composition as composition_module
     from dashanan.infrastructure import composition_root as composition_root_module
 
     captured_kwargs: dict[str, dict[str, object]] = {}
@@ -280,12 +283,54 @@ def test_build_app_context_forwards_verify_privileges_true_to_all_four_real_buil
     ):
         monkeypatch.setattr(composition_root_module, builder_name, _stub(builder_name))
 
+    class _FakeConnectionCtx:
+        def __init__(self, connection: object) -> None:
+            self._connection = connection
+
+        def __enter__(self) -> object:
+            return self._connection
+
+        def __exit__(self, *exc_info: object) -> bool:
+            return False
+
+    class _FakePool:
+        def __init__(self, connection: object) -> None:
+            self._connection = connection
+
+        def connection(self, timeout: float | None = None) -> _FakeConnectionCtx:
+            return _FakeConnectionCtx(self._connection)
+
     fake_connection = object()
-    build_app_context(
+    ctx = build_app_context(
         tenant_credential_signing_key=_TENANT_CREDENTIAL_KEY,
         jwt_signing_key=_JWT_KEY,
-        postgres_connection=fake_connection,
+        postgres_pool=_FakePool(fake_connection),
     )
+
+    get_pooled_connection = composition_module.make_pooled_connection_dependency(ctx)
+    get_provenance_repository = composition_module.make_provenance_repository_dependency(
+        get_pooled_connection, ctx
+    )
+    get_episodic_repository = composition_module.make_episodic_repository_dependency(
+        get_pooled_connection, ctx
+    )
+    get_semantic_repository = composition_module.make_semantic_repository_dependency(
+        get_pooled_connection, ctx
+    )
+    get_conflict_aware_entity_repository = (
+        composition_module.make_conflict_aware_entity_repository_dependency(
+            get_pooled_connection, ctx
+        )
+    )
+
+    connection_gen = get_pooled_connection()
+    connection = next(connection_gen)
+    get_provenance_repository(connection)
+    get_episodic_repository(connection)
+    get_semantic_repository(connection)
+    get_conflict_aware_entity_repository(connection)
+    with pytest.raises(StopIteration):
+        next(connection_gen)
 
     for builder_name in (
         "build_provenance_repository",
@@ -324,16 +369,18 @@ def test_app_context_orchestrator_is_the_real_composition_root_instance(
 
 
 # --------------------------------------------------------------------------
-# AC-023-3: eraseSubject invokes the real SubjectErasureCascadeService.
+# AC-027-DEV-1/3 (re-scoping DASH-STORY-027-DEV's own AC-023-3): eraseSubject
+# now invokes the real, wider UnifiedSubjectErasureOrchestrator.
 # --------------------------------------------------------------------------
 
 
-class _SpySubjectErasureCascadeService:
+class _SpyUnifiedSubjectErasureOrchestrator:
     """A real Protocol-shaped collaborator (not the domain class itself) that records calls.
 
     Used to prove the ENDPOINT CODE genuinely calls
-    `AppContext.subject_erasure_service.request_erasure` -- a dependency-
-    injection unit test, not a test of the fake itself.
+    `UnifiedSubjectErasureOrchestrator.request_erasure` -- a dependency-
+    injection unit test, not a test of the fake itself. Mirrors this test
+    module's own pre-existing `_SpySubjectErasureCascadeService` pattern.
     """
 
     def __init__(self) -> None:
@@ -348,13 +395,24 @@ class _SpySubjectErasureCascadeService:
         )
 
 
-def test_erase_subject_invokes_the_real_subject_erasure_cascade_service(
-    app_context: AppContext,
+def test_erase_subject_invokes_the_real_unified_orchestrator(
+    app_context: AppContext, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC-023-3 happy path: DELETE .../subjects/{id} calls request_erasure exactly once."""
-    spy = _SpySubjectErasureCascadeService()
-    app_context.subject_erasure_service = spy  # type: ignore[assignment]
-    app_context.postgres_available = True
+    """AC-027-DEV-1/3 happy path: DELETE .../subjects/{id} calls request_erasure exactly once.
+
+    Substitutes `make_unified_subject_erasure_orchestrator_dependency`
+    itself so `erase_subject`'s injected dependency resolves to the spy,
+    proving the ENDPOINT CODE calls `request_erasure` on the wider
+    orchestrator (not this test's plumbing) -- mirrors the pre-existing
+    `make_subject_erasure_service_dependency` substitution pattern this
+    module already used before DASH-STORY-027-DEV's re-scope.
+    """
+    spy = _SpyUnifiedSubjectErasureOrchestrator()
+    monkeypatch.setattr(
+        app_module,
+        "make_unified_subject_erasure_orchestrator_dependency",
+        lambda get_pooled_connection, get_zone8_consolidation_store, ctx: (lambda: spy),
+    )
     app = app_module.create_app(app_context)
     with TestClient(app) as client:
         response = client.delete(
@@ -368,16 +426,21 @@ def test_erase_subject_invokes_the_real_subject_erasure_cascade_service(
     assert spy.calls[0].subject_id == "subject-99"
 
 
-def test_erase_subject_never_uses_the_wider_unified_orchestrator(app_context: AppContext) -> None:
-    """AC-023-3 boundary (must-not-deviate item 3): the endpoint's own source stays scoped.
+def test_erase_subject_source_uses_the_wider_unified_orchestrator(app_context: AppContext) -> None:
+    """DASH-STORY-027-DEV re-scope: the endpoint's own source now calls the wider orchestrator.
 
-    `app.py`'s `erase_subject` handler must reference only
-    `subject_erasure_service`, never `UnifiedSubjectErasureOrchestrator`
-    -- this story does not present a wider cascade than Zone 8 alone.
+    `app.py`'s `erase_subject` handler must reference
+    `unified_erasure_orchestrator.request_erasure(`, not a direct
+    `subject_erasure_service.request_erasure(` call -- superseding this
+    module's pre-DASH-STORY-027-DEV boundary test of the same name.
+    `SubjectErasureCascadeService` remains imported and used (by the
+    orchestrator's own Zone 8 leg, and by
+    `make_subject_erasure_service_dependency`, still present for any
+    other caller) -- only the ENDPOINT's own direct call site changed.
     """
     source = inspect.getsource(app_module)
-    assert "import UnifiedSubjectErasureOrchestrator" not in source
-    assert "ctx.subject_erasure_service.request_erasure(" in source
+    assert "unified_erasure_orchestrator.request_erasure(" in source
+    assert "subject_erasure_service.request_erasure(" not in source
 
 
 def test_erase_subject_degrades_when_postgres_unavailable_never_fakes_success(
@@ -497,15 +560,23 @@ class _RaisingWorkingRepository:
 
 
 def test_get_item_provenance_never_leaks_raw_driver_text_on_503(
-    app_context: AppContext,
+    app_context: AppContext, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DSHN-75: a ZoneRepositoryError's raw `reason` must not reach the response body."""
+    """DSHN-75: a ZoneRepositoryError's raw `reason` must not reach the response body.
+
+    DASH-STORY-028-DEV: `provenance_repository` is now built per-request by
+    `make_provenance_repository_dependency`, not a settable `AppContext`
+    field -- this test substitutes that factory itself.
+    """
+    raising_repository = _RaisingProvenanceRepository()
+    monkeypatch.setattr(
+        app_module,
+        "make_provenance_repository_dependency",
+        lambda get_pooled_connection, ctx: (lambda: raising_repository),
+    )
     app = app_module.create_app(app_context)
     with TestClient(app) as client:
         write_id = _write_one_item(client)
-
-        app_context.postgres_available = True
-        app_context.provenance_repository = _RaisingProvenanceRepository()  # type: ignore[assignment]
 
         response = client.get(
             f"/items/{write_id}/provenance", headers=_auth("context:read")

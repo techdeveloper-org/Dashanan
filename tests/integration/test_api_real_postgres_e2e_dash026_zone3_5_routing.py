@@ -89,8 +89,12 @@ from fastapi.testclient import TestClient
 
 from dashanan.api import app as app_module
 from dashanan.api.composition import AppContext, build_app_context
+from dashanan.application.conflict_aware_zone_writes import (
+    ConflictAwareEntityMemoryRepository,
+    ConflictAwareSemanticRepository,
+)
 from dashanan.domain.exceptions import ZoneRepositoryError
-from dashanan.infrastructure.composition_root import build_postgres_connection
+from dashanan.infrastructure.composition_root import build_postgres_connection_pool
 from dashanan.infrastructure.migration_runner import SCHEMA_FILES, run_migrations
 from dashanan.infrastructure.settings import PostgresSettings
 
@@ -255,24 +259,34 @@ def _auth(scope: str, **kwargs: object) -> dict[str, str]:
 
 @pytest.fixture
 def real_postgres_app_context(applied_migrations: ShapeBStack) -> Iterator[AppContext]:
-    """A real `AppContext` wired to a real, live Postgres connection (Shape B, live branch).
+    """A real `AppContext` wired to a real, live Postgres connection pool (Shape B, live branch).
 
-    Mirrors `test_api_real_postgres_e2e_dash3.py`'s own
-    `real_postgres_app_context` fixture exactly.
+    UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix): mirrors
+    `test_api_real_postgres_e2e_dash3.py`'s own `real_postgres_app_context`
+    fixture exactly, including that file's same fix -- `postgres_connection`
+    renamed to `postgres_pool` by DASH-STORY-028's per-request DI refactor.
+    The two assertions this fixture previously made directly against
+    `context.semantic_repository`/`context.conflict_aware_entity_repository`
+    are removed: `AppContext` no longer holds those fields at all post-028
+    -- Zone 3/5 repositories are now built per-request via `api.app`'s
+    `Depends(...)` providers, not stored on the shared `AppContext` (see
+    `api/composition.py`'s own `AppContext` docstring). The Zone 3/5 routing
+    behavior this test module actually exercises is verified end-to-end
+    through real HTTP requests via the `client` fixture below, not through
+    direct `AppContext` field access, so removing these two now-invalid
+    assertions does not reduce this module's real coverage.
     """
-    connection = build_postgres_connection(applied_migrations.postgres_settings())
+    pool = build_postgres_connection_pool(applied_migrations.postgres_settings())
     try:
         context = build_app_context(
             tenant_credential_signing_key=_TENANT_CREDENTIAL_KEY,
             jwt_signing_key=_JWT_KEY,
-            postgres_connection=connection,
+            postgres_pool=pool,
         )
         assert context.postgres_available is True
-        assert context.semantic_repository is not None
-        assert context.conflict_aware_entity_repository is not None
         yield context
     finally:
-        connection.close()
+        pool.close()
 
 
 @pytest.fixture
@@ -630,11 +644,17 @@ class TestCase10PartialZone3FailureAfterZone5Success:
         # actual subject -- the 207-partial contract for a Zone 3 edge
         # failure AFTER a successful Zone 5 write -- independent of that
         # unrelated, already-flagged infrastructure defect.
+        # UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix):
+        # `conflict_aware_entity_repository`/`semantic_repository` are built
+        # fresh per-request now, not stored on `AppContext` -- patch the
+        # real, unmodified CLASS method instead of a specific pre-built
+        # instance, so the patch still applies to whichever instance this
+        # request's own Depends(...) provider constructs.
         with patch.object(
-            real_postgres_app_context.conflict_aware_entity_repository,
+            ConflictAwareEntityMemoryRepository,
             "write_attribute",
         ), patch.object(
-            real_postgres_app_context.semantic_repository,
+            ConflictAwareSemanticRepository,
             "insert_edge",
             side_effect=ZoneRepositoryError(
                 zone="3-semantic",
@@ -668,8 +688,11 @@ class TestCase11Zone5FailureBeforeAnyZone3Attempt:
     def test_case11_zone5_failure_returns_503_and_no_zone3_attempted(
         self, client: TestClient, real_postgres_app_context: AppContext
     ) -> None:
+        # UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix): see
+        # TestCase10's own comment above -- patch the real CLASS method,
+        # not a specific pre-built AppContext instance attribute.
         with patch.object(
-            real_postgres_app_context.conflict_aware_entity_repository,
+            ConflictAwareEntityMemoryRepository,
             "write_attribute",
             side_effect=ZoneRepositoryError(
                 zone="5-entity",

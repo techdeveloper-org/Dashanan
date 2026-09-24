@@ -1,6 +1,6 @@
 # Connection Pooling Design — Closing AR1-S3-G3 (Composition Root)
 
-Status: DRAFT v2.6 — pending user review. No implementation files have been modified.
+Status: DRAFT v2.7 — pending user review. No implementation files have been modified.
 Related: `src/dashanan/infrastructure/composition_root.py`, `src/dashanan/api/composition.py`,
 `src/dashanan/api/app.py`, `docs/phase-1-architecture/HLD.md` Section 6 (circuit-breaker
 precedent), `docs/phase-1.5-api/fr013-predicate-schema-design.md` Section 6 (the exact wording
@@ -190,23 +190,127 @@ range of 20-32 for a typical 4-16 core deployment host — formula-derived `pool
 as the Shape B default (env-overridable, matching every other Shape B setting's
 `load_postgres_settings_from_env` convention).
 
-**PROVISIONAL, NOT FINAL (updated v2.5, user-directed correction).** The `pool_min=2, pool_max=20`
-values above are a reasoned estimate derived from the formula, not measured against real
-concurrent load. Prior drafts of this section framed that as an acceptable "documented starting
-default" a reviewer could simply accept. The user overrode that framing 2026-09-22: these numbers
-MUST NOT be treated as final for implementation until a real load test has been run against the
-actual `docker-compose.yml` Postgres container and produced real connection-acquisition-latency
-and pool-exhaustion-behavior numbers under realistic concurrency. That load test is now a tracked,
-blocking prerequisite — `DASH-STORY-028-LOADTEST` (see Section 8 item 1 and this codebase's
-`docs/phase-6-sprint-planning/backlog_draft.json`) — which must complete and produce real
-min/max pool-size recommendations **before** `DASH-STORY-028-DEV` treats this section's numbers as
-final. No load test has been run to produce this revision; none of this section's numbers change
-until that real run happens.
+**RESOLVED (v2.7) — real load test run, real numbers below replace the formula's provisional
+estimate.** `DASH-STORY-028-LOADTEST` ran a real concurrent connection-acquisition load test —
+`scripts/loadtest/connection_pool_loadtest.py`, using `psycopg_pool.ConnectionPool` — against the
+actual `docker-compose.yml` `postgres` service (`postgres:16-alpine`, brought up via
+`docker compose up -d postgres`, confirmed healthy, `SHOW max_connections;` confirmed the
+documented default of **100**, unmodified). Full methodology, raw results, and the harness bug
+found and fixed along the way are in Section 4.1 below.
+
+**Revised recommendation: `pool_min=2, pool_max=32`** (was `pool_max=20`). `pool_max=32` is both
+the top of the formula's own originally-derived range (Section 4's formula already named "20-32
+for a typical 4-16 core deployment host") and the exact ceiling `anyio`'s default
+`min(32, os.cpu_count() + 4)` threadpool imposes on a modern multi-core host — sizing the pool at
+that ceiling means every thread that can concurrently touch Postgres has a connection available
+with no queuing, which is the sizing principle Section 4's formula already argued for. The
+measured data in Section 4.1 confirms this concretely: at `pool_max=20` with a realistic 20ms
+per-request hold time and a tight 250ms acquire timeout, pool exhaustion (`PoolTimeout`) started
+appearing once concurrency reached 200 (10x `pool_max`); at `pool_max=32` under the identical
+concurrency sweep (20-200) and the same tight 250ms timeout, **zero exhaustion occurred at any
+level tested** — `pool_max=32` absorbed the same stress `pool_max=20` could not, at negligible
+extra Postgres-side connection cost (32 of the default 100 `max_connections`, still leaving 68%
+headroom, comfortably above Section 4's original ">=50% headroom" requirement).
+
+`pool_min=2` is retained unchanged — the load test did not stress `pool_min` directly (it measures
+steady-state acquisition under concurrency, not cold-start behavior), and Section 4's original
+rationale for `pool_min=2` (avoid a cold-connect penalty on first requests without
+over-provisioning idle connections) is unaffected by this revision.
 
 `pool_min=2` (not 0): `psycopg_pool.ConnectionPool` eagerly opens `pool_min` connections at
 construction and keeps them warm, avoiding a cold-connect penalty on the first requests after
 startup — appropriate for a service expected to receive traffic immediately after health-check
 readiness, without over-provisioning idle connections the way a larger `pool_min` would.
+
+---
+
+## 4.1 Load-test methodology and results (DASH-STORY-028-LOADTEST, added v2.7)
+
+**Harness:** `scripts/loadtest/connection_pool_loadtest.py`. A standalone script (no
+`DASH-STORY-028-DEV` application code required or touched) that opens one
+`psycopg_pool.ConnectionPool` against the real Postgres container and drives it with a configurable
+number of Python worker threads for a fixed duration per concurrency level. Each worker repeatedly:
+acquires a connection via `pool.connection(timeout=...)` (the acquisition call itself is timed with
+`time.perf_counter()`), runs a query, and releases the connection back to the pool. Results are
+aggregated per concurrency level into total/successful acquisitions, `PoolTimeout` count, exhaustion
+rate (`timeouts / total_acquisitions`), and acquire-latency p50/p95/p99 (linear-interpolation
+percentile over the collected per-acquisition latencies).
+
+**Environment:** `postgres:16-alpine` via this repository's own `docker-compose.yml`, `SHOW
+max_connections;` confirmed at **100** (the documented default, not modified — see Section 4's own
+note on this constraint). Credentials came from a local, gitignored `.env` created for this run
+only (`DASHANAN_POSTGRES_MIGRATION_USER`/`_PASSWORD`, following the existing `.env.example`
+convention — no value hardcoded anywhere, per this codebase's established
+application-security-core convention). `docker-compose.yml` itself was **not modified** except that
+`DASHANAN_POSTGRES_PORT` was overridden to `55432` in the local `.env` only (port `5432` was already
+bound by an unrelated local process on the host machine) — the committed `docker-compose.yml`'s
+`postgres` service definition, including its `max_connections`-relevant configuration, is
+unchanged.
+
+**Harness bug found and fixed during this run (worth recording for `DASH-STORY-028-DEV`):** the
+first attempt at every concurrency level hung — `pool.wait()`/`pool.getconn()` timed out with
+`connections_num` > 0 but `pool_available` stuck at 0 indefinitely. Root cause, isolated by timing
+bare `psycopg.connect()` calls directly: the harness's Postgres host was configured as `localhost`,
+which resolves IPv6 (`::1`) before IPv4 on this machine, and Docker Desktop's port mapping only
+binds `127.0.0.1` (IPv4) per `docker-compose.yml`'s own `127.0.0.1:${PORT}:5432` binding — every
+connection attempt wasted its full `connect_timeout` on the doomed IPv6 attempt before falling back
+to the working IPv4 address, and psycopg_pool's background connection-adding worker experienced
+this as an indefinite stall rather than a clean error. Fix: use `127.0.0.1` explicitly (not
+`localhost`) as `DASHANAN_POSTGRES_HOST` for this load test's `.env`. This is a loopback-hostname
+resolution-order quirk specific to this local Windows/Docker Desktop setup, not a `psycopg_pool` or
+Postgres defect, and does not affect the production Shape B deployment path (where hosts are
+addressed by service/DNS name, not `localhost`) — but it's worth carrying into
+`DASH-STORY-028-DEV`'s own local dev-setup notes so a future contributor doesn't lose time to the
+same 5-10 second-per-connect stall.
+
+**Sweep 1 — trivial query (`SELECT 1`), `pool_max=20`, `acquire_timeout=2s`, 6s per level:**
+establishes the pool's baseline queuing behavior when server-side work is negligible.
+
+| Concurrency | Total acquisitions | Timeouts | Exhaustion rate | p50 (ms) | p95 (ms) | p99 (ms) |
+|---|---|---|---|---|---|---|
+| 5 | 8,323 | 0 | 0.0% | 0.015 | 0.028 | 0.10 |
+| 10 | 10,568 | 0 | 0.0% | 0.016 | 0.029 | 1.16 |
+| 20 | 11,313 | 0 | 0.0% | 0.016 | 0.072 | 5.59 |
+| 32 | 10,794 | 0 | 0.0% | 7.22 | 9.57 | 11.97 |
+| 50 | 10,448 | 0 | 0.0% | 17.50 | 20.94 | 30.18 |
+| 100 | 9,992 | 0 | 0.0% | 45.94 | 62.65 | 95.70 |
+| 150 | 8,462 | 0 | 0.0% | 94.42 | 108.44 | 121.60 |
+
+With a trivial query, no exhaustion occurred at any concurrency tested up to 150 (7.5x
+`pool_max`) — a 2-second acquire timeout comfortably absorbs the queuing delay when each connection
+is held for a sub-millisecond query, confirming Section 4's formula intuition that pool sizing
+should track concurrent *in-flight* work, not raw throughput.
+
+**Sweep 2 — realistic 20ms held work (`SELECT pg_sleep(0.02)`), `pool_max=20` vs. `pool_max=32`,
+`acquire_timeout=250ms` (a deliberately tight timeout, to surface real exhaustion behavior rather
+than mask it behind Section 5's more forgiving 2-second recommendation), 6s per level:**
+
+| Concurrency | `pool_max=20` timeouts | `pool_max=20` exhaustion rate | `pool_max=20` p99 (ms) | `pool_max=32` timeouts | `pool_max=32` exhaustion rate | `pool_max=32` p99 (ms) |
+|---|---|---|---|---|---|---|
+| 20 | 0 | 0.0% | 24.03 | 0 | 0.0% | 25.05 |
+| 40 | 0 | 0.0% | 28.35 | 0 | 0.0% | 17.88 |
+| 60 | 0 | 0.0% | 56.26 | 0 | 0.0% | 26.31 |
+| 80 | 0 | 0.0% | 137.11 | 0 | 0.0% | 45.36 |
+| 100 | 0 | 0.0% | 107.75 | 0 | 0.0% | 64.12 |
+| 150 | 0 | 0.0% | 205.23 | 0 | 0.0% | 97.43 |
+| 200 | **3** | **0.059%** | 244.82 | 0 | 0.0% | 153.06 |
+
+At `pool_max=20`, real `PoolTimeout` exhaustion appears once concurrency reaches 200 (10x
+`pool_max`) under a tight 250ms acquire timeout. At `pool_max=32`, the identical sweep produced
+**zero** timeouts at every level tested, with consistently lower p99 latency at every concurrency
+above 20 — direct measured evidence for the `pool_max=20` -> `pool_max=32` revision above. Raw JSON
+output for both sweeps (plus the trivial-query sweep) is retained under `scripts/loadtest/` as
+`results_pool20.json`, `results_pool20_timeout250ms.json`, and `results_pool32_timeout250ms.json`
+for anyone reproducing this run.
+
+**What this load test does not (yet) establish:** these numbers characterize connection-acquisition
+behavior under synthetic, uniform concurrent load against a `SELECT`-only workload; they do not
+model this application's real query mix (writes, multi-statement zone-repository calls) or
+`DASH-STORY-028-DEV`'s eventual per-request connection lifetime once real route handlers replace
+this harness's trivial `pg_sleep` stand-in. `DASH-STORY-028-DEV`/QA's own test suite (Section 9's
+existing Definition of Done items) is expected to validate `pool_max=32` against the real
+application workload once it exists — this load test's job was narrowly to replace Section 4's
+unmeasured formula guess with a real measured data point, which it has done.
 
 ---
 
@@ -467,20 +571,16 @@ Change Log) plus a user-decision resolution round (2026-09-22, v2.3), which toge
 items 2 and 3 below in place. One genuinely open item remains that a further review pass should
 resolve before implementation:
 
-1. **BLOCKED on load-test prerequisite (updated v2.5, user-directed correction) — see backlog for
-   the tracking task.** Section 4's `pool_min=2, pool_max=20` is derived from a formula, not from
-   load-test data — no load test exists for this codebase yet. This item is **no longer** "accept
-   as documented default, adjustable later" — the user explicitly overrode that framing 2026-09-22
-   and required a REAL load test (k6/locust/pgbench-style concurrent-connection simulation against
-   the actual Postgres container defined in `docker-compose.yml`, measuring connection-acquisition
-   latency and exhaustion behavior under realistic concurrency) to produce real min/max pool-size
-   numbers before these defaults are treated as final for implementation. Tracked as
-   `DASH-STORY-028-LOADTEST` in `docs/phase-6-sprint-planning/backlog_draft.json`'s
-   `sprint_5_dependency_graph` and `sprint5_ar1_assignments.json`'s
-   `dependency_integrity_check.sprint_5_edges`, as a blocking prerequisite for
-   `DASH-STORY-028-DEV`. This item stays OPEN/BLOCKED — not closed — until that sub-task actually
-   runs and produces real numbers; no load test has been run and no load-test numbers exist as of
-   this revision.
+1. ~~**BLOCKED on load-test prerequisite**~~ **RESOLVED in v2.7.** `DASH-STORY-028-LOADTEST` ran a
+   real load test (`scripts/loadtest/connection_pool_loadtest.py`, `psycopg_pool.ConnectionPool`
+   against the actual `docker-compose.yml` Postgres container) measuring connection-acquisition
+   latency and `PoolTimeout` exhaustion rate across a concurrency sweep, at both `pool_max=20` and
+   `pool_max=32`. Section 4.1 has the full methodology and results. Outcome: `pool_max=20` measurably
+   exhausted under sustained 10x-oversubscribed concurrency with a tight acquire timeout;
+   `pool_max=32` did not, at any tested level. Section 4's recommendation is revised from
+   `pool_min=2, pool_max=20` to **`pool_min=2, pool_max=32`** on that evidence.
+   `DASH-STORY-028-DEV` is unblocked by this revision — this item is closed, not carried forward as
+   open.
 2. ~~**Whether Postgres access should also get a full circuit breaker**~~ **RESOLVED in v2.3.**
    The user decided pooled Postgres access REQUIRES a full circuit breaker now, matching HLD
    Section 6's existing mandatory "Every adapter call -> Circuit Breaker" pattern with no
@@ -524,8 +624,8 @@ resolve before implementation:
 - [ ] Sprint 4's existing 202/207/503 partial-reporting contract for Zone 3/5 writes is
       unchanged and unaffected — verified by a re-run of `fr013-predicate-schema-design.md`
       Section 5's 14-case test matrix after pooling lands, confirming no behavior regression.
-- [ ] Real load-test numbers replace Section 4's formula-derived defaults, or the defaults are
-      explicitly accepted as-is by the user/reviewer.
+- [x] Real load-test numbers replace Section 4's formula-derived defaults (v2.7): `pool_max`
+      revised from 20 to 32 on measured `PoolTimeout` exhaustion evidence, see Section 4.1.
 - [ ] The per-request repository/service construction path (Section 3/7) is verified wired
       correctly for **all** of Zone 2 (episodic), Zone 3 (semantic), Zone 5 (conflict-aware entity),
       Zone 7 (provenance), and Zone 8-manifest (`SqlManifestRepository`,
@@ -565,3 +665,4 @@ resolve before implementation:
 | 2026-09-22 | v2.4 (`solution-architect`, consensus-agent review remediation — 4 BLOCKER findings on v2.3's Section 5.1): a consensus-agent review of DASH-STORY-028's new circuit-breaker design found and required fixes for 4 issues, all BLOCKER. (1) **Retry-After/error-code disambiguation gap**: v2.3's Section 5.1 OPEN-state 503 reused the exact same response shape as Section 5's `PoolTimeout` 503 with no distinguishing value or error code — a client or operator could not tell "Postgres is down" (breaker-OPEN, can persist up to 300s) from "pool momentarily saturated" (`PoolTimeout`, ~1s) from the response alone, and reusing the 1s value against breaker-OPEN would hammer a known-down dependency roughly once per second for up to five minutes, defeating the breaker's purpose. Fixed by adding new Section 5.1.1 ("Retry-After and error-code disambiguation from PoolTimeout"): breaker-OPEN now returns `error.code = POSTGRES_UNAVAILABLE` and a dynamically-computed `Retry-After` (`max(1, ceil(opened_at + backoff_duration - now))`, the actual remaining time until the next HALF_OPEN probe), while `PoolTimeout` (Section 5) is given the corresponding `error.code = POOL_EXHAUSTED` for symmetry. Added a matching Definition of Done item (Section 9). (2) **Missing independent REVIEW-side verification of the breaker**: DASH-STORY-028-REVIEW's 4 ACs verified DI-wiring, atomicity-overclaim absence, and rollback, but none verified the breaker itself was implemented per spec, despite this bundle's own established precedent (AC-028-REVIEW-3) that self-certified Dev/QA claims about correctness-critical behavior get independent review — the breaker is 8 of the story's 21 SP, its own largest scope addition, with zero prior REVIEW coverage. Fixed outside this file: `sprint5_ar1_assignments.json` gains AC-028-REVIEW-5 (failure taxonomy, thresholds/backoff, and this revision's Retry-After/error-code disambiguation, all independently verified against source); propagated into `sprint5_implementation_execution_plan.json`'s review_prompt. (3) **Stale v2.2 citation**: `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-REVIEW `review_prompt` CONTEXT SOURCES still cited `design_doc_full_connection-pooling-design.md_v2.2` after this doc advanced to v2.3 — fixed to cite v2.4 (this revision). (4) **Internal v2.2/v2.3 inconsistency**: `sprint5_ar3_context_windows.json`'s DASH-STORY-028-REVIEW entry had `sources.design_doc_full` correctly at v2.3 but its own `files_to_read_or_modify` two lines later still cited "connection-pooling-design.md v2.2 Section 7.1" — fixed within the same object to v2.4. Section 8's one remaining open item (pool sizing unmeasured) is unaffected by this revision; no new open item was introduced — the disambiguation gap was a defect in already-"resolved" v2.3 content, not a newly discovered design question. |
 | 2026-09-22 | v2.5 (`solution-architect`, user-directed correction — REAL load test now required before Section 4's defaults ship): the user overrode this document's own prior framing of Section 8 item 1 ("accept `pool_min=2, pool_max=20` as a documented starting default, adjustable via env var without a code change") and required a REAL load test — k6/locust/pgbench-style concurrent-connection simulation against the actual Postgres container in `docker-compose.yml`, measuring connection-acquisition latency and exhaustion behavior under realistic concurrency — to produce real min/max pool-size numbers before Section 4's formula-derived defaults are treated as final for implementation. Section 4 updated to mark `pool_min=2, pool_max=20` PROVISIONAL, NOT FINAL. Section 8 item 1 updated from "accept as documented default" to BLOCKED, citing the new tracking task. This is a **docs-only planning correction**: no load test was run, no load-test numbers were fabricated or added anywhere in this document, and no implementation files were touched. Companion fix, tracked outside this file: a new lightweight sub-task, `DASH-STORY-028-LOADTEST`, was added to `docs/phase-6-sprint-planning/backlog_draft.json` (blocking `DASH-STORY-028-DEV`, not folded into DASH-STORY-028's existing 21 SP), and propagated into `sprint5_sprint_plan.json`, `sprint5_ar1_assignments.json`'s `dependency_integrity_check`, and `sprint5_implementation_execution_plan.json`'s `sequencing_note` and DASH-STORY-028-DEV prompt (now stated as blocked pending this prerequisite), plus its own dispatch-ready (PREPARED FOR FUTURE USE, NOT EXECUTED) prompt and its own `sprint5_ar3_context_windows.json` entry. Section 8's other former item (circuit breaker) remains RESOLVED per v2.3/v2.4 and is unaffected by this revision. |
 | 2026-09-22 | v2.6 (`solution-architect`, consensus-agent review remediation on the DASH-STORY-028-LOADTEST sub-task — INFO fix 4 of 5): this table's v2.5 row was listed BEFORE the v2.4 row, reversing chronological order (v2.4 precedes v2.5 in this document's own version history). Reordered so v2.4 appears before v2.5, matching every other row's chronological sequence. No design content changed by this fix — table ordering only. Companion fixes in the same consensus-agent review pass, tracked outside this file: `sprint5_ar1_assignments.json` gains a `failure_and_escalation_policy` field on DASH-STORY-028-LOADTEST (fix 1, BLOCKER) and a clarified DASH-STORY-028 `logging_note` (fix 5, INFO); `sprint5_ar3_context_windows.json`'s `summary.sub_tasks_with_pii_exclusion_applied` corrected from 6 to 7 (fix 2, BLOCKER); `sprint5_implementation_execution_plan.json` and `sprint5_ar3_context_windows.json` had their stale v2.4 citations of this document bumped to v2.5, and `sprint5_implementation_execution_plan.json`'s DASH-STORY-028-DEV dev_prompt's self-contradictory "pool sizing unmeasured" vs. "BLOCKED PENDING LOAD-TEST PREREQUISITE" phrasing was aligned to BLOCKED throughout (fix 3, non-BLOCKER). |
+| 2026-09-24 | v2.7 (`performance-testing-engineer`, DASH-STORY-028-LOADTEST executed): ran the real load test Section 8 item 1 required — no longer a plan, an actual dispatched run. Built `scripts/loadtest/connection_pool_loadtest.py` (standalone `psycopg_pool.ConnectionPool` harness, no `DASH-STORY-028-DEV` application code touched or required), brought up `docker-compose.yml`'s real `postgres` service via `docker compose up -d postgres`, confirmed `max_connections=100` (default, unmodified — `docker-compose.yml` itself was not changed; only a local, gitignored `.env`'s `DASHANAN_POSTGRES_PORT` was remapped to `55432` because port 5432 was already bound by an unrelated process on the host machine, and `DASHANAN_POSTGRES_HOST` was set to `127.0.0.1` after diagnosing a `localhost`-resolves-IPv6-first stall against Docker Desktop's IPv4-only port binding — both disclosed in new Section 4.1, neither is a `docker-compose.yml` change). Ran three concurrency sweeps (trivial-query baseline at `pool_max=20`; a realistic 20ms-held-connection sweep at `pool_max=20` vs. `pool_max=32` under a tight 250ms acquire timeout) and recorded real p50/p95/p99 acquire-latency and `PoolTimeout`-exhaustion-rate numbers for each level — added as new Section 4.1, with raw JSON retained under `scripts/loadtest/`. Measured result: `pool_max=20` exhausted (0.059% `PoolTimeout` rate) once concurrency reached 10x `pool_max` under the tight timeout; `pool_max=32` did not exhaust at any tested level and showed lower p99 latency throughout. Section 4's recommendation revised from `pool_min=2, pool_max=20` to **`pool_min=2, pool_max=32`** on this evidence — `pool_min=2` unchanged (not directly stress-tested by this run; its own cold-start rationale is unaffected). Section 8 item 1 changed from BLOCKED to RESOLVED; Section 9's matching Definition of Done item checked off. `DASH-STORY-028-DEV` is unblocked by this revision. No numbers in this revision are estimated or reasoned in place of measurement — every latency/exhaustion figure in Section 4/4.1 comes from an actual run against the real containerized Postgres instance, per the user's explicit requirement that motivated this sub-task (see the v2.5 entry above). |

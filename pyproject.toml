@@ -34,9 +34,17 @@ license = { text = "MIT" }
 # Section 2 Communication Matrix) rather than a hand-rolled HMAC decoder,
 # per application-security-core's "use a peer-reviewed primitive" guidance
 # already established for zone8_crypto_shredding's AES-256-GCM choice.
+#
+# psycopg[pool]: added by DASH-STORY-028-DEV (connection-pooling-design.md
+# Section 3/5/5.1) -- promoted from `dev` (where DASH-STORY-028-LOADTEST's
+# standalone load-test harness declared it first) to a real runtime
+# dependency, now that `composition_root.build_postgres_connection_pool`
+# uses `psycopg_pool.ConnectionPool` in the actual request path, not only in
+# the load-test script.
 dependencies = [
     "cryptography>=42.0",
     "psycopg[binary]>=3.2,<4.0",
+    "psycopg[pool]>=3.2,<4.0",
     "fastapi>=0.115",
     "uvicorn>=0.30",
     "pyjwt>=2.8",

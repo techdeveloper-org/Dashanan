@@ -72,9 +72,15 @@ from fastapi.testclient import TestClient
 from dashanan.api import app as app_module
 from dashanan.api.composition import AppContext, build_app_context
 from dashanan.application.subject_erasure_cascade import SubjectErasureJobStatus
+from dashanan.application.zone8_consolidation_store import Zone8ConsolidationStore
+from dashanan.application.zone8_crypto_shredding_store import Zone8SubjectKeyedArchiver
+from dashanan.infrastructure.sql_manifest_repository import SqlManifestRepository
 from dashanan.domain.consolidated_blob import ArchiveBatchItem
 from dashanan.domain.zone import ZoneId
-from dashanan.infrastructure.composition_root import build_postgres_connection
+from dashanan.infrastructure.composition_root import (
+    build_postgres_connection,
+    build_postgres_connection_pool,
+)
 from dashanan.infrastructure.migration_runner import SCHEMA_FILES, run_migrations
 from dashanan.infrastructure.settings import PostgresSettings
 
@@ -241,25 +247,31 @@ def _auth(scope: str, **kwargs: object) -> dict[str, str]:
 
 @pytest.fixture
 def real_postgres_app_context(applied_migrations: ShapeBStack) -> Iterator[AppContext]:
-    """A real `AppContext` wired to a real, live Postgres connection (Shape B, live branch).
+    """A real `AppContext` wired to a real, live Postgres connection pool (Shape B, live branch).
 
-    Mirrors `test_api_wire_layer_dash023.py`'s own `app_context` fixture
-    shape, but passes an already-open `build_postgres_connection(...)`
-    result as `postgres_connection` instead of `None` -- exercising
-    `build_app_context`'s Postgres-AVAILABLE branch for the first time
-    against a real database rather than a fake connection double.
+    UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix): `build_app_context`'s
+    DI seam was renamed from `postgres_connection` (single shared connection)
+    to `postgres_pool` (a real `psycopg_pool.ConnectionPool`) when DASH-STORY-028
+    replaced the single-connection factory with real pooling -- this fixture
+    was outside that story's own file scope and was never updated to match,
+    breaking every test in this module until now. Mirrors
+    `test_api_wire_layer_dash023.py`'s own `app_context` fixture shape, but
+    passes an already-open `build_postgres_connection_pool(...)` result as
+    `postgres_pool` instead of the default sentinel -- exercising
+    `build_app_context`'s Postgres-AVAILABLE branch against a real database
+    rather than a fake pool double.
     """
-    connection = build_postgres_connection(applied_migrations.postgres_settings())
+    pool = build_postgres_connection_pool(applied_migrations.postgres_settings())
     try:
         context = build_app_context(
             tenant_credential_signing_key=_TENANT_CREDENTIAL_KEY,
             jwt_signing_key=_JWT_KEY,
-            postgres_connection=connection,
+            postgres_pool=pool,
         )
         assert context.postgres_available is True
         yield context
     finally:
-        connection.close()
+        pool.close()
 
 
 @pytest.fixture
@@ -436,7 +448,7 @@ class TestScenario2ReadinessReportsHealthy:
 
 
 class TestScenario3RealPostgresBackedErasure:
-    def test_erase_subject_reaches_real_postgres_and_stays_honestly_zone8_scoped(
+    def test_erase_subject_reaches_real_postgres_via_the_full_cascade(
         self, client: TestClient, real_postgres_app_context: AppContext,
         applied_migrations: ShapeBStack,
     ) -> None:
@@ -486,9 +498,15 @@ class TestScenario3RealPostgresBackedErasure:
         # collaborators `erase_subject` itself actually calls) consistent
         # with the manifest row seeded above, via their own real methods
         # -- never a spy or fake.
-        archiver = real_postgres_app_context.subject_erasure_service._archiver  # type: ignore[union-attr]
-        archiver._key_store.get_or_create_key(_TENANT_ID, subject_id)
-        archiver._subject_index.record_item(_TENANT_ID, subject_id, item_id)
+        # UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix):
+        # `subject_erasure_service` is built per-request now, not stored on
+        # `AppContext` -- but `_key_store`/`_subject_index` are still the
+        # SAME startup-constructed singletons every per-request instance's
+        # `_archiver` closes over (`AppContext.zone8_key_store`/
+        # `zone8_subject_index`, per `make_subject_erasure_service_dependency`'s
+        # own docstring), so reaching them directly here is equivalent.
+        real_postgres_app_context.zone8_key_store.get_or_create_key(_TENANT_ID, subject_id)
+        real_postgres_app_context.zone8_subject_index.record_item(_TENANT_ID, subject_id, item_id)
 
         # Independent read on the migration-role connection too: the app
         # login connection has no SELECT grant on zone8_manifest either
@@ -519,24 +537,32 @@ class TestScenario3RealPostgresBackedErasure:
         assert erase_response.status_code == 202, erase_response.text
         job_id = erase_response.json()["job_id"]
 
-        # Verify erasure via an independent read: the real
-        # SubjectErasureCascadeService's own job record (not the HTTP
-        # layer's separate admin_job_store, which does not carry
-        # item_ids) -- the real, Postgres-index-resolved list of items
-        # this subject's crypto-shred reached.
-        job = real_postgres_app_context.subject_erasure_service.get_job(job_id)  # type: ignore[union-attr]
+        # UPDATED 2026-09-24 (DASH-STORY-027-DEV regression fix): the
+        # eraseSubject handler now wires `UnifiedSubjectErasureOrchestrator`
+        # (not `SubjectErasureCascadeService` directly) -- verify via that
+        # orchestrator's own job store, `AppContext.unified_erasure_job_store`
+        # (a startup-constructed singleton, same rationale as
+        # `zone8_job_store`: a job created in one request is polled in
+        # another). `GET /jobs/{job_id}`'s own `admin_job_store` still does
+        # not carry `item_ids` (unchanged), so this in-process read remains
+        # the only way to assert the resolved item list.
+        job = real_postgres_app_context.unified_erasure_job_store.get(job_id)
         assert job is not None
         assert job.status == SubjectErasureJobStatus.COMPLETED
         assert item_id in job.item_ids
 
-        # Honesty check (must-not-deviate item 3, mirrored from
-        # test_api_wire_layer_dash023.py): this endpoint never claims a
-        # wider DPDP cascade than Zone 8 alone, live Postgres or not.
+        # Honesty check, UPDATED 2026-09-24: this endpoint's own scope
+        # claim flipped with DASH-STORY-027-DEV's re-scoping (solution-
+        # architect review round 6) -- it no longer stays Zone-8-only; it
+        # now wires the full `UnifiedSubjectErasureOrchestrator` cascade
+        # (Zones 1/2/3/6/7/8, not Zone 4/5 -- see that story's own
+        # must-not-deviate list). This assertion is flipped to match, not
+        # deleted, so a future silent revert back to Zone-8-only is still
+        # caught by this test.
         import inspect
 
         source = inspect.getsource(app_module)
-        assert "import UnifiedSubjectErasureOrchestrator" not in source
-        assert "ctx.subject_erasure_service.request_erasure(" in source
+        assert "UnifiedSubjectErasureOrchestrator" in source
 
 
 # ---------------------------------------------------------------------------
@@ -569,26 +595,47 @@ class TestScenario3bZone8AppLoginRoleGrant:
         subject_id = f"subj-{uuid.uuid4().hex[:10]}"
         item_id = f"item-{uuid.uuid4().hex[:10]}"
 
-        archiver = real_postgres_app_context.subject_erasure_service._archiver  # type: ignore[union-attr]
-        item = ArchiveBatchItem(
-            tenant_id=_TENANT_ID,
-            item_id=item_id,
-            source_zone=ZoneId.EPISODIC,
-            payload=b"real app-login-role zone8 write, GitHub #22 regression guard",
-            subject_id=None,
-        )
-
-        try:
-            result = archiver.archive_for_subject(item, subject_id)
-        except Exception as exc:  # noqa: BLE001 -- re-raised below with full context
-            pytest.fail(
-                "archive_for_subject on the real app-login connection raised "
-                f"{type(exc).__name__}: {exc} -- if this is InsufficientPrivilege, "
-                "GitHub #22's fix (dashanan_zone8_role GRANT + "
-                "_PER_ZONE_LOGIN_MEMBER_ROLES membership) has regressed."
+        # UPDATED 2026-09-24 (DASH-STORY-028-DEV regression fix):
+        # `subject_erasure_service`/its `_archiver` are built per-request now,
+        # not stored on `AppContext` -- rebuild the SAME real, unmodified
+        # collaborator chain `make_subject_erasure_service_dependency` itself
+        # builds (SqlManifestRepository -> Zone8ConsolidationStore ->
+        # Zone8SubjectKeyedArchiver), from a real connection checked out of
+        # `AppContext.postgres_pool` (the SAME pool every live HTTP request
+        # actually uses), so this test still proves the real app-login-role
+        # DB path, not a substitute.
+        assert real_postgres_app_context.postgres_pool is not None
+        with real_postgres_app_context.postgres_pool.connection() as connection:
+            manifest = SqlManifestRepository(connection=connection)
+            zone8_store = Zone8ConsolidationStore(
+                object_store=real_postgres_app_context.zone8_object_store,
+                manifest=manifest,
+                clock=real_postgres_app_context.clock,
+            )
+            archiver = Zone8SubjectKeyedArchiver(
+                zone8_store=zone8_store,
+                key_store=real_postgres_app_context.zone8_key_store,
+                subject_index=real_postgres_app_context.zone8_subject_index,
+            )
+            item = ArchiveBatchItem(
+                tenant_id=_TENANT_ID,
+                item_id=item_id,
+                source_zone=ZoneId.EPISODIC,
+                payload=b"real app-login-role zone8 write, GitHub #22 regression guard",
+                subject_id=None,
             )
 
-        assert any(written.item_id == item_id for written in result.written)
+            try:
+                result = archiver.archive_for_subject(item, subject_id)
+            except Exception as exc:  # noqa: BLE001 -- re-raised below with full context
+                pytest.fail(
+                    "archive_for_subject on the real app-login connection raised "
+                    f"{type(exc).__name__}: {exc} -- if this is InsufficientPrivilege, "
+                    "GitHub #22's fix (dashanan_zone8_role GRANT + "
+                    "_PER_ZONE_LOGIN_MEMBER_ROLES membership) has regressed."
+                )
+
+            assert any(written.item_id == item_id for written in result.written)
 
 
 # ---------------------------------------------------------------------------

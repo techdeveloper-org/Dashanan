@@ -16,12 +16,16 @@ AC-023-2: every `MemoryOrchestrator`/`SqlProvenanceRepository`/
 `composition_root.py` builder functions -- this module never imports or
 calls those three classes' constructors directly.
 
-AC-023-3: `eraseSubject` below calls `AppContext.subject_erasure_service.
-request_erasure` (Zone-8-only `SubjectErasureCascadeService`), never a
-stub and never `UnifiedSubjectErasureOrchestrator` (the wider, separate
-DASH-STORY-025/DSHN-70 fan-out) -- so this endpoint does NOT present
-itself as closing HLD Section 7.4's full "cascades across all 8 zones"
-promise (must-not-deviate item 3) until DASH-STORY-025 lands.
+AC-023-3, RE-SCOPED by DASH-STORY-027-DEV: `eraseSubject` below now calls
+`UnifiedSubjectErasureOrchestrator.request_erasure` (DASH-STORY-025/
+DSHN-70's wider fan-out, extended by DASH-STORY-027-DEV with a real
+`SubjectToItemIndex`, a Zone 8 write-ahead-marker durability boundary,
+and an honestly-disclosed Zone 1 seam) rather than calling
+`SubjectErasureCascadeService` directly -- see `erase_subject`'s own
+handler docstring for the exact, still-open scope this does NOT close
+(Zone 1, Zone 4, OAQ-10). `SubjectErasureCascadeService` itself is
+unmodified and still real; the orchestrator's own Zone 8 leg still calls
+it internally.
 
 Zone 3/5 write path (DASH-STORY-026, traces to FR-013, closes GitHub
 #23): `WriteMemoryRequest.content` now carries `predicate`/
@@ -49,7 +53,22 @@ from fastapi.responses import JSONResponse
 
 from dashanan.api import schemas as sc
 from dashanan.api import state as st
-from dashanan.api.composition import AppContext, build_app_context
+from dashanan.api.composition import (
+    AppContext,
+    PostgresPoolExhaustedError,
+    PostgresUnavailableError,
+    POOL_TIMEOUT_RETRY_AFTER_SECONDS,
+    build_app_context,
+    make_conflict_aware_entity_repository_dependency,
+    make_episodic_repository_dependency,
+    make_pooled_connection_dependency,
+    make_provenance_repository_dependency,
+    make_semantic_repository_dependency,
+    make_manifest_repository_dependency,
+    make_subject_erasure_service_dependency,
+    make_unified_subject_erasure_orchestrator_dependency,
+    make_zone8_consolidation_store_dependency,
+)
 from dashanan.api.security import (
     AuthenticatedCaller,
     TenantAuthenticationError,
@@ -58,7 +77,15 @@ from dashanan.api.security import (
     verify_bearer_token,
 )
 from dashanan.application.context_assembly_request import ContextAssemblyRequest
-from dashanan.application.conflict_aware_zone_writes import _zone3_edge_item_id
+from dashanan.application.conflict_aware_zone_writes import (
+    ConflictAwareEntityMemoryRepository,
+    ConflictAwareSemanticRepository,
+    _zone3_edge_item_id,
+)
+from dashanan.application.conflict_detection_sweep import ProvenanceRepositoryPort
+from dashanan.application.unified_subject_erasure_orchestrator import (
+    UnifiedSubjectErasureOrchestrator,
+)
 from dashanan.domain.entity_ownership_specification import (
     CandidateFact,
     GeneralFactRouting,
@@ -69,6 +96,7 @@ from dashanan.domain.exceptions import ZoneRepositoryError
 from dashanan.domain.provenance_record import SourceType
 from dashanan.domain.subject_erasure import SubjectErasureRequest
 from dashanan.domain.zone import ZoneId
+from dashanan.infrastructure import composition_root
 from dashanan.infrastructure.composition_root import (
     load_tenant_credential_signing_key_from_env,
 )
@@ -139,6 +167,30 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         jwt_signing_key=load_jwt_signing_key_from_env(),
     )
 
+    # DASH-STORY-028-DEV: per-request Postgres dependency chain, bound to
+    # this `ctx` -- mirrors `_require_scope`'s own bound-closure convention
+    # below. `get_pooled_connection` is the root; every other provider
+    # depends on it (directly or transitively), so FastAPI's per-request
+    # dependency caching means a single request that touches several zones
+    # still acquires exactly one pooled connection (AC-028-DEV-1).
+    get_pooled_connection = make_pooled_connection_dependency(ctx)
+    get_provenance_repository = make_provenance_repository_dependency(get_pooled_connection, ctx)
+    get_episodic_repository = make_episodic_repository_dependency(get_pooled_connection, ctx)
+    get_semantic_repository = make_semantic_repository_dependency(get_pooled_connection, ctx)
+    get_conflict_aware_entity_repository = make_conflict_aware_entity_repository_dependency(
+        get_pooled_connection, ctx
+    )
+    get_manifest_repository = make_manifest_repository_dependency(get_pooled_connection)
+    get_zone8_consolidation_store = make_zone8_consolidation_store_dependency(
+        get_manifest_repository, ctx
+    )
+    get_subject_erasure_service = make_subject_erasure_service_dependency(
+        get_zone8_consolidation_store, ctx
+    )
+    get_unified_subject_erasure_orchestrator = make_unified_subject_erasure_orchestrator_dependency(
+        get_pooled_connection, get_zone8_consolidation_store, ctx
+    )
+
     write_status_store = st.WriteStatusStore()
     admin_job_store = st.AdminJobStore()
     zone_config_store = st.ZoneConfigStore()
@@ -151,6 +203,36 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         version="1.0.0",
         description="FR-014 REST gateway (DASH-STORY-023). See docs/phase-1.5-api/openapi.yaml.",
     )
+
+    @app.exception_handler(PostgresUnavailableError)
+    async def _handle_postgres_unavailable(
+        _request: object, exc: PostgresUnavailableError
+    ) -> JSONResponse:
+        """Section 5.1.1: breaker-OPEN -- `POSTGRES_UNAVAILABLE`, dynamic `Retry-After`.
+
+        Distinct from `_handle_postgres_pool_exhausted` below (Section
+        5.1.1's own BLOCKER fix: never reuse `PoolTimeout`'s fixed 1-second
+        `Retry-After` or `POOL_EXHAUSTED` code for a breaker-OPEN response).
+        """
+        response = _error(
+            503, "POSTGRES_UNAVAILABLE",
+            "Postgres is currently unreachable (circuit breaker OPEN); "
+            "retry after the indicated interval",
+        )
+        response.headers["Retry-After"] = str(exc.retry_after_seconds)
+        return response
+
+    @app.exception_handler(PostgresPoolExhaustedError)
+    async def _handle_postgres_pool_exhausted(
+        _request: object, _exc: PostgresPoolExhaustedError
+    ) -> JSONResponse:
+        """Section 5: `PoolTimeout` -- `POOL_EXHAUSTED`, fixed short `Retry-After`."""
+        response = _error(
+            503, "POOL_EXHAUSTED",
+            "the Postgres connection pool is temporarily exhausted",
+        )
+        response.headers["Retry-After"] = str(POOL_TIMEOUT_RETRY_AFTER_SECONDS)
+        return response
 
     def _require_scope(scope: str) -> Callable[..., AuthenticatedCaller]:
         def _dependency(
@@ -294,15 +376,19 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
 
     @app.get("/items/{item_id}/provenance", operation_id="getItemProvenance")
     def get_item_provenance(
-        item_id: str, caller: Annotated[AuthenticatedCaller, Depends(context_read)]
+        item_id: str,
+        caller: Annotated[AuthenticatedCaller, Depends(context_read)],
+        provenance_repository: Annotated[
+            ProvenanceRepositoryPort | None, Depends(get_provenance_repository)
+        ],
     ) -> Response:
         record = _lookup_item(caller, item_id)
         if record is None:
             return _error(404, "NOT_FOUND", "item not found")
-        if not ctx.postgres_available or ctx.provenance_repository is None:
+        if provenance_repository is None:
             return JSONResponse(status_code=200, content={"item_id": item_id, "records": []})
         try:
-            records = ctx.provenance_repository.find_by_item_id(caller.tenant_id, item_id)
+            records = provenance_repository.find_by_item_id(caller.tenant_id, item_id)
         except ZoneRepositoryError as exc:
             logger.error(
                 "Zone 7 (Provenance) repository call failed",
@@ -397,7 +483,11 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         return _WIRE_TO_DOMAIN_ZONE.get(body.content.zone_hint) is ZoneId.SEMANTIC
 
     def _do_write_zone3_5(
-        caller: AuthenticatedCaller, body: sc.WriteMemoryRequest, source_type: SourceType
+        caller: AuthenticatedCaller,
+        body: sc.WriteMemoryRequest,
+        source_type: SourceType,
+        semantic_repository: ConflictAwareSemanticRepository | None,
+        conflict_aware_entity_repository: ConflictAwareEntityMemoryRepository | None,
     ) -> tuple[Response, str | None]:
         """FR-013 design Section 4.2 steps 1-6: Zone 5 / Zone 3 routing and writes.
 
@@ -417,7 +507,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
                 "provenance.retrieval_context_hash is required for a Zone 3/5 write (FR-013)",
             ), None
 
-        if not ctx.postgres_available or ctx.semantic_repository is None or ctx.conflict_aware_entity_repository is None:
+        if semantic_repository is None or conflict_aware_entity_repository is None:
             logger.error(
                 "Zone 3/5 write attempted with no live Postgres backend",
                 extra={"tenant_id": caller.tenant_id},
@@ -446,7 +536,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
             )
 
             if len(subjects) == 1:
-                ctx.conflict_aware_entity_repository.write_attribute(
+                conflict_aware_entity_repository.write_attribute(
                     caller.tenant_id,
                     subjects[0],
                     candidate_fact.predicate,
@@ -479,7 +569,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
             for edge in routing.edges:
                 item_id = _zone3_edge_item_id(edge.subject_ref, edge.predicate, edge.object_ref)
                 try:
-                    ctx.semantic_repository.insert_edge(
+                    semantic_repository.insert_edge(
                         edge,
                         provenance_id=str(uuid.uuid4()),
                         source_type=source_type,
@@ -495,7 +585,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
                     zone3_edges_failed.append(item_id)
         elif isinstance(routing, GeneralFactRouting):
             try:
-                ctx.semantic_repository.insert_general_fact(
+                semantic_repository.insert_general_fact(
                     routing.fact,
                     provenance_id=str(uuid.uuid4()),
                     source_type=source_type,
@@ -526,7 +616,13 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         status_code = 207 if zone3_edges_failed else 202
         return JSONResponse(status_code=status_code, content=receipt.model_dump(mode="json")), write_id
 
-    def _do_write(caller: AuthenticatedCaller, body: sc.WriteMemoryRequest) -> tuple[Response, str | None]:
+    def _do_write(
+        caller: AuthenticatedCaller,
+        body: sc.WriteMemoryRequest,
+        episodic_repository: composition_root.SqlEpisodicRepository | None,
+        semantic_repository: ConflictAwareSemanticRepository | None,
+        conflict_aware_entity_repository: ConflictAwareEntityMemoryRepository | None,
+    ) -> tuple[Response, str | None]:
         resolved_source_type_raw = _resolve_source_type(body)
         if resolved_source_type_raw is None:
             return _error(
@@ -535,7 +631,13 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
             ), None
 
         if _zone3_5_routing_gate_triggered(body):
-            return _do_write_zone3_5(caller, body, SourceType(resolved_source_type_raw))
+            return _do_write_zone3_5(
+                caller,
+                body,
+                SourceType(resolved_source_type_raw),
+                semantic_repository,
+                conflict_aware_entity_repository,
+            )
 
         write_id = str(uuid.uuid4())
         text = body.content.text or ""
@@ -569,7 +671,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
                 ctx.procedural_repository.commit(procedure)
                 item_id = body.content.task_signature_hash
                 source_zone = ZoneId.PROCEDURAL
-            elif zone_hint_domain is ZoneId.EPISODIC and ctx.postgres_available and ctx.episodic_repository is not None:
+            elif zone_hint_domain is ZoneId.EPISODIC and episodic_repository is not None:
                 from dashanan.domain.episode import Episode, EpisodeState
 
                 item_id = write_id
@@ -585,7 +687,7 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
                     token_count=token_count,
                     state=EpisodeState.ACTIVE,
                 )
-                ctx.episodic_repository.append(episode)
+                episodic_repository.append(episode)
                 source_zone = ZoneId.EPISODIC
             else:
                 item_id = write_id
@@ -632,8 +734,20 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         body: sc.WriteMemoryRequest,
         caller: Annotated[AuthenticatedCaller, Depends(memory_write)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+        episodic_repository: Annotated[
+            composition_root.SqlEpisodicRepository | None, Depends(get_episodic_repository)
+        ],
+        semantic_repository: Annotated[
+            ConflictAwareSemanticRepository | None, Depends(get_semantic_repository)
+        ],
+        conflict_aware_entity_repository: Annotated[
+            ConflictAwareEntityMemoryRepository | None,
+            Depends(get_conflict_aware_entity_repository),
+        ],
     ) -> Response:
-        response, _ = _do_write(caller, body)
+        response, _ = _do_write(
+            caller, body, episodic_repository, semantic_repository, conflict_aware_entity_repository
+        )
         return response
 
     @app.post("/memory/write:batch", operation_id="writeMemoryBatch")
@@ -641,10 +755,22 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
         body: sc.WriteMemoryBatchRequest,
         caller: Annotated[AuthenticatedCaller, Depends(memory_write)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+        episodic_repository: Annotated[
+            composition_root.SqlEpisodicRepository | None, Depends(get_episodic_repository)
+        ],
+        semantic_repository: Annotated[
+            ConflictAwareSemanticRepository | None, Depends(get_semantic_repository)
+        ],
+        conflict_aware_entity_repository: Annotated[
+            ConflictAwareEntityMemoryRepository | None,
+            Depends(get_conflict_aware_entity_repository),
+        ],
     ) -> Response:
         receipts = []
         for index, item in enumerate(body.items):
-            response, write_id = _do_write(caller, item)
+            response, write_id = _do_write(
+                caller, item, episodic_repository, semantic_repository, conflict_aware_entity_repository
+            )
             if write_id is not None:
                 receipts.append(sc.BatchWriteReceiptItem(index=index, status="accepted", write_id=write_id))
             else:
@@ -865,24 +991,39 @@ def create_app(app_context: AppContext | None = None) -> FastAPI:
     def erase_subject(
         tenant_id: str, subject_id: str,
         caller: Annotated[AuthenticatedCaller, Depends(admin_tenants)],
+        unified_erasure_orchestrator: Annotated[
+            UnifiedSubjectErasureOrchestrator | None,
+            Depends(get_unified_subject_erasure_orchestrator),
+        ],
     ) -> Response:
-        """AC-023-3: invokes the real, Zone-8-only `SubjectErasureCascadeService`.
+        """DASH-STORY-027-DEV, AC-027-DEV-1/3: invokes the real, wider `UnifiedSubjectErasureOrchestrator`.
 
-        Does NOT present this as HLD Section 7.4's full "all 8 zones"
-        cascade (must-not-deviate item 3) -- only Zone 8 is reached here.
+        RE-SCOPED from AC-023-3's original Zone-8-only
+        `SubjectErasureCascadeService` call: the orchestrator's own
+        Zone 8 leg still calls that exact same service internally
+        (`api.composition.make_unified_subject_erasure_orchestrator_
+        dependency`'s own docstring), so Zone 8's behaviour for THIS
+        endpoint is unchanged; `SubjectErasureCascadeService` itself, and
+        `make_subject_erasure_service_dependency`, remain untouched for
+        any other caller (must-not-deviate). Does NOT present this as
+        HLD Section 7.4's full "all 8 zones" cascade closing OAQ-10 or
+        AC-013 in full -- Zone 1 (no subject-linkable field on
+        `WorkingItem` yet) and Zone 4 (out of scope) are still not
+        reached; see `UnifiedSubjectErasureOrchestrator`'s own module
+        docstring for the exact, honestly-disclosed remaining scope.
         """
         try:
             enforce_tenant_scope_match(caller, tenant_id)
         except TenantAuthenticationError:
             return _error(403, "TENANT_SCOPE_MISMATCH", "You are not authorized to access this tenant.")
-        if ctx.subject_erasure_service is None:
+        if unified_erasure_orchestrator is None:
             return _error(
                 503, "SERVICE_DEGRADED",
-                "Zone 8 (Consolidation) is backed by SqlManifestRepository, which "
-                "requires Postgres; no live Postgres is reachable in this "
-                "deployment (see api.composition module docstring)",
+                "The DPDP erasure cascade's Zone 3/7/8 legs require Postgres; "
+                "no live Postgres is reachable in this deployment (see "
+                "api.composition module docstring)",
             )
-        accepted = ctx.subject_erasure_service.request_erasure(
+        accepted = unified_erasure_orchestrator.request_erasure(
             SubjectErasureRequest(tenant_id=tenant_id, subject_id=subject_id)
         )
         admin_job_store.record(st.AdminJobEntry(job_id=accepted.job_id, status="succeeded", progress=1.0))

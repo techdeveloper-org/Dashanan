@@ -33,6 +33,7 @@ import os
 from collections.abc import Mapping
 
 import psycopg
+from psycopg_pool import ConnectionPool
 
 from dashanan.application.conflict_aware_zone_writes import (
     ConflictAwareEntityMemoryRepository,
@@ -46,6 +47,7 @@ from dashanan.application.memory_orchestrator import MemoryOrchestrator
 from dashanan.domain.exceptions import DashananError
 from dashanan.domain.ports import Clock, EventBus, ZoneRepository
 from dashanan.domain.zone import ZoneId
+from dashanan.infrastructure.circuit_breaker import CircuitBreaker
 from dashanan.infrastructure.entity_memory_repository import EntityMemoryRepository
 from dashanan.infrastructure.settings import (
     PostgresSettings,
@@ -462,3 +464,79 @@ def build_postgres_connection(
             "detail; this error intentionally carries no connection-string "
             "or credential content."
         ) from exc
+
+
+def build_postgres_connection_pool(
+    settings: PostgresSettings | None = None,
+    env: Mapping[str, str] | None = None,
+) -> ConnectionPool:
+    """Build the one real `psycopg_pool.ConnectionPool` this host constructs at startup.
+
+    DASH-STORY-028-DEV (connection-pooling-design.md Section 3): replaces
+    `build_postgres_connection`'s single shared connection (`AR1-S3-G3`'s
+    known, flagged gap -- `psycopg.Connection` is not safe for concurrent
+    use across threads) for every Postgres-dependent zone repository/
+    service. Connects as the same `PostgresSettings.app_login_user` least-
+    privilege role `build_postgres_connection` already uses -- this function
+    changes only HOW connections are acquired (pooled vs. one-shot), never
+    WHO the host connects as (AC-024-2 unaffected).
+
+    `pool_min`/`pool_max` come from `settings.pool_min`/`settings.pool_max`
+    -- `DASHANAN_POSTGRES_POOL_MIN`/`_MAX`, defaulting to the v2.7 load-
+    test-measured `2`/`32` (connection-pooling-design.md Section 4.1).
+
+    This function is constructed ONCE, at host startup (`api.composition.
+    build_app_context`) -- never per-request. Per-request code acquires a
+    connection via `pool.connection(timeout=...)`, never by calling this
+    function again.
+
+    Args:
+        settings: The env-sourced settings to build the pool with. When
+            `None` (the default), loaded via
+            `load_postgres_settings_from_env(env)`.
+        env: Forwarded to `load_postgres_settings_from_env` when `settings`
+            is not supplied directly.
+
+    Returns:
+        An opened `psycopg_pool.ConnectionPool` (`open=True`, matching
+        `psycopg_pool`'s own recommended eager-open construction so
+        `pool_min` connections are warm before the first request, per
+        connection-pooling-design.md Section 4's `pool_min` rationale).
+
+    Raises:
+        dashanan.infrastructure.settings.SettingsConfigurationError: If
+            `settings` is not supplied and the environment does not hold a
+            complete, valid `PostgresSettings` (re-raised unchanged from
+            `load_postgres_settings_from_env`).
+    """
+    resolved = settings if settings is not None else load_postgres_settings_from_env(env)
+    return ConnectionPool(
+        conninfo=resolved.app_dsn(),
+        min_size=resolved.pool_min,
+        max_size=resolved.pool_max,
+        open=True,
+    )
+
+
+def build_postgres_circuit_breaker(clock: Clock) -> CircuitBreaker:
+    """Build the one Postgres-connection circuit breaker this host constructs at startup.
+
+    DASH-STORY-028-DEV (connection-pooling-design.md Section 5.1, closing
+    HLD.md ADR-020's documented exception): thresholds mirror HLD Section
+    8's vector-store (Qdrant) breaker exactly -- the `dashanan.
+    infrastructure.circuit_breaker.CircuitBreaker` defaults already encode
+    those thresholds (window=20, failure-rate>=50%, slow-rate>=30% at 2x
+    p99, `30s * 2^(trips-1)` capped at 300s, 5 half-open probes) -- this
+    function exists only to name the intent (one breaker per Postgres pool,
+    constructed once at startup, never per-request) and to bind it to the
+    host's own `Clock` (deterministic in tests, matching every other
+    `composition_root` builder's `clock` parameter).
+
+    Args:
+        clock: Time source for the breaker's OPEN-state backoff timing.
+
+    Returns:
+        A `CircuitBreaker` with HLD Section 8-mirrored thresholds, in the
+        `CLOSED` state.
+    """
+    return CircuitBreaker(clock=clock)
